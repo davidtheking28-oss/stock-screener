@@ -604,7 +604,9 @@ const RESULTS_CACHE_KEY  = 'sepa_scan_results_v1';
 let allResults = [], results = [], ttUniverse = {};
 let _currentUser = null;
 let watchlist  = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
-let sortKey = 'score', sortDir = -1, view = 'table', activeRow = -1;
+const _savedSort = JSON.parse(localStorage.getItem('sepa_sort')||'null');
+let sortKey = _savedSort?.sortKey||'score', sortDir = _savedSort?.sortDir??-1;
+let view = localStorage.getItem('sepa_view')||'table', activeRow = -1;
 let _galleryKey = '';
 const _ohlcCache = new Map();
 let _ohlcLd = 0; const _ohlcQ = [];
@@ -615,14 +617,20 @@ async function _ohlcDraw(el){
   try{
     let bars=_ohlcCache.get(sym);
     if(!bars){
+      try{ const sc=sessionStorage.getItem('ohlc_'+sym); if(sc) bars=JSON.parse(sc); }catch(e){}
+    }
+    if(!bars){
       const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON}});
       const j=await r.json();
       bars=Array.isArray(j.bars)?j.bars:[];
-      _ohlcCache.set(sym,bars);
+      try{ sessionStorage.setItem('ohlc_'+sym, JSON.stringify(bars)); }catch(e){}
     }
+    _ohlcCache.set(sym,bars);
     if(!bars.length){ _ohlcMsg(el,'אין נתונים'); return; }
     el.innerHTML='';
     const box=document.createElement('div'); box.className='tv-lite'; el.appendChild(box);
+    box.addEventListener('click', e=>e.stopPropagation());
+    box.addEventListener('pointerdown', e=>e.stopPropagation());
     const chart=LightweightCharts.createChart(box,{
       width:box.clientWidth||el.clientWidth, height:200,
       layout:{background:{color:'#0a1120'},textColor:'#5b6b85',fontSize:10,fontFamily:'JetBrains Mono, monospace',attributionLogo:false},
@@ -728,10 +736,11 @@ function loadResultsCache(){
     const {allResults:ar, time} = JSON.parse(raw);
     if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(RESULTS_CACHE_KEY); return; }
     allResults = ar;
-    applySectorFilter(); sortResults(); render();
+    applySectorFilter(); sortResults();
     $('resultsPanel').style.display='block';
     $('colPickerWrap').style.display='';
     buildSectorFilter();
+    setView(view);
     const d = new Date(time);
     const hh = d.getHours().toString().padStart(2,'0');
     const mm = d.getMinutes().toString().padStart(2,'0');
@@ -1004,11 +1013,13 @@ function applySectorFilter(){
 
 function buildSectorFilter(){
   const sectors=[...new Set(allResults.map(r=>r.sector))].sort();
+  const saved=localStorage.getItem('sepa_sector')||'';
   const wrap=$('sectorWrap'); if(!wrap) return;
-  wrap.innerHTML='<select id="sectorFilter" class="filter-select" onchange="applySectorFilter();sortResults();render()">'
-    +'<option value="">כל הסקטורים ('+allResults.length+')</option>'
-    +sectors.map(s=>'<option value="'+s+'">'+s+' ('+allResults.filter(r=>r.sector===s).length+')</option>').join('')
+  wrap.innerHTML='<select id="sectorFilter" class="filter-select" onchange="applySectorFilter();sortResults();render();try{localStorage.setItem(\'sepa_sector\',this.value)}catch(e){}">'
+    +'<option value="" '+(saved?'':'selected')+'>כל הסקטורים ('+allResults.length+')</option>'
+    +sectors.map(s=>'<option value="'+s+'" '+(saved===s?'selected':'')+'>'+s+' ('+allResults.filter(r=>r.sector===s).length+')</option>').join('')
     +'</select>';
+  if(saved && sectors.includes(saved)){ applySectorFilter(); sortResults(); render(); }
 }
 
 /* ════════════════════════════════════
@@ -1021,7 +1032,7 @@ const SORTS={
   rev:r=>r.rev??-1e9, roe:r=>r.roe??-1e9, nm:r=>r.nm??-1e9, range:r=>r.rangePos
 };
 function sortResults(){ const f=SORTS[sortKey]||SORTS.score; results.sort((a,b)=>(f(a)>f(b)?1:f(a)<f(b)?-1:0)*sortDir); }
-function setSort(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k;sortDir=-1;} sortResults(); render(); }
+function setSort(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k;sortDir=-1;} sortResults(); render(); try{localStorage.setItem('sepa_sort',JSON.stringify({sortKey,sortDir}));}catch(e){} }
 
 function render(){
   $('resCount').textContent='('+results.length+')';
@@ -1032,6 +1043,7 @@ function render(){
 
 function setView(v){
   view=v;
+  try{ localStorage.setItem('sepa_view', v); }catch(e){}
   ['tabTable','tabGallery','tabWatchlist'].forEach(id=>$(id)?.classList.remove('active'));
   if(v==='table')     $('tabTable')?.classList.add('active');
   if(v==='gallery')   $('tabGallery')?.classList.add('active');
@@ -1149,8 +1161,8 @@ function renderGallery(){
     const wl=watchlist.has(r.ticker);
     return '<div class="gcard" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button><div><span class="gcard-sym">'+r.ticker+'</span> <span class="gcard-price">$'+(r.close>=100?r.close.toFixed(0):r.close.toFixed(2))+'</span></div></div>'
-      +'<div class="gcard-badges"><span class="badge '+(r.rs>=80?'badge-rs-hi':'badge-rs-mid')+'">RS '+r.rs+'</span></div></div>'
-      +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
+      +'<div class="gcard-badges"><span style="font:700 13px var(--mono-data);color:'+scoreColor(r.score)+'" title="ציון SEPA '+r.score+'/100">'+r.score+'</span><span class="badge '+(r.rs>=80?'badge-rs-hi':'badge-rs-mid')+'">RS '+r.rs+'</span></div></div>'
+      +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +'<div class="gstat"><div class="gstat-lbl">ביצֹ 1Y</div><div class="gstat-val '+((r.perfY??0)>=0?'pos':'neg')+'">'+pct(r.perfY)+'</div></div>'
       +'<div class="gstat"><div class="gstat-lbl">EPS YoY</div><div class="gstat-val '+((r.eps??0)>=0?'pos':'neg')+'">'+pct(r.eps)+'</div></div>'
@@ -1190,12 +1202,17 @@ function renderWatchlist(){
 function openChart(sym, ticker, name){
   $('modalTitle').textContent=ticker; $('modalSub').textContent=name;
   const wrap=$('modalChart'); wrap.innerHTML='';
-  const cont=document.createElement('div'); cont.style.cssText='height:100%;width:100%';
-  const inner=document.createElement('div'); inner.style.height='100%'; cont.appendChild(inner);
+  const cont=document.createElement('div');
+  cont.className='tradingview-widget-container';
+  cont.style.cssText='height:100%;width:100%';
+  const inner=document.createElement('div');
+  inner.className='tradingview-widget-container__widget';
+  inner.style.cssText='height:100%;width:100%';
+  cont.appendChild(inner);
   const s=document.createElement('script'); s.async=true;
   s.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
   s.textContent=JSON.stringify({
-    symbol:sym, interval:"D", timezone:"Etc/UTC", theme:"dark", style:"0",
+    symbol:sym, interval:"D", timezone:"Etc/UTC", theme:"dark", style:"1",
     range:"6M", locale:"he_IL", autosize:true, hide_side_toolbar:false, allow_symbol_change:true,
     studies:["STD;SMA","STD;SMA","STD;SMA"],
     overrides:{"paneProperties.background":"#0a1120","paneProperties.backgroundType":"solid"},
