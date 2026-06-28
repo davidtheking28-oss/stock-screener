@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://s3.tradingview.com">
 <link rel="dns-prefetch" href="https://www.tradingview.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23091525'/%3E%3Ctext x='16' y='23' font-family='monospace' font-weight='900' font-size='20' fill='%234f83ff' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -26,8 +26,9 @@
   --amber:    oklch(78% 0.14 70);
   --text:     oklch(94% 0.018 252);
   --text2:    oklch(76% 0.04 252);
-  --text3:    oklch(60% 0.04 252);
+  --text3:    oklch(64% 0.04 252);
   --mono:     'JetBrains Mono', monospace;
+  --mono-data:'DM Mono', 'JetBrains Mono', monospace;
   --sans:     'Inter', system-ui, sans-serif;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -45,7 +46,7 @@ body {
 .topbar {
   background: var(--bg2);
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 0 oklch(64% 0.2 258 / 0.12), 0 4px 24px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 0 var(--border), 0 4px 24px rgba(0,0,0,0.3);
   padding: 0 28px;
   display: flex;
   align-items: center;
@@ -56,7 +57,7 @@ body {
   z-index: 40;
   flex-wrap: wrap;
 }
-.logo-mark { font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text); white-space: nowrap; }
+.logo-mark { font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--text); white-space: nowrap; }
 .logo-mark em { color: var(--accent); font-style: normal; }
 .topbar-sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
 .breadth-chip {
@@ -113,8 +114,11 @@ body {
 .filter-sub { font-size: 12px; color: var(--text3); }
 .filter-arrow { margin-right: auto; color: var(--text3); font-size: 11px; transition: transform 0.2s; }
 .filter-panel.open .filter-arrow { transform: rotate(180deg); }
-.filter-body { display: none; padding: 0 20px 18px; }
-.filter-panel.open .filter-body { display: block; }
+.filter-body {
+  max-height: 0; overflow: hidden; padding: 0 20px;
+  transition: max-height 0.28s cubic-bezier(0.16,1,0.3,1), padding-bottom 0.28s;
+}
+.filter-panel.open .filter-body { max-height: 700px; padding-bottom: 18px; }
 
 .presets { display: flex; gap: 7px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
 .preset-label { font-size: 11px; color: var(--text3); font-weight: 600; }
@@ -143,7 +147,7 @@ body {
 input[type=number], select {
   background: var(--bg2); border: 1px solid var(--border);
   color: var(--text); border-radius: 8px;
-  padding: 7px 9px; font: 13px var(--mono); width: 100%;
+  padding: 7px 9px; font: 13px var(--mono-data); width: 100%;
   transition: border-color 0.12s ease-out;
 }
 input[type=number]:hover, select:hover { border-color: rgba(255,255,255,0.14); }
@@ -164,7 +168,7 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: al
   background: linear-gradient(135deg, oklch(64% 0.2 258) 0%, oklch(60% 0.22 268) 100%);
   color: oklch(97% 0.01 252);
   padding: 10px 24px; min-height: 40px; border-radius: 10px;
-  font: 700 13px var(--mono); letter-spacing: 0.5px;
+  font: 700 13px var(--sans); letter-spacing: 0.3px;
   box-shadow: 0 4px 14px oklch(64% 0.2 258 / 0.3), inset 0 1px 0 oklch(100% 0 0 / 0.12);
   transition: filter 0.15s ease-out, box-shadow 0.15s ease-out, transform 0.1s;
 }
@@ -180,7 +184,7 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: al
 .btn-rescan {
   background: transparent; color: var(--text2);
   padding: 5px 12px; border-radius: 8px; min-height: 30px;
-  font: 600 12px var(--mono); letter-spacing: 0.3px;
+  font: 600 12px var(--sans); letter-spacing: 0;
   border: 1px solid var(--border);
   transition: background 0.12s, color 0.12s;
 }
@@ -220,7 +224,7 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: al
   display: flex; align-items: center; gap: 12px;
   padding: 12px 18px; border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
-  background: linear-gradient(180deg, oklch(14% 0.03 252) 0%, var(--surface) 100%);
+  background: var(--bg2);
 }
 .results-title { font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); }
 .results-count { color: var(--accent2); }
@@ -246,14 +250,14 @@ table { width: 100%; border-collapse: collapse; }
 thead th {
   position: sticky; top: 0;
   background: var(--bg2); color: var(--text3);
-  font: 600 10.5px var(--sans); text-transform: uppercase; letter-spacing: 0.8px;
+  font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: 0.5px;
   padding: 10px 11px; text-align: right; cursor: pointer; white-space: nowrap;
   border-bottom: 1px solid var(--border); user-select: none;
   transition: color 0.12s, background 0.12s;
 }
 thead th:hover { color: var(--accent2); }
 thead th.sorted { color: var(--accent); background: oklch(64% 0.2 258 / 0.06); }
-.sort-arr { font-size: 9px; opacity: 0.6; margin-right: 2px; }
+.sort-arr { font-size: 10px; opacity: 0.5; margin-right: 2px; }
 thead th.sorted .sort-arr { opacity: 1; }
 tbody td { padding: 9px 11px; border-bottom: 1px solid var(--border2); vertical-align: middle; white-space: nowrap; }
 tbody tr { cursor: pointer; transition: background 0.1s; }
@@ -262,19 +266,19 @@ tbody tr:hover .sym { color: var(--accent2); }
 tbody tr:last-child td { border-bottom: none; }
 
 /* table cells */
-.sym { font: 700 14px var(--mono); color: var(--text); cursor: copy; }
+.sym { font: 700 15px var(--mono); color: var(--text); cursor: copy; letter-spacing: 0.3px; }
 .sym:hover { color: var(--accent2); }
-.cname { font-size: 11px; color: var(--text3); margin-top: 1px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
-.mn { font: 500 13.5px var(--mono); color: var(--text2); }
+.cname { font-size: 11px; color: var(--text3); margin-top: 2px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.mn { font: 500 13px var(--mono-data); color: var(--text2); }
 .mn.hi { color: var(--text); font-weight: 600; }
 .pos { color: var(--green); } .neg { color: var(--red); }
 
 /* score ring */
 .score-ring {
-  width: 36px; height: 36px;
+  width: 44px; height: 44px;
   display: flex; align-items: center; justify-content: center;
   position: relative;
-  font: 700 11px var(--mono);
+  font: 700 12px var(--mono-data);
   flex-shrink: 0;
 }
 .score-ring svg { position: absolute; inset: 0; }
@@ -710,7 +714,7 @@ function calcScore(r){
   return Math.round(clamp(rsS+epsS+revS+hiS,0,100));
 }
 function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var(--text3)'; }
-function scoreBorder(s)  { return s>=80?'rgba(46,204,113,0.16)':s>=60?'rgba(245,185,74,0.16)':'rgba(117,137,168,0.12)'; }
+function scoreBorder(s)  { return s>=80?'rgba(46,204,113,0.28)':s>=60?'rgba(245,185,74,0.28)':'rgba(117,137,168,0.22)'; }
 
 function toggleFundFields(){
   const ff=$('fundFields'); if(!ff) return;
@@ -1011,8 +1015,8 @@ function renderTable(rows){
     const revS=Math.round(Math.min(clamp(r.rev??0,0,200)/200,1)*20);
     const hiS=Math.round(clamp((1-Math.abs(r.fromHighPct)/25),0,1)*15);
     const scTip='ציון SEPA: '+sc+'/100\nRS: '+rsS+'/40\nEPS: '+epsS+'/25\nהכנסות: '+revS+'/20\nקרבה לשיא: '+hiS+'/15';
-    const arc=((sc/100)*94.248).toFixed(1);
-    const scEl='<div class="score-ring" title="'+scTip+'"><svg viewBox="0 0 36 36" width="36" height="36" style="transform:rotate(-90deg);display:block"><circle cx="18" cy="18" r="15" fill="none" stroke="'+scoreBorder(sc)+'" stroke-width="2"/><circle cx="18" cy="18" r="15" fill="none" stroke="'+scoreColor(sc)+'" stroke-width="2.5" stroke-dasharray="'+arc+' 94.248" stroke-linecap="round"/></svg><span class="ring-num" style="color:'+scoreColor(sc)+'">'+sc+'</span></div>';
+    const arc=((sc/100)*113.097).toFixed(1);
+    const scEl='<div class="score-ring" title="'+scTip+'"><svg viewBox="0 0 44 44" width="44" height="44" style="transform:rotate(-90deg);display:block"><circle cx="22" cy="22" r="18" fill="none" stroke="'+scoreBorder(sc)+'" stroke-width="2.5"/><circle cx="22" cy="22" r="18" fill="none" stroke="'+scoreColor(sc)+'" stroke-width="3" stroke-dasharray="'+arc+' 113.097" stroke-linecap="round"/></svg><span class="ring-num" style="color:'+scoreColor(sc)+'">'+sc+'</span></div>';
 
     const rsCol=r.rs>=80?'var(--green)':r.rs>=60?'var(--amber)':'var(--text3)';
     const rsEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+r.rs+'%;background:'+rsCol+'"></div></div><span class="mn" style="color:'+rsCol+';font-weight:600">'+r.rs+'</span></div>';
