@@ -1209,23 +1209,22 @@ function renderWatchlist(){
 function openChart(sym, ticker, name){
   $('modalTitle').textContent=ticker; $('modalSub').textContent=name;
   const wrap=$('modalChart'); wrap.innerHTML='';
-  const cont=document.createElement('div');
-  cont.className='tradingview-widget-container';
-  cont.style.cssText='height:100%;width:100%';
-  const inner=document.createElement('div');
-  inner.className='tradingview-widget-container__widget';
-  inner.style.cssText='height:100%;width:100%';
-  cont.appendChild(inner);
-  const s=document.createElement('script'); s.async=true;
-  s.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-  s.textContent=JSON.stringify({
-    symbol:sym, interval:"D", timezone:"Etc/UTC", theme:"dark", style:"1",
-    range:"6M", locale:"he_IL", autosize:true, hide_side_toolbar:false, allow_symbol_change:true,
+  const config=JSON.stringify({
+    autosize:true, symbol:sym, interval:"D", timezone:"Etc/UTC",
+    theme:"dark", style:"1", range:"6M", locale:"he_IL",
+    hide_side_toolbar:false, allow_symbol_change:true,
     studies:[{id:"STD;SMA",inputs:{length:50}},{id:"STD;SMA",inputs:{length:150}},{id:"STD;SMA",inputs:{length:200}}],
     overrides:{"paneProperties.background":"#0a1120","paneProperties.backgroundType":"solid"},
     support_host:"https://www.tradingview.com"
   });
-  cont.appendChild(s); wrap.appendChild(cont);
+  const html='<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;overflow:hidden;background:#0a1120}.tradingview-widget-container,.tradingview-widget-container__widget{width:100%;height:100%}</style></head>'
+    +'<body><div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div>'
+    +'<script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js">'+config+'<\/script>'
+    +'</div></body></html>';
+  const iframe=document.createElement('iframe');
+  iframe.style.cssText='width:100%;height:100%;border:none;display:block;';
+  iframe.srcdoc=html;
+  wrap.appendChild(iframe);
   $('modal').classList.add('open');
 }
 function closeModal(){ $('modal').classList.remove('open'); $('modalChart').innerHTML=''; }
