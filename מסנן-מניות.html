@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מסנן מניות — Minervini SEPA</title>
+<link rel="preconnect" href="https://www.tradingview.com">
+<link rel="preconnect" href="https://s3.tradingview.com">
+<link rel="dns-prefetch" href="https://www.tradingview.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0c1322;
+  --bg2:      #09101e;
+  --bg3:      #101a30;
+  --surface:  #101b30;
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.04);
+  --accent:   oklch(64% 0.2 258);
+  --accent2:  oklch(73% 0.16 258);
+  --green:    oklch(72% 0.18 142);
+  --red:      oklch(62% 0.22 25);
+  --amber:    oklch(78% 0.14 70);
+  --text:     oklch(94% 0.018 252);
+  --text2:    oklch(76% 0.04 252);
+  --text3:    oklch(60% 0.04 252);
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Inter', system-ui, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ── Topbar ── */
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 oklch(64% 0.2 258 / 0.12), 0 4px 24px rgba(0,0,0,0.3);
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 54px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  flex-wrap: wrap;
+}
+.logo-mark { font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text); white-space: nowrap; }
+.logo-mark em { color: var(--accent); font-style: normal; }
+.topbar-sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+.breadth-chip {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+}
+.breadth-chip.show { display: flex; }
+.breadth-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+#statBar { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text2); flex-wrap: wrap; }
+#statBar b { color: var(--text); font-weight: 700; }
+.topbar-end { margin-right: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+#scanTime { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+
+/* ── Spinner ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block; vertical-align: middle; flex-shrink: 0;
+}
+
+/* ── Main ── */
+.main { padding: 22px 28px; max-width: 1640px; margin: 0 auto; }
+
+/* ── Filter panel ── */
+.filter-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.filter-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 20px;
+  cursor: pointer;
+  user-select: none;
+}
+.filter-header:hover { background: rgba(255,255,255,0.02); }
+.filter-title { font-size: 12px; font-weight: 700; color: var(--text2); letter-spacing: 1.2px; text-transform: uppercase; }
+.filter-sub { font-size: 12px; color: var(--text3); }
+.filter-arrow { margin-right: auto; color: var(--text3); font-size: 11px; transition: transform 0.2s; }
+.filter-panel.open .filter-arrow { transform: rotate(180deg); }
+.filter-body { display: none; padding: 0 20px 18px; }
+.filter-panel.open .filter-body { display: block; }
+
+.presets { display: flex; gap: 7px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.preset-label { font-size: 11px; color: var(--text3); font-weight: 600; }
+.preset-btn {
+  padding: 4px 13px; border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text2);
+  font: 600 12px var(--sans); cursor: pointer; transition: all 0.12s;
+}
+.preset-btn:hover { border-color: var(--accent); color: var(--accent2); }
+.preset-btn.active { background: rgba(79,131,255,0.15); border-color: var(--accent); color: var(--accent2); }
+
+.filter-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 680px) { .filter-sections { grid-template-columns: 1fr; } }
+.filter-section h3 {
+  font-size: 11px; font-weight: 600; color: var(--text3);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 11px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border2);
+}
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12px; color: var(--text2); font-weight: 500; }
+.field .hint { font-size: 11px; color: var(--text3); }
+
+input[type=number], select {
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px;
+  padding: 7px 9px; font: 13px var(--mono); width: 100%;
+  transition: border-color 0.12s ease-out;
+}
+input[type=number]:hover, select:hover { border-color: rgba(255,255,255,0.14); }
+input[type=number]:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,131,255,0.12); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#fundFields { transition: opacity 0.18s ease-out; }
+.filter-toggles { display: flex; flex-direction: column; gap: 7px; margin-top: 11px; }
+.toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; font-size: 12px; color: var(--text2); }
+.toggle input { accent-color: var(--accent); width: 13px; height: 13px; }
+
+.filter-actions { display: flex; align-items: center; gap: 14px; margin-top: 16px; border-top: 1px solid var(--border2); padding-top: 14px; }
+.note-text { font-size: 12px; color: var(--text3); line-height: 1.7; }
+
+/* ── Buttons ── */
+button { font-family: var(--sans); cursor: pointer; border: none; transition: all 0.12s; }
+.btn-scan {
+  background: linear-gradient(135deg, oklch(64% 0.2 258) 0%, oklch(60% 0.22 268) 100%);
+  color: oklch(97% 0.01 252);
+  padding: 10px 24px; min-height: 40px; border-radius: 10px;
+  font: 700 13px var(--mono); letter-spacing: 0.5px;
+  box-shadow: 0 4px 14px oklch(64% 0.2 258 / 0.3), inset 0 1px 0 oklch(100% 0 0 / 0.12);
+  transition: filter 0.15s ease-out, box-shadow 0.15s ease-out, transform 0.1s;
+}
+.btn-scan:hover:not(:disabled) { filter: brightness(1.12); box-shadow: 0 6px 20px oklch(64% 0.2 258 / 0.4); }
+.btn-scan:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 2px 8px oklch(64% 0.2 258 / 0.25); }
+.btn-scan:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent; color: var(--text2);
+  padding: 6px 13px; border-radius: 8px;
+  font: 600 12px var(--sans); border: 1px solid var(--border);
+}
+.btn-ghost:hover { background: var(--bg3); color: var(--text); }
+.btn-rescan {
+  background: transparent; color: var(--text2);
+  padding: 5px 12px; border-radius: 8px; min-height: 30px;
+  font: 600 12px var(--mono); letter-spacing: 0.3px;
+  border: 1px solid var(--border);
+  transition: background 0.12s, color 0.12s;
+}
+.btn-rescan:hover:not(:disabled) { background: var(--bg3); color: var(--text); }
+.btn-rescan:disabled { opacity: 0.4; cursor: not-allowed; }
+.filter-select {
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text2); border-radius: 8px;
+  padding: 5px 9px; font: 500 12px var(--sans); cursor: pointer;
+  transition: border-color 0.12s;
+}
+.filter-select:hover { border-color: rgba(255,255,255,0.14); }
+
+/* ── Column picker ── */
+.col-picker { position: relative; }
+.col-picker-panel {
+  position: fixed;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px; z-index: 60;
+  display: none; grid-template-columns: 1fr 1fr; gap: 8px 18px;
+  min-width: 230px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+}
+.col-picker-panel.open { display: grid; }
+.col-picker-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text2); cursor: pointer; user-select: none; white-space: nowrap; }
+.col-picker-item input { accent-color: var(--accent); flex-shrink: 0; }
+.col-picker-item:hover { color: var(--text); }
+
+/* ── Results panel ── */
+.results-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.results-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px; border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  background: linear-gradient(180deg, oklch(14% 0.03 252) 0%, var(--surface) 100%);
+}
+.results-title { font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); }
+.results-count { color: var(--accent2); }
+.results-controls { display: flex; align-items: center; gap: 8px; margin-right: auto; flex-wrap: wrap; }
+.view-tabs { display: flex; gap: 2px; background: var(--bg2); border-radius: 8px; padding: 3px; }
+.view-tab {
+  padding: 5px 12px; border-radius: 6px;
+  font: 600 12px var(--sans); color: var(--text3);
+  background: transparent; border: none; cursor: pointer; transition: all 0.12s;
+}
+.view-tab:hover { color: var(--text2); }
+.view-tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+.kbd-hint {
+  font: 500 11px var(--mono); color: var(--text3);
+  background: var(--bg2); border: 1px solid var(--border);
+  padding: 3px 8px; border-radius: 6px; cursor: default;
+  letter-spacing: 0.5px; white-space: nowrap;
+}
+
+/* ── Table ── */
+.table-wrap { overflow-x: auto; max-height: 72vh; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  position: sticky; top: 0;
+  background: var(--bg2); color: var(--text3);
+  font: 600 10.5px var(--sans); text-transform: uppercase; letter-spacing: 0.8px;
+  padding: 10px 11px; text-align: right; cursor: pointer; white-space: nowrap;
+  border-bottom: 1px solid var(--border); user-select: none;
+  transition: color 0.12s, background 0.12s;
+}
+thead th:hover { color: var(--accent2); }
+thead th.sorted { color: var(--accent); background: oklch(64% 0.2 258 / 0.06); }
+.sort-arr { font-size: 9px; opacity: 0.6; margin-right: 2px; }
+thead th.sorted .sort-arr { opacity: 1; }
+tbody td { padding: 9px 11px; border-bottom: 1px solid var(--border2); vertical-align: middle; white-space: nowrap; }
+tbody tr { cursor: pointer; transition: background 0.1s; }
+tbody tr:hover { background: oklch(64% 0.2 258 / 0.06); }
+tbody tr:hover .sym { color: var(--accent2); }
+tbody tr:last-child td { border-bottom: none; }
+
+/* table cells */
+.sym { font: 700 14px var(--mono); color: var(--text); cursor: copy; }
+.sym:hover { color: var(--accent2); }
+.cname { font-size: 11px; color: var(--text3); margin-top: 1px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.mn { font: 500 13.5px var(--mono); color: var(--text2); }
+.mn.hi { color: var(--text); font-weight: 600; }
+.pos { color: var(--green); } .neg { color: var(--red); }
+
+/* score ring */
+.score-ring {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  font: 700 11px var(--mono);
+  flex-shrink: 0;
+}
+.score-ring svg { position: absolute; inset: 0; }
+.ring-num { position: relative; z-index: 1; line-height: 1; }
+
+/* mini bars */
+.mini-bar-wrap { display: flex; align-items: center; gap: 6px; }
+.mini-bar { width: 52px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.07); overflow: hidden; flex-shrink: 0; }
+.mini-bar-fill { height: 100%; border-radius: 2px; }
+.range-track { width: 52px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.07); position: relative; flex-shrink: 0; }
+.range-dot { position: absolute; top: -3px; width: 10px; height: 10px; border-radius: 50%; transform: translateX(-50%); border: 2px solid var(--bg2); }
+
+.sector-tag { font-size: 11px; color: var(--text3); background: rgba(255,255,255,0.04); border: 1px solid var(--border); padding: 2px 7px; border-radius: 4px; }
+
+.star-btn { background: none; border: none; cursor: pointer; font-size: 15px; padding: 2px 4px; border-radius: 4px; transition: transform 0.1s; }
+.star-btn:hover { opacity: 0.7; }
+.star-btn.on { color: var(--amber); }
+.star-btn.off { color: var(--text3); }
+
+/* ── Gallery ── */
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 12px; padding: 14px; }
+.gcard { background: var(--bg3); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color 0.18s ease-out, transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s ease-out; }
+.gcard:hover { border-color: oklch(64% 0.2 258 / 0.45); transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.4), 0 0 0 1px oklch(64% 0.2 258 / 0.08); }
+.gcard:active { transform: translateY(-1px); }
+.gcard-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px 8px; }
+.gcard-left { display: flex; align-items: center; gap: 7px; }
+.gcard-sym { font: 700 14px var(--mono); color: var(--text); }
+.gcard-price { font: 500 12px var(--mono); color: var(--text3); }
+.gcard-badges { display: flex; gap: 5px; }
+.badge { padding: 2px 7px; border-radius: 5px; font: 700 11px var(--mono); }
+.badge-rs-hi  { background: rgba(46,204,113,0.14); color: var(--green); }
+.badge-rs-mid { background: rgba(245,185,74,0.14); color: var(--amber); }
+.gcard-chart { height: 200px; background: #0a1120; position: relative; overflow: hidden; }
+.gcard-chart iframe { width: calc(100% + 52px); height: 200px; margin-top: 0; margin-left: -52px; display: block; border: none; }
+.gcard-stats { display: grid; grid-template-columns: repeat(3,1fr); border-top: 1px solid var(--border2); }
+.gstat { padding: 7px 10px; text-align: center; border-left: 1px solid var(--border2); }
+.gstat:last-child { border-left: none; }
+.gstat-lbl { font-size: 10px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.gstat-val { font: 600 12px var(--mono); margin-top: 2px; }
+
+/* ── Modal ── */
+@keyframes modalBackdrop { from { opacity:0; } to { opacity:1; } }
+@keyframes modalSlide { from { opacity:0; transform:scale(0.96) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
+.modal { position: fixed; inset: 0; background: rgba(3,8,18,0.88); backdrop-filter: blur(6px); display: none; place-items: center; z-index: 100; padding: 20px; }
+.modal.open { display: grid; animation: modalBackdrop 0.2s ease-out; }
+.modal.open .modal-box { animation: modalSlide 0.22s cubic-bezier(0.16,1,0.3,1); }
+.modal-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 18px; width: min(1200px,96vw); height: min(82vh,820px); display: flex; flex-direction: column; overflow: hidden; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.modal-ticker { font: 700 16px var(--mono); color: var(--text); }
+.modal-name { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.modal-close { width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text2); font-size: 16px; display: grid; place-items: center; }
+.modal-close:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+#modalChart { flex: 1; min-height: 0; }
+
+/* ── Empty ── */
+.empty { padding: 60px 24px; text-align: center; color: var(--text3); }
+.empty-icon { width: 44px; height: 44px; margin: 0 auto 14px; opacity: 0.35; }
+.empty-msg { font-size: 14px; color: var(--text2); margin-bottom: 5px; font-weight: 500; }
+.empty-hint { font-size: 12px; }
+
+/* ── Toast ── */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(14px); background: var(--surface); border: 1px solid rgba(255,255,255,0.1); color: var(--text); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity 0.2s ease-out, transform 0.2s cubic-bezier(0.16,1,0.3,1); z-index: 200; pointer-events: none; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="logo-mark">SEPA<em>.</em>screen</div>
+  <div class="topbar-sep"></div>
+  <div class="breadth-chip" id="breadthChip">
+    <span class="breadth-dot" id="breadthDot"></span>
+    <span id="breadthLabel"></span>
+  </div>
+  <div id="statBar"><span style="color:var(--text3)">8 תנאי Trend Template · RS Rating · EPS · הכנסות · ROE</span></div>
+  <div class="topbar-end">
+    <span id="scanTime"></span>
+    <button class="btn-rescan" id="scanBtn" onclick="scan()" style="display:none">&#8635; סרוק שנית</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Filter -->
+  <div class="filter-panel open" id="filterPanel">
+    <div class="filter-header" onclick="document.getElementById('filterPanel').classList.toggle('open')">
+      <span class="filter-title">קריטריוני סינון</span>
+      <span class="filter-sub" id="filterSub">Trend Template + SEPA</span>
+      <span class="filter-arrow">&#9660;</span>
+    </div>
+    <div class="filter-body">
+      <div class="presets">
+        <span class="preset-label">פריסט:</span>
+        <button class="preset-btn active" onclick="applyPreset('classic',this)">קלאסי Minervini</button>
+        <button class="preset-btn" onclick="applyPreset('aggressive',this)">אגרסיבי</button>
+        <button class="preset-btn" onclick="applyPreset('conservative',this)">שמרני</button>
+      </div>
+      <div class="filter-sections">
+        <div class="filter-section">
+          <h3>טכני — Trend Template</h3>
+          <div class="fields">
+            <div class="field"><label>RS Rating מינ&#8217;</label><input type="number" id="rsMin" value="70" min="1" max="99"><span class="hint">ביצוע יחסי (0-99)</span></div>
+            <div class="field"><label>מהשיא (%) מקס&#8217;</label><input type="number" id="fromHigh" value="25" min="0" max="100"><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
+            <div class="field"><label>מעל השפל (%) מינ&#8217;</label><input type="number" id="fromLow" value="25" min="0" max="500"><span class="hint">% מעל שפל 52ש&#8217;</span></div>
+            <div class="field"><label>מחיר מינ&#8217; ($)</label><input type="number" id="priceMin" value="10" min="0"></div>
+            <div class="field"><label>שווי שוק מינ&#8217; ($M)</label><input type="number" id="mcMin" value="1000" min="0" step="100"></div>
+          </div>
+        </div>
+        <div class="filter-section">
+          <h3>פונדמנטלי</h3>
+          <div class="fields" id="fundFields">
+            <div class="field"><label>EPS YoY מינ&#8217; (%)</label><input type="number" id="epsMin" value="25"><span class="hint">רבעון מול שנה קודמת</span></div>
+            <div class="field"><label>הכנסות YoY מינ&#8217; (%)</label><input type="number" id="revMin" value="20"></div>
+            <div class="field"><label>ROE מינ&#8217; (%)</label><input type="number" id="roeMin" value="15"></div>
+          </div>
+          <div class="filter-toggles">
+            <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
+            <label class="toggle"><input type="checkbox" id="requireProfit" checked> שולי רווח חיוביים</label>
+          </div>
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn-scan" id="scanBtnPanel" onclick="scan()">סרוק את השוק</button>
+        <div class="note-text">MA200 במגמה מוערך דרך מבנה MA50&gt;MA150&gt;MA200 · נתונים מ-TradingView בזמן אמת</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-panel" id="resultsPanel" style="display:none">
+    <div class="results-header">
+      <div class="results-title">תוצאות <span class="results-count" id="resCount"></span></div>
+      <div id="sectorWrap"></div>
+      <div class="results-controls">
+        <div class="view-tabs">
+          <button class="view-tab active" id="tabTable" onclick="setView('table')">טבלה</button>
+          <button class="view-tab" id="tabGallery" onclick="setView('gallery')">גרפים</button>
+          <button class="view-tab" id="tabWatchlist" onclick="setView('watchlist')">&#9733; מעקב</button>
+        </div>
+        <div class="col-picker" id="colPickerWrap" style="display:none">
+          <button class="btn-ghost" onclick="toggleColPicker(event)" title="בחר עמודות">עמודות &#8862;</button>
+          <div class="col-picker-panel" id="colPickerPanel"></div>
+        </div>
+        <button class="btn-ghost" onclick="exportCSV()">ייצוא CSV</button>
+        <span class="kbd-hint" id="kbdHint" title="ניווט מקלדת: j/k לזוז · Enter לפתוח גרף · Esc לסגור">j/k &#8629;</span>
+      </div>
+    </div>
+    <div id="tableView" class="table-wrap"></div>
+    <div id="galleryView" class="gallery" style="display:none"></div>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div><div class="modal-ticker" id="modalTitle"></div><div class="modal-name" id="modalSub"></div></div>
+      <button class="modal-close" onclick="closeModal()">&#10005;</button>
+    </div>
+    <div id="modalChart"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════
+   CONSTANTS
+════════════════════════════════════ */
+const COLUMNS = [
+  "name","description","close","SMA50","SMA150","SMA200",
+  "price_52_week_high","price_52_week_low","Perf.Y",
+  "earnings_per_share_diluted_yoy_growth_fq",
+  "total_revenue_yoy_growth_fq","return_on_equity_fq",
+  "net_margin","sector","market_cap_basic","volume",
+  "exchange","average_volume_10d_calc"
+];
+const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
+
+const PRESETS = {
+  classic:      {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:1000,epsMin:25,revMin:20,roeMin:15},
+  aggressive:   {rsMin:80,fromHigh:15,fromLow:30,priceMin:15,mcMin:2000,epsMin:40,revMin:30,roeMin:20},
+  conservative: {rsMin:60,fromHigh:35,fromLow:15,priceMin:5, mcMin:500, epsMin:10,revMin:10,roeMin:8},
+};
+
+const COL_DEFS = [
+  {key:'price',  label:'מחיר',       defaultOn:true},
+  {key:'score',  label:'ציון SEPA',  defaultOn:true},
+  {key:'rs',     label:'RS',         defaultOn:true},
+  {key:'perfY',  label:'ביצʹ 1Y',  defaultOn:true},
+  {key:'eps',    label:'EPS YoY',    defaultOn:true},
+  {key:'rev',    label:'הכנסות YoY', defaultOn:true},
+  {key:'range',  label:'טווח 52שʹ', defaultOn:false},
+  {key:'roe',    label:'ROE %',      defaultOn:false},
+  {key:'nm',     label:'מרווח נקי',  defaultOn:false},
+  {key:'vol',    label:'נפח',        defaultOn:false},
+  {key:'mc',     label:'שווי שוק',   defaultOn:false},
+  {key:'sector', label:'סקטור',      defaultOn:false},
+];
+
+const UNIVERSE_CACHE_KEY = 'sepa_universe_v1';
+
+/* ════════════════════════════════════
+   STATE
+════════════════════════════════════ */
+let allResults = [], results = [], ttUniverse = {};
+let watchlist  = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
+let sortKey = 'score', sortDir = -1, view = 'table', activeRow = -1;
+let _galleryKey = '';
+let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
+
+/* ════════════════════════════════════
+   UTILS
+════════════════════════════════════ */
+const $   = id => document.getElementById(id);
+const num = id => parseFloat($(id)?.value ?? '0');
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+const pct = v => v==null ? '—' : v.toFixed(1)+'%';
+const fmtB = v => {
+  if(v==null) return '—';
+  if(v>=1e12) return (v/1e12).toFixed(2)+'T';
+  if(v>=1e9)  return (v/1e9).toFixed(1)+'B';
+  if(v>=1e6)  return (v/1e6).toFixed(0)+'M';
+  return v.toFixed(0);
+};
+const fmtVol = v => {
+  if(v==null) return '—';
+  if(v>=1e6)  return (v/1e6).toFixed(1)+'M';
+  if(v>=1e3)  return (v/1e3).toFixed(0)+'K';
+  return v.toString();
+};
+const col = (key, html) => colVis[key] ? html : '';
+function esc(s){ return (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function toast(msg, dur=2600){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), dur); }
+function saveWL(){ localStorage.setItem('sepa_wl', JSON.stringify([...watchlist])); }
+
+function toggleWL(e, ticker){
+  e.stopPropagation();
+  watchlist.has(ticker) ? watchlist.delete(ticker) : watchlist.add(ticker);
+  saveWL(); render();
+}
+function copyTicker(e, ticker){
+  e.stopPropagation();
+  navigator.clipboard?.writeText(ticker).then(()=>toast(ticker+' הועתק ✓'));
+}
+
+/* ════════════════════════════════════
+   UNIVERSE CACHE
+════════════════════════════════════ */
+function saveUniverseCache(){
+  try {
+    localStorage.setItem(UNIVERSE_CACHE_KEY, JSON.stringify({data:ttUniverse, time:Date.now()}));
+  } catch(e) {}
+}
+
+function loadUniverseCache(){
+  try {
+    const raw = localStorage.getItem(UNIVERSE_CACHE_KEY);
+    if(!raw) return;
+    const {data, time} = JSON.parse(raw);
+    if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(UNIVERSE_CACHE_KEY); return; }
+    ttUniverse = data;
+    const d = new Date(time);
+    const hh = d.getHours().toString().padStart(2,'0');
+    const mm = d.getMinutes().toString().padStart(2,'0');
+    const isToday = d.toDateString() === new Date().toDateString();
+    $('scanTime').textContent = isToday ? hh+':'+mm+' (מאוחסן)' : 'אמש '+hh+':'+mm;
+    const rb=$('scanBtn'); if(rb) rb.style.display='';
+    toast('נטענו נתוני ★ מעקב מסריקה קודמת', 3200);
+  } catch(e) {}
+}
+
+/* ════════════════════════════════════
+   COLUMN PICKER
+════════════════════════════════════ */
+function buildColPicker(){
+  const panel=$('colPickerPanel'); if(!panel) return;
+  panel.innerHTML = COL_DEFS.map(c=>
+    '<label class="col-picker-item"><input type="checkbox" '+(colVis[c.key]?'checked':'')+' onchange="setColVis(\''+c.key+'\',this.checked)"> '+c.label+'</label>'
+  ).join('');
+}
+
+function toggleColPicker(e){
+  e.stopPropagation();
+  const panel=$('colPickerPanel'); if(!panel) return;
+  if(!panel.innerHTML) buildColPicker();
+  if(panel.classList.contains('open')){ panel.classList.remove('open'); return; }
+  const rect=e.currentTarget.getBoundingClientRect();
+  panel.style.top=(rect.bottom+6)+'px';
+  panel.style.left=rect.left+'px';
+  panel.classList.add('open');
+}
+
+function setColVis(key, on){
+  colVis[key]=on;
+  localStorage.setItem('sepa_colvis', JSON.stringify(colVis));
+  if(view==='table') renderTable();
+}
+
+document.addEventListener('click', e=>{
+  const wrap=$('colPickerWrap');
+  if(wrap && !wrap.contains(e.target)) $('colPickerPanel')?.classList.remove('open');
+});
+
+/* ════════════════════════════════════
+   SEPA SCORE  (0-100)
+════════════════════════════════════ */
+function calcScore(r){
+  const rsS  = clamp(r.rs,0,99)/99*40;
+  const epsS = Math.min(clamp(r.eps??0,0,300)/300,1)*25;
+  const revS = Math.min(clamp(r.rev??0,0,200)/200,1)*20;
+  const hiS  = clamp((1-Math.abs(r.fromHighPct)/25),0,1)*15;
+  return Math.round(clamp(rsS+epsS+revS+hiS,0,100));
+}
+function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var(--text3)'; }
+function scoreBorder(s)  { return s>=80?'rgba(46,204,113,0.16)':s>=60?'rgba(245,185,74,0.16)':'rgba(117,137,168,0.12)'; }
+
+function toggleFundFields(){
+  const ff=$('fundFields'); if(!ff) return;
+  const on=$('useFund').checked;
+  ff.style.opacity=on?'':'0.35';
+  ff.style.pointerEvents=on?'':'none';
+}
+
+function validateInputs(){
+  const rsV=num('rsMin'), fhV=num('fromHigh'), flV=num('fromLow'), pV=num('priceMin'), mcV=num('mcMin');
+  if(rsV<1||rsV>99){ toast('RS מינימום חייב להיות 1–99',3200); return false; }
+  if(fhV<0||fhV>100){ toast('מהשיא חייב להיות 0–100%',3200); return false; }
+  if(flV<0||flV>500){ toast('מעל השפל חייב להיות 0–500%',3200); return false; }
+  if(pV<0){ toast('מחיר מינימום לא יכול להיות שלילי',3200); return false; }
+  if(mcV<0){ toast('שווי שוק מינימום לא יכול להיות שלילי',3200); return false; }
+  return true;
+}
+
+/* ════════════════════════════════════
+   PRESETS
+════════════════════════════════════ */
+const PRESET_NAMES = {classic:'קלאסי Minervini',aggressive:'אגרסיבי',conservative:'שמרני'};
+function applyPreset(key, btn){
+  const p=PRESETS[key]; if(!p) return;
+  Object.entries(p).forEach(([k,v])=>{ const el=$(k); if(el) el.value=v; });
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+PRESET_NAMES[key];
+}
+
+/* ════════════════════════════════════
+   SCAN
+════════════════════════════════════ */
+function _setScanLoading(on){
+  const panel=$('scanBtnPanel'); if(panel){panel.disabled=on;panel.textContent=on?'סורק...':'סרוק את השוק';}
+  const top=$('scanBtn'); if(top) top.disabled=on;
+}
+
+async function scan(){
+  if(!validateInputs()) return;
+  _setScanLoading(true);
+  $('statBar').innerHTML='<span class="spinner"></span> מושך נתונים מ-TradingView...';
+  try{
+    const universe = await fetchUniverse();
+    $('statBar').innerHTML='<span class="spinner"></span> מחשב RS Rating ומסנן...';
+    const rsMap = computeRS(universe);
+
+    const up = universe.filter(r=>{
+      const d=r.d,c=d[C.close],s50=d[C.SMA50],s150=d[C.SMA150],s200=d[C.SMA200];
+      return c&&s50&&s150&&s200&&c>s150&&c>s200&&s150>s200&&s50>s150&&c>s50;
+    }).length;
+    const bPct = Math.round(up/universe.length*100);
+    const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--amber)':'var(--red)';
+    $('breadthDot').style.background = bCol;
+    $('breadthLabel').style.color    = bCol;
+    $('breadthLabel').textContent    = bPct+'% במגמת עלייה';
+    $('breadthChip').classList.add('show');
+
+    allResults = applyFilters(universe, rsMap);
+    allResults.forEach(r=>r.score=calcScore(r));
+    ttUniverse = {};
+    applyFilters(universe, rsMap, {skipFund:true}).forEach(r=>{ r.score=calcScore(r); ttUniverse[r.ticker]=r; });
+    saveUniverseCache();
+
+    applySectorFilter(); sortResults(); render();
+    renderGallery();  // preload gallery charts in background so they're ready before the tab is opened
+    $('resultsPanel').style.display='block';
+    $('colPickerWrap').style.display='';
+    buildSectorFilter();
+
+    const now=new Date();
+    $('scanTime').textContent='עודכן '+now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+
+    const sparseMsg = bPct<35 && allResults.length<20
+      ? ' \xb7 <span style="color:var(--amber);font-weight:500">שוק חלש — מעט הזדמנויות SEPA</span>'
+      : '';
+    $('statBar').innerHTML='<b>'+results.length+'</b> מניות עברו \xb7 מתוך <b>'+universe.length.toLocaleString()+'</b> שנסרקו'+sparseMsg;
+    toast('נמצאו '+results.length+' מניות');
+    const rb=$('scanBtn'); if(rb) rb.style.display='';
+  }catch(e){
+    console.error(e);
+    $('statBar').innerHTML='<span style="color:var(--red)">שגיאה: '+e.message+'</span> <button onclick="scan()" style="background:transparent;border:1px solid var(--border);color:var(--text2);padding:3px 10px;border-radius:6px;font:600 11px var(--mono);cursor:pointer;margin-right:8px">↻ נסה שנית</button>';
+  }finally{
+    _setScanLoading(false);
+  }
+}
+
+/* ════════════════════════════════════
+   FETCH + RS
+════════════════════════════════════ */
+async function fetchUniverse(){
+  const body={
+    columns:COLUMNS,
+    filter:[
+      {left:"type",operation:"equal",right:"stock"},
+      {left:"is_primary",operation:"equal",right:true},
+      {left:"close",operation:"egreater",right:2},
+      {left:"market_cap_basic",operation:"egreater",right:200000000}
+    ],
+    markets:["america"],
+    sort:{sortBy:"market_cap_basic",sortOrder:"desc"},
+    range:[0,8000]
+  };
+  const res=await fetch('https://scanner.tradingview.com/america/scan?label-product=screener-stock',
+    {method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body)});
+  if(!res.ok) throw new Error('TradingView '+res.status);
+  return (await res.json()).data||[];
+}
+
+function computeRS(universe){
+  const valid=universe.filter(r=>r.d[C['Perf.Y']]!=null).map(r=>({s:r.s,p:r.d[C['Perf.Y']]})).sort((a,b)=>a.p-b.p);
+  const n=valid.length; const map={};
+  valid.forEach((row,i)=>{ map[row.s]=Math.max(1,Math.min(99,Math.round((i/(n-1))*98)+1)); });
+  return map;
+}
+
+/* ════════════════════════════════════
+   FILTER
+════════════════════════════════════ */
+function applyFilters(universe, rsMap, opts={}){
+  const rsMin=num('rsMin'), fhPct=num('fromHigh')/100, flPct=num('fromLow')/100;
+  const mcMin=num('mcMin')*1e6, priceMin=num('priceMin');
+  const useFund=opts.skipFund?false:$('useFund').checked, reqProfit=opts.skipFund?false:$('requireProfit').checked;
+  const epsMin=num('epsMin'), revMin=num('revMin'), roeMin=num('roeMin');
+  const out=[];
+
+  for(const r of universe){
+    const d=r.d;
+    const close=d[C.close],s50=d[C.SMA50],s150=d[C.SMA150],s200=d[C.SMA200];
+    const hi=d[C.price_52_week_high],lo=d[C.price_52_week_low],mc=d[C.market_cap_basic];
+    if([close,s50,s150,s200,hi,lo].some(v=>v==null)) continue;
+    if(close<priceMin||mc<mcMin) continue;
+    const rs=rsMap[r.s]??0;
+    const t1=close>s150&&close>s200, t2=s150>s200, t3=s50>s150&&s50>s200;
+    const t5=close>s50, t6=close>=lo*(1+flPct), t7=close>=hi*(1-fhPct), t8=rs>=rsMin;
+    if(![t1,t2,t3,t5,t6,t7,t8].every(Boolean)) continue;
+    const eps=d[C.earnings_per_share_diluted_yoy_growth_fq],
+          rev=d[C.total_revenue_yoy_growth_fq],
+          roe=d[C.return_on_equity_fq], nm=d[C.net_margin];
+    if(useFund){ if(eps==null||eps<epsMin||rev==null||rev<revMin||roe==null||roe<roeMin) continue; }
+    if(reqProfit&&(nm==null||nm<=0)) continue;
+    out.push({
+      sym:r.s, ticker:d[C.name], name:d[C.description]||'', exch:d[C.exchange],
+      close, rs, sector:d[C.sector]||'—', mc,
+      vol:d[C.volume], avgVol:d[C.average_volume_10d_calc],
+      fromHighPct:(close/hi-1)*100, fromLowPct:(close/lo-1)*100,
+      rangePos:(close-lo)/(hi-lo), perfY:d[C['Perf.Y']],
+      eps, rev, roe, nm, score:0, checks:{t1,t2,t3,t5,t6,t7,t8}
+    });
+  }
+  return out;
+}
+
+function applySectorFilter(){
+  const v=$('sectorFilter')?.value||'';
+  results = v ? allResults.filter(r=>r.sector===v) : [...allResults];
+}
+
+function buildSectorFilter(){
+  const sectors=[...new Set(allResults.map(r=>r.sector))].sort();
+  const wrap=$('sectorWrap'); if(!wrap) return;
+  wrap.innerHTML='<select id="sectorFilter" class="filter-select" onchange="applySectorFilter();sortResults();render()">'
+    +'<option value="">כל הסקטורים ('+allResults.length+')</option>'
+    +sectors.map(s=>'<option>'+s+' ('+allResults.filter(r=>r.sector===s).length+')</option>').join('')
+    +'</select>';
+}
+
+/* ════════════════════════════════════
+   SORT & VIEW
+════════════════════════════════════ */
+const SORTS={
+  ticker:r=>r.ticker, close:r=>r.close, rs:r=>r.rs, score:r=>r.score,
+  mc:r=>r.mc, vol:r=>r.vol??0, fromHigh:r=>r.fromHighPct,
+  perfY:r=>r.perfY??-1e9, eps:r=>r.eps??-1e9,
+  rev:r=>r.rev??-1e9, roe:r=>r.roe??-1e9, nm:r=>r.nm??-1e9, range:r=>r.rangePos
+};
+function sortResults(){ const f=SORTS[sortKey]||SORTS.score; results.sort((a,b)=>(f(a)>f(b)?1:f(a)<f(b)?-1:0)*sortDir); }
+function setSort(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k;sortDir=-1;} sortResults(); render(); }
+
+function render(){
+  $('resCount').textContent='('+results.length+')';
+  if(view==='table')       renderTable();
+  else if(view==='gallery') renderGallery();
+  else                      renderWatchlist();
+}
+
+function setView(v){
+  view=v;
+  ['tabTable','tabGallery','tabWatchlist'].forEach(id=>$(id)?.classList.remove('active'));
+  if(v==='table')     $('tabTable')?.classList.add('active');
+  if(v==='gallery')   $('tabGallery')?.classList.add('active');
+  if(v==='watchlist') $('tabWatchlist')?.classList.add('active');
+  $('tableView').style.display  =(v==='table'||v==='watchlist')?'block':'none';
+  $('galleryView').style.display= v==='gallery'?'grid':'none';
+  const kh=$('kbdHint'); if(kh) kh.style.display=(v==='gallery')?'none':'';
+  const cpw=$('colPickerWrap'); if(cpw) cpw.style.display=(v==='gallery')?'none':(allResults.length?'':'none');
+  if(v==='watchlist' && watchlist.size>0) $('resultsPanel').style.display='block';
+  render();
+}
+
+/* ════════════════════════════════════
+   TABLE
+════════════════════════════════════ */
+function arr(k){
+  const a=sortDir<0?'↓':'↑';
+  return sortKey===k ? '<span class="sort-arr">'+a+'</span>' : '<span class="sort-arr" style="opacity:0.3">↕</span>';
+}
+function th(label,key,tip){
+  const t=tip?' title="'+tip+'"':'';
+  return '<th class="'+(sortKey===key?'sorted':'')+'" onclick="setSort(\''+key+'\')\"'+t+'>'+label+' '+arr(key)+'</th>';
+}
+
+function renderTable(rows){
+  if(rows===undefined) rows=results;
+  const tv=$('tableView');
+  if(!rows.length){
+    const hint = allResults.length>0
+      ? 'הסקטור הנוכחי ריק — נסה "כל הסקטורים"'
+      : 'נסה פריסט שמרני, הורד RS מינימום או הסר פילטרים פונדמנטליים';
+    tv.innerHTML=emptyHtml('אין תוצאות',hint);
+    return;
+  }
+
+  const head='<tr>'
+    +'<th style="width:30px"></th>'
+    +th('מניה','ticker')
+    +(colVis.price ? th('מחיר','close','מחיר סגירה אחרון') : '')
+    +(colVis.score ? th('ציון SEPA','score','ציון מורכב 0–100: RS (40%) + EPS (25%) + הכנסות (20%) + קרבה לשיא (15%)') : '')
+    +(colVis.rs    ? th('RS','rs','דירוג יחסי 1–99') : '')
+    +(colVis.perfY ? th('ביצֹ 1Y','perfY','שינוי מחיר ב-12 חודשים האחרונים') : '')
+    +(colVis.eps   ? th('EPS YoY','eps','צמיחת רווח למניה שנה/שנה') : '')
+    +(colVis.rev   ? th('הכנסות YoY','rev','צמיחת הכנסות שנה/שנה') : '')
+    +(colVis.range ? th('טווח 52שֹ','range','מיקום המחיר בין השפל לשיא') : '')
+    +(colVis.roe   ? th('ROE %','roe','תשואה על ההון') : '')
+    +(colVis.nm    ? th('מרווח נקי','nm','Net Margin') : '')
+    +(colVis.vol   ? th('נפח','vol','נפח מסחר יומי') : '')
+    +(colVis.mc    ? th('שווי שוק','mc','שווי שוק בדולרים') : '')
+    +(colVis.sector? '<th>סקטור</th>' : '')
+    +'</tr>';
+
+  const bodyRows=rows.map(r=>{
+    const wl=watchlist.has(r.ticker), sc=r.score;
+
+    const rsS=Math.round(clamp(r.rs,0,99)/99*40);
+    const epsS=Math.round(Math.min(clamp(r.eps??0,0,300)/300,1)*25);
+    const revS=Math.round(Math.min(clamp(r.rev??0,0,200)/200,1)*20);
+    const hiS=Math.round(clamp((1-Math.abs(r.fromHighPct)/25),0,1)*15);
+    const scTip='ציון SEPA: '+sc+'/100\nRS: '+rsS+'/40\nEPS: '+epsS+'/25\nהכנסות: '+revS+'/20\nקרבה לשיא: '+hiS+'/15';
+    const arc=((sc/100)*94.248).toFixed(1);
+    const scEl='<div class="score-ring" title="'+scTip+'"><svg viewBox="0 0 36 36" width="36" height="36" style="transform:rotate(-90deg);display:block"><circle cx="18" cy="18" r="15" fill="none" stroke="'+scoreBorder(sc)+'" stroke-width="2"/><circle cx="18" cy="18" r="15" fill="none" stroke="'+scoreColor(sc)+'" stroke-width="2.5" stroke-dasharray="'+arc+' 94.248" stroke-linecap="round"/></svg><span class="ring-num" style="color:'+scoreColor(sc)+'">'+sc+'</span></div>';
+
+    const rsCol=r.rs>=80?'var(--green)':r.rs>=60?'var(--amber)':'var(--text3)';
+    const rsEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+r.rs+'%;background:'+rsCol+'"></div></div><span class="mn" style="color:'+rsCol+';font-weight:600">'+r.rs+'</span></div>';
+
+    const rPos=clamp(r.rangePos*100,2,98);
+    const rCol=r.rangePos>0.7?'var(--green)':r.rangePos>0.4?'var(--amber)':'var(--red)';
+    const rngEl='<div class="mini-bar-wrap"><div class="range-track"><div class="range-dot" style="left:'+rPos+'%;background:'+rCol+'"></div></div><span class="mn" style="color:'+rCol+'">'+(r.rangePos*100).toFixed(0)+'%</span></div>';
+
+    const vr=r.vol&&r.avgVol?r.vol/r.avgVol:null;
+    const vCol=vr==null?'var(--text3)':vr>=1.5?'var(--green)':vr<0.7?'var(--red)':'var(--text2)';
+    const volEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+Math.min((vr??0)*50,100)+'%;background:'+vCol+'"></div></div><span class="mn" style="color:'+vCol+'">'+fmtVol(r.vol)+'</span></div>';
+
+    const priceStr=r.close>=100?r.close.toFixed(0):r.close.toFixed(2);
+    return '<tr onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
+      +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button></td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+r.ticker+'</div><div class="cname">'+esc(r.name)+'</div></td>'
+      +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
+      +col('score',  '<td>'+scEl+'</td>')
+      +col('rs',     '<td>'+rsEl+'</td>')
+      +col('perfY',  '<td><span class="mn '+((r.perfY??0)>=0?'pos':'neg')+'">'+pct(r.perfY)+'</span></td>')
+      +col('eps',    '<td><span class="mn '+((r.eps??0)>=0?'pos':'neg')+'">'+pct(r.eps)+'</span></td>')
+      +col('rev',    '<td><span class="mn '+((r.rev??0)>=0?'pos':'neg')+'">'+pct(r.rev)+'</span></td>')
+      +col('range',  '<td>'+rngEl+'</td>')
+      +col('roe',    '<td><span class="mn">'+pct(r.roe)+'</span></td>')
+      +col('nm',     '<td><span class="mn '+((r.nm??0)>=0?'pos':'neg')+'">'+pct(r.nm)+'</span></td>')
+      +col('vol',    '<td>'+volEl+'</td>')
+      +col('mc',     '<td><span class="mn">'+fmtB(r.mc)+'</span></td>')
+      +col('sector', '<td><span class="sector-tag">'+r.sector.split(' ').slice(0,2).join(' ')+'</span></td>')
+      +'</tr>';
+  }).join('');
+
+  tv.innerHTML='<table><thead>'+head+'</thead><tbody>'+bodyRows+'</tbody></table>';
+}
+
+/* ════════════════════════════════════
+   GALLERY
+════════════════════════════════════ */
+function renderGallery(){
+  const g=$('galleryView');
+  if(!results.length){ g.innerHTML=emptyHtml('אין תוצאות'); _galleryKey=''; return; }
+  const _key=results.map(r=>r.sym).join(',');
+  if(_key===_galleryKey && g.querySelector('.gcard')){
+    g.querySelectorAll('.gcard .star-btn').forEach((btn,i)=>{ const r=results[i]; if(!r) return; const on=watchlist.has(r.ticker); btn.className='star-btn '+(on?'on':'off'); btn.textContent=on?'★':'☆'; });
+    return;
+  }
+  _galleryKey=_key;
+  g.innerHTML=results.map(r=>{
+    const wl=watchlist.has(r.ticker);
+    return '<div class="gcard" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')">'
+      +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button><div><span class="gcard-sym">'+r.ticker+'</span> <span class="gcard-price">$'+(r.close>=100?r.close.toFixed(0):r.close.toFixed(2))+'</span></div></div>'
+      +'<div class="gcard-badges"><span class="badge '+(r.rs>=80?'badge-rs-hi':'badge-rs-mid')+'">RS '+r.rs+'</span></div></div>'
+      +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
+      +'<div class="gcard-stats">'
+      +'<div class="gstat"><div class="gstat-lbl">ביצֹ 1Y</div><div class="gstat-val '+((r.perfY??0)>=0?'pos':'neg')+'">'+pct(r.perfY)+'</div></div>'
+      +'<div class="gstat"><div class="gstat-lbl">EPS YoY</div><div class="gstat-val '+((r.eps??0)>=0?'pos':'neg')+'">'+pct(r.eps)+'</div></div>'
+      +'<div class="gstat"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(r.fromHighPct>=-5?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>'
+      +'</div></div>';
+  }).join('');
+
+  let _tvLoading=0; const _tvQueue=[];
+  const _to=Math.floor(Date.now()/1000), _from=_to-90*24*60*60;
+  const TV_SRC=sym=>'https://www.tradingview.com/widgetembed/?symbol='+encodeURIComponent(sym)+'&interval=D&theme=dark&style=0&hidesidetoolbar=1&hidetoptoolbar=1&hide_top_toolbar=1&no_bgcolor=1&saveimage=0&calendar=0&news=0&hide_legend=1&from='+_from+'&to='+_to+'&locale=en&timezone=Etc%2FUTC&overrides=%7B%22mainSeriesProperties.barStyle.upColor%22%3A%22%23ffffff%22%2C%22mainSeriesProperties.barStyle.downColor%22%3A%22%23ffffff%22%7D&studies_overrides=%7B%22volume.volume.color.0%22%3A%22%23ffffff%22%2C%22volume.volume.color.1%22%3A%22%23ffffff%22%7D';
+  function _tvNext(){
+    while(_tvLoading<3&&_tvQueue.length){
+      const el=_tvQueue.shift(); _tvLoading++;
+      const iframe=document.createElement('iframe');
+      iframe.style.cssText='border:none;width:calc(100% + 52px);height:200px;margin-left:-52px;display:block';
+      iframe.title=el.dataset.ticker;
+      const done=()=>{ _tvLoading--; _tvNext(); };
+      iframe.onload=done; iframe.onerror=done;
+      iframe.src=TV_SRC(el.dataset.sym);
+      el.innerHTML=''; el.appendChild(iframe);
+    }
+  }
+  g.querySelectorAll('.tv-lazy').forEach(el=>_tvQueue.push(el));
+  _tvNext();
+}
+
+/* ════════════════════════════════════
+   WATCHLIST
+════════════════════════════════════ */
+function renderWatchlist(){
+  $('tableView').style.display='block'; $('galleryView').style.display='none';
+  if(watchlist.size===0){
+    $('tableView').innerHTML=emptyHtml('רשימת המעקב ריקה','לחץ ☆ ליד מניה להוספה');
+    return;
+  }
+  if(!Object.keys(ttUniverse).length){
+    $('tableView').innerHTML=emptyHtml('נתונים טרם נטענו','סרוק את השוק תחילה כדי לראות נתוני מעקב');
+    return;
+  }
+  const wlRows=[...watchlist].map(t=>ttUniverse[t]).filter(Boolean);
+  if(!wlRows.length){
+    $('tableView').innerHTML=emptyHtml('המניות במעקב לא עוברות את תנאי ה-Trend Template','בדוק את הפילטרים הטכניים או סרוק שנית');
+    return;
+  }
+  renderTable(wlRows);
+}
+
+/* ════════════════════════════════════
+   MODAL
+════════════════════════════════════ */
+function openChart(sym, ticker, name){
+  $('modalTitle').textContent=ticker; $('modalSub').textContent=name;
+  const wrap=$('modalChart'); wrap.innerHTML='';
+  const cont=document.createElement('div'); cont.style.cssText='height:100%;width:100%';
+  const inner=document.createElement('div'); inner.style.height='100%'; cont.appendChild(inner);
+  const s=document.createElement('script'); s.async=true;
+  s.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+  s.innerHTML=JSON.stringify({
+    symbol:sym, interval:"D", timezone:"Etc/UTC", theme:"dark", style:"0",
+    range:"6M", locale:"he_IL", autosize:true, hide_side_toolbar:false, allow_symbol_change:true,
+    studies:["STD;SMA","STD;SMA","STD;SMA"],
+    overrides:{"paneProperties.background":"#0a1120","paneProperties.backgroundType":"solid"},
+    support_host:"https://www.tradingview.com"
+  });
+  cont.appendChild(s); wrap.appendChild(cont);
+  $('modal').classList.add('open');
+}
+function closeModal(){ $('modal').classList.remove('open'); $('modalChart').innerHTML=''; }
+
+/* ════════════════════════════════════
+   EXPORT
+════════════════════════════════════ */
+function exportCSV(){
+  if(!results.length){ toast('אין תוצאות לייצוא'); return; }
+  const head=['Ticker','Name','Exchange','Price','Score','RS','Perf.Y%','From High%','Range%','EPS%','Rev%','ROE%','Net Margin%','Volume','Avg Vol','Market Cap','Sector'];
+  const lines=[head.join(',')];
+  results.forEach(r=>lines.push([
+    r.ticker,'"'+(r.name||'').replace(/"/g,'')+'"',r.exch,
+    r.close.toFixed(2),r.score,r.rs,
+    (r.perfY??'').toString(),r.fromHighPct.toFixed(1),(r.rangePos*100).toFixed(1),
+    (r.eps??'').toString(),(r.rev??'').toString(),(r.roe??'').toString(),(r.nm??'').toString(),
+    r.vol??'',r.avgVol??'',Math.round(r.mc||0),'"'+r.sector+'"'
+  ].join(',')));
+  const blob=new Blob(['﻿'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='sepa_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+  toast('הקובץ הורד');
+}
+
+/* ════════════════════════════════════
+   KEYBOARD NAV  (j/k/Enter)
+════════════════════════════════════ */
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ closeModal(); return; }
+  if(view!=='table') return;
+  const rows=document.querySelectorAll('tbody tr');
+  if(!rows.length) return;
+  if(e.key==='j'||e.key==='ArrowDown'){ e.preventDefault(); activeRow=Math.min(activeRow+1,rows.length-1); }
+  else if(e.key==='k'||e.key==='ArrowUp'){ e.preventDefault(); activeRow=Math.max(activeRow-1,0); }
+  else if(e.key==='Enter'&&activeRow>=0&&results[activeRow]){
+    const r=results[activeRow]; openChart(r.sym,r.ticker,r.name); return;
+  } else return;
+  rows.forEach((r,i)=>{
+    r.style.background=i===activeRow?'rgba(79,131,255,0.12)':'';
+    r.setAttribute('aria-selected',i===activeRow?'true':'false');
+  });
+  rows[activeRow]?.scrollIntoView({block:'nearest',behavior:'smooth'});
+});
+
+const EMPTY_SVG='<svg class="empty-icon" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="22" cy="22" r="16" stroke="currentColor" stroke-width="1.5"/><circle cx="22" cy="22" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="22" y1="6" x2="22" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="22" y1="32" x2="22" y2="38" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="22" x2="12" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="32" y1="22" x2="38" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+function emptyHtml(msg,hint){
+  return '<div class="empty">'+EMPTY_SVG+'<div class="empty-msg">'+msg+'</div><div class="empty-hint">'+(hint||'')+'</div></div>';
+}
+
+loadUniverseCache();
+</script>
+</body>
+</html>
