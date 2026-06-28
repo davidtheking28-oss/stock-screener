@@ -1,0 +1,7 @@
+project_id = "fnklrqxwyeibfptaxewf"
+
+[functions.scan-universe]
+verify_jwt = false
+
+[functions.ohlc]
+verify_jwt = false
