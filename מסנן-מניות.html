@@ -596,6 +596,7 @@ const COL_DEFS = [
 ];
 
 const UNIVERSE_CACHE_KEY = 'sepa_universe_v1';
+const RESULTS_CACHE_KEY  = 'sepa_scan_results_v1';
 
 /* ════════════════════════════════════
    STATE
@@ -711,14 +712,34 @@ function loadUniverseCache(){
     const {data, time} = JSON.parse(raw);
     if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(UNIVERSE_CACHE_KEY); return; }
     ttUniverse = data;
+  } catch(e) {}
+}
+
+function saveResultsCache(){
+  try {
+    localStorage.setItem(RESULTS_CACHE_KEY, JSON.stringify({allResults, time:Date.now()}));
+  } catch(e){}
+}
+
+function loadResultsCache(){
+  try {
+    const raw = localStorage.getItem(RESULTS_CACHE_KEY);
+    if(!raw) return;
+    const {allResults:ar, time} = JSON.parse(raw);
+    if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(RESULTS_CACHE_KEY); return; }
+    allResults = ar;
+    applySectorFilter(); sortResults(); render();
+    $('resultsPanel').style.display='block';
+    $('colPickerWrap').style.display='';
+    buildSectorFilter();
     const d = new Date(time);
     const hh = d.getHours().toString().padStart(2,'0');
     const mm = d.getMinutes().toString().padStart(2,'0');
     const isToday = d.toDateString() === new Date().toDateString();
     $('scanTime').textContent = isToday ? hh+':'+mm+' (מאוחסן)' : 'אמש '+hh+':'+mm;
     const rb=$('scanBtn'); if(rb) rb.style.display='';
-    toast('נטענו נתוני ★ מעקב מסריקה קודמת', 3200);
-  } catch(e) {}
+    $('statBar').innerHTML='<b>'+results.length+'</b> מניות מסריקה '+(isToday?'ב-'+hh+':'+mm:'מאתמול')+' <span style="color:var(--text3);font-size:11px">· לחץ "סרוק שנית" לעדכון</span>';
+  } catch(e){}
 }
 
 /* ════════════════════════════════════
@@ -756,6 +777,8 @@ document.addEventListener('click', e=>{
   const wrap=$('colPickerWrap');
   if(wrap && !wrap.contains(e.target)) $('colPickerPanel')?.classList.remove('open');
 });
+document.addEventListener('scroll', ()=>{ $('colPickerPanel')?.classList.remove('open'); }, {passive:true, capture:true});
+window.addEventListener('resize', ()=>{ $('colPickerPanel')?.classList.remove('open'); });
 
 /* ════════════════════════════════════
    SEPA SCORE  (0-100)
@@ -875,6 +898,7 @@ async function scan(){
     ttUniverse = {};
     applyFilters(universe, rsMap, {skipFund:true}).forEach(r=>{ r.score=calcScore(r); ttUniverse[r.ticker]=r; });
     saveUniverseCache();
+    saveResultsCache();
     checkAndSaveHistory(allResults.map(r=>r.ticker));
     $('filterPanel')?.classList.remove('open');
 
@@ -1111,7 +1135,10 @@ function renderTable(rows){
 ════════════════════════════════════ */
 function renderGallery(){
   const g=$('galleryView');
-  if(!results.length){ g.innerHTML=emptyHtml('אין תוצאות'); _galleryKey=''; return; }
+  if(!results.length){
+    const hint = allResults.length>0 ? 'הסקטור הנוכחי ריק — נסה "כל הסקטורים"' : 'שנה את הפילטרים והסרוק שנית';
+    g.innerHTML=emptyHtml('אין תוצאות בגלריה', hint); _galleryKey=''; return;
+  }
   const _key=results.map(r=>r.sym).join(',');
   if(_key===_galleryKey && g.querySelector('.gcard')){
     g.querySelectorAll('.gcard .star-btn').forEach((btn,i)=>{ const r=results[i]; if(!r) return; const on=watchlist.has(r.ticker); btn.className='star-btn '+(on?'on':'off'); btn.textContent=on?'★':'☆'; });
@@ -1329,6 +1356,7 @@ function loadFilterPrefs(){
 
 loadFilterPrefs();
 loadUniverseCache();
+loadResultsCache();
 initAuth();
 </script>
 </body>
