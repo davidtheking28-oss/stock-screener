@@ -1098,10 +1098,10 @@ function renderGallery(){
       const box=document.createElement('div'); box.className='tv-lite'; el.appendChild(box);
       const chart=LightweightCharts.createChart(box,{
         width:box.clientWidth||el.clientWidth, height:200,
-        layout:{background:{color:'#0a1120'},textColor:'#5b6b85',fontSize:10,fontFamily:'JetBrains Mono, monospace'},
+        layout:{background:{color:'#0a1120'},textColor:'#5b6b85',fontSize:10,fontFamily:'JetBrains Mono, monospace',attributionLogo:false},
         grid:{vertLines:{color:'rgba(255,255,255,0.035)'},horzLines:{color:'rgba(255,255,255,0.035)'}},
         rightPriceScale:{borderColor:'rgba(255,255,255,0.06)'},
-        timeScale:{borderColor:'rgba(255,255,255,0.06)',rightOffset:1,fixLeftEdge:true,fixRightEdge:true},
+        timeScale:{borderColor:'rgba(255,255,255,0.06)',rightOffset:2,fixLeftEdge:true,fixRightEdge:true},
         handleScroll:false, handleScale:false,
       });
       const toTime=t=>new Date(t*1000).toISOString().slice(0,10);
