@@ -1,3 +1,8 @@
 .playwright-mcp/
 node_modules/
 *.png.bak
+
+# local screenshots / scratch artifacts
+screener-audit.png
+*-shot.png
+*-audit.png

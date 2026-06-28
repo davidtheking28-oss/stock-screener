@@ -11,7 +11,7 @@
 - RS Rating — דירוג יחסי לפי ביצוע 12 חודשים
 - ציון SEPA 0–100 לכל מניה (RS + EPS + הכנסות + קרבה לשיא)
 - 3 פריסטים: קלאסי / אגרסיבי / שמרני
-- גלריית גרפים עם TradingView Widgets
+- גלריית גרפים יומיים (Lightweight Charts) עם נתוני OHLC אמיתיים
 - Watchlist מסונכרן בענן (דורש כניסה עם magic link)
 - ייצוא CSV
 - ניווט מקלדת: j/k לזוז, Enter לגרף, Esc לסגור
@@ -20,9 +20,9 @@
 
 - Static HTML + Vanilla JS (ללא framework)
 - Supabase — Auth (magic link) + DB (watchlist, prefs)
-- Supabase Edge Function — proxy לTradingView עם caching של 5 דקות
+- Supabase Edge Functions — `scan-universe` (proxy ל-TradingView, cache 5 דק') ו-`ohlc` (נתוני גרף יומי מ-Yahoo, cache שעה). הקוד שלהן ב-`supabase/functions/`
 - GitHub Pages — hosting
-- TradingView Scanner API + Widgets
+- TradingView Scanner API + Lightweight Charts
 
 ## GitHub Secrets נדרשים
 
