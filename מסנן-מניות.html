@@ -376,6 +376,24 @@ tbody tr:last-child td { border-bottom: none; }
 .auth-logout { color: var(--text3); cursor: pointer; padding: 3px 8px; border-radius: 6px; font-size: 11px; background: transparent; border: 1px solid var(--border); font-family: var(--sans); }
 .auth-logout:hover { color: var(--text); background: var(--bg3); }
 
+/* ── Ticker search ── */
+.ticker-search {
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px;
+  padding: 5px 10px; font: 13px var(--mono); width: 120px;
+  transition: width 0.2s ease-out, border-color 0.12s;
+}
+.ticker-search:focus { outline: none; border-color: var(--accent); width: 160px; }
+.ticker-search::placeholder { color: var(--text3); }
+
+/* ── New badge ── */
+.new-badge {
+  display: inline-block; font: 700 9px var(--sans); color: var(--green);
+  background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.2);
+  padding: 1px 5px; border-radius: 4px; letter-spacing: 0.5px;
+  text-transform: uppercase; margin-right: 4px; vertical-align: middle;
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -458,12 +476,16 @@ tbody tr:last-child td { border-bottom: none; }
           <button class="view-tab" id="tabGallery" onclick="setView('gallery')">גרפים</button>
           <button class="view-tab" id="tabWatchlist" onclick="setView('watchlist')">&#9733; מעקב</button>
         </div>
+        <input type="search" id="tickerSearch" class="ticker-search" placeholder="חיפוש מניה..."
+          oninput="searchQuery=this.value.trim().toUpperCase();if(view==='table'||view==='watchlist')render()"
+          onkeydown="if(event.key==='Escape'){this.value='';searchQuery='';if(view==='table'||view==='watchlist')render();}event.stopPropagation()">
         <div class="col-picker" id="colPickerWrap" style="display:none">
           <button class="btn-ghost" onclick="toggleColPicker(event)" title="בחר עמודות">עמודות &#8862;</button>
           <div class="col-picker-panel" id="colPickerPanel"></div>
         </div>
+        <button class="btn-ghost" onclick="exportTickers()" title="העתק כל הטיקרים לקליפבורד">עתק רשימה</button>
         <button class="btn-ghost" onclick="exportCSV()">ייצוא CSV</button>
-        <span class="kbd-hint" id="kbdHint" title="ניווט מקלדת: j/k לזוז · Enter לפתוח גרף · Esc לסגור">j/k &#8629;</span>
+        <span class="kbd-hint" id="kbdHint" title="ניווט מקלדת: j/k לזוז · Enter לפתוח גרף · w להוסיף/הסיר ממעקב · Esc לסגור">j/k/w &#8629;</span>
       </div>
     </div>
     <div id="tableView" class="table-wrap"></div>
@@ -564,6 +586,8 @@ let watchlist  = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
 let sortKey = 'score', sortDir = -1, view = 'table', activeRow = -1;
 let _galleryKey = '';
 let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
+let searchQuery = '';
+let newToday = new Set();
 
 /* ════════════════════════════════════
    UTILS
@@ -755,16 +779,19 @@ async function checkAndSaveHistory(tickers){
     tickers.map(t=>({user_id:_currentUser.id, ticker:t, first_seen:today, last_seen:today})),
     {onConflict:'user_id,ticker'}
   );
+  const {data:todayIn} = await _sb.from('screener_history')
+    .select('ticker').eq('user_id',_currentUser.id).eq('first_seen',today).in('ticker',tickers);
+  if(todayIn) todayIn.forEach(h=>newToday.add(h.ticker));
   if(watchlist.size > 0){
-    const {data:newIn} = await _sb.from('screener_history')
-      .select('ticker').eq('user_id',_currentUser.id).eq('first_seen',today).in('ticker',[...watchlist]);
-    if(newIn && newIn.length) toast('נכנסו לסינון היום: '+newIn.map(h=>h.ticker).join(', '), 6000);
+    const wlNew = todayIn?.filter(h=>watchlist.has(h.ticker));
+    if(wlNew && wlNew.length) toast('נכנסו לסינון היום: '+wlNew.map(h=>h.ticker).join(', '), 6000);
   }
 }
 
 async function scan(){
   if(!validateInputs()) return;
   _setScanLoading(true);
+  newToday = new Set();
   showSkeleton();
   $('statBar').innerHTML='<span class="spinner"></span> מושך נתונים מ-TradingView...';
   try{
@@ -946,6 +973,7 @@ function th(label,key,tip){
 
 function renderTable(rows){
   if(rows===undefined) rows=results;
+  if(searchQuery) rows=rows.filter(r=>r.ticker.includes(searchQuery)||r.name.toUpperCase().includes(searchQuery));
   const tv=$('tableView');
   if(!rows.length){
     const hint = allResults.length>0
@@ -995,9 +1023,10 @@ function renderTable(rows){
     const volEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+Math.min((vr??0)*50,100)+'%;background:'+vCol+'"></div></div><span class="mn" style="color:'+vCol+'">'+fmtVol(r.vol)+'</span></div>';
 
     const priceStr=r.close>=100?r.close.toFixed(0):r.close.toFixed(2);
+    const isNew = newToday.has(r.ticker);
     return '<tr onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button></td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+r.ticker+'</div><div class="cname">'+esc(r.name)+'</div></td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+'</div><div class="cname">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
@@ -1123,8 +1152,14 @@ function exportCSV(){
   toast('הקובץ הורד');
 }
 
+function exportTickers(){
+  const src = view==='watchlist' ? [...watchlist] : results.map(r=>r.ticker);
+  if(!src.length){ toast('אין מניות להעתקה'); return; }
+  navigator.clipboard?.writeText(src.join(',')).then(()=>toast(src.length+' טיקרים הועתקו ✓'));
+}
+
 /* ════════════════════════════════════
-   KEYBOARD NAV  (j/k/Enter)
+   KEYBOARD NAV  (j/k/w/Enter)
 ════════════════════════════════════ */
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){ closeModal(); return; }
@@ -1135,6 +1170,13 @@ document.addEventListener('keydown', e=>{
   else if(e.key==='k'||e.key==='ArrowUp'){ e.preventDefault(); activeRow=Math.max(activeRow-1,0); }
   else if(e.key==='Enter'&&activeRow>=0&&results[activeRow]){
     const r=results[activeRow]; openChart(r.sym,r.ticker,r.name); return;
+  } else if(e.key==='w'&&activeRow>=0&&results[activeRow]){
+    const r=results[activeRow];
+    const adding=!watchlist.has(r.ticker);
+    adding?watchlist.add(r.ticker):watchlist.delete(r.ticker);
+    saveWL(r.ticker,adding); render();
+    toast((adding?'נוסף':'הוסר')+' ממעקב: '+r.ticker);
+    return;
   } else return;
   rows.forEach((r,i)=>{
     r.style.background=i===activeRow?'rgba(79,131,255,0.12)':'';
