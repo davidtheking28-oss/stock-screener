@@ -9,6 +9,8 @@
 <link rel="dns-prefetch" href="https://www.tradingview.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23091525'/%3E%3Ctext x='16' y='23' font-family='monospace' font-weight='900' font-size='20' fill='%234f83ff' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --bg:       #0c1322;
@@ -343,6 +345,12 @@ tbody tr:last-child td { border-bottom: none; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
 
+/* ── Auth ── */
+.auth-user { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
+.auth-email { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+.auth-logout { color: var(--text3); cursor: pointer; padding: 3px 8px; border-radius: 6px; font-size: 11px; background: transparent; border: 1px solid var(--border); font-family: var(--sans); }
+.auth-logout:hover { color: var(--text); background: var(--bg3); }
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -363,6 +371,7 @@ tbody tr:last-child td { border-bottom: none; }
   <div class="topbar-end">
     <span id="scanTime"></span>
     <button class="btn-rescan" id="scanBtn" onclick="scan()" style="display:none">&#8635; סרוק שנית</button>
+    <div id="authChip"><button class="btn-ghost" style="font-size:12px" onclick="toggleAuthModal()">כניסה</button></div>
   </div>
 </div>
 
@@ -449,9 +458,42 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
+<!-- Auth Modal -->
+<div class="modal" id="authModal" onclick="if(event.target===this)closeAuthModal()">
+  <div class="modal-box" style="width:min(380px,94vw);height:auto">
+    <div class="modal-head">
+      <div><div class="modal-ticker">כניסה</div><div class="modal-name">לסנכרון רשימת מעקב בין מכשירים</div></div>
+      <button class="modal-close" onclick="closeAuthModal()">&#10005;</button>
+    </div>
+    <div id="authModalBody" style="padding:20px 24px 24px">
+      <div id="authForm">
+        <div class="field" style="margin-bottom:14px">
+          <label style="margin-bottom:6px;display:block">אימייל</label>
+          <input type="email" id="authEmail" placeholder="you@example.com" style="direction:ltr;width:100%" onkeydown="if(event.key==='Enter')sendMagicLink()">
+        </div>
+        <button class="btn-scan" onclick="sendMagicLink()" style="width:100%">שלח קישור כניסה</button>
+        <p style="font-size:11px;color:var(--text3);margin-top:12px;text-align:center;line-height:1.6">קישור כניסה חד-פעמי יישלח לאימייל שלך · ללא סיסמה</p>
+      </div>
+      <div id="authSent" style="display:none;text-align:center;padding:16px 0;color:var(--text2)">
+        <div style="font-size:28px;margin-bottom:10px">✉</div>
+        <div style="font-weight:600">בדוק את האימייל שלך</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px" id="authSentEmail"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
+/* ════════════════════════════════════
+   SUPABASE
+════════════════════════════════════ */
+const SUPABASE_URL  = 'https://fnklrqxwyeibfptaxewf.supabase.co';
+const SUPABASE_ANON = '__SUPABASE_ANON__';
+const HAS_SUPABASE  = SUPABASE_ANON !== '__SUPABASE_ANON__';
+const _sb = HAS_SUPABASE ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : null;
+
 /* ════════════════════════════════════
    CONSTANTS
 ════════════════════════════════════ */
@@ -492,6 +534,7 @@ const UNIVERSE_CACHE_KEY = 'sepa_universe_v1';
    STATE
 ════════════════════════════════════ */
 let allResults = [], results = [], ttUniverse = {};
+let _currentUser = null;
 let watchlist  = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
 let sortKey = 'score', sortDir = -1, view = 'table', activeRow = -1;
 let _galleryKey = '';
@@ -520,12 +563,23 @@ const fmtVol = v => {
 const col = (key, html) => colVis[key] ? html : '';
 function esc(s){ return (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 function toast(msg, dur=2600){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), dur); }
-function saveWL(){ localStorage.setItem('sepa_wl', JSON.stringify([...watchlist])); }
+async function saveWL(ticker, adding){
+  if(_currentUser && _sb){
+    if(adding){
+      await _sb.from('screener_watchlist').upsert({user_id:_currentUser.id, ticker});
+    } else {
+      await _sb.from('screener_watchlist').delete().eq('user_id',_currentUser.id).eq('ticker',ticker);
+    }
+  } else {
+    localStorage.setItem('sepa_wl', JSON.stringify([...watchlist]));
+  }
+}
 
 function toggleWL(e, ticker){
   e.stopPropagation();
-  watchlist.has(ticker) ? watchlist.delete(ticker) : watchlist.add(ticker);
-  saveWL(); render();
+  const adding = !watchlist.has(ticker);
+  adding ? watchlist.add(ticker) : watchlist.delete(ticker);
+  saveWL(ticker, adding); render();
 }
 function copyTicker(e, ticker){
   e.stopPropagation();
@@ -579,9 +633,13 @@ function toggleColPicker(e){
   panel.classList.add('open');
 }
 
-function setColVis(key, on){
+async function setColVis(key, on){
   colVis[key]=on;
-  localStorage.setItem('sepa_colvis', JSON.stringify(colVis));
+  if(_currentUser && _sb){
+    await _sb.from('screener_prefs').upsert({user_id:_currentUser.id, col_vis:colVis, updated_at:new Date().toISOString()});
+  } else {
+    localStorage.setItem('sepa_colvis', JSON.stringify(colVis));
+  }
   if(view==='table') renderTable();
 }
 
@@ -705,6 +763,12 @@ async function fetchUniverse(){
     sort:{sortBy:"market_cap_basic",sortOrder:"desc"},
     range:[0,8000]
   };
+  if(HAS_SUPABASE){
+    const res=await fetch(SUPABASE_URL+'/functions/v1/scan-universe',
+      {method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},body:JSON.stringify(body)});
+    if(!res.ok) throw new Error('Scan service '+res.status);
+    return (await res.json()).data||[];
+  }
   const res=await fetch('https://scanner.tradingview.com/america/scan?label-product=screener-stock',
     {method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body)});
   if(!res.ok) throw new Error('TradingView '+res.status);
@@ -765,7 +829,7 @@ function buildSectorFilter(){
   const wrap=$('sectorWrap'); if(!wrap) return;
   wrap.innerHTML='<select id="sectorFilter" class="filter-select" onchange="applySectorFilter();sortResults();render()">'
     +'<option value="">כל הסקטורים ('+allResults.length+')</option>'
-    +sectors.map(s=>'<option>'+s+' ('+allResults.filter(r=>r.sector===s).length+')</option>').join('')
+    +sectors.map(s=>'<option value="'+s+'">'+s+' ('+allResults.filter(r=>r.sector===s).length+')</option>').join('')
     +'</select>';
 }
 
@@ -1018,7 +1082,70 @@ function emptyHtml(msg,hint){
   return '<div class="empty">'+EMPTY_SVG+'<div class="empty-msg">'+msg+'</div><div class="empty-hint">'+(hint||'')+'</div></div>';
 }
 
+/* ════════════════════════════════════
+   AUTH
+════════════════════════════════════ */
+async function initAuth(){
+  if(!_sb) return;
+  const {data:{session}} = await _sb.auth.getSession();
+  _currentUser = session?.user ?? null;
+  updateAuthUI();
+  if(_currentUser) await loadUserData();
+  _sb.auth.onAuthStateChange(async(event, session)=>{
+    _currentUser = session?.user ?? null;
+    updateAuthUI();
+    if(event==='SIGNED_IN') await loadUserData();
+    if(event==='SIGNED_OUT'){
+      watchlist = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
+      colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key,c.defaultOn]));
+    }
+  });
+}
+
+async function loadUserData(){
+  const [{data:wlData},{data:prefData}] = await Promise.all([
+    _sb.from('screener_watchlist').select('ticker').eq('user_id',_currentUser.id),
+    _sb.from('screener_prefs').select('col_vis').eq('user_id',_currentUser.id).maybeSingle()
+  ]);
+  if(wlData) watchlist = new Set(wlData.map(r=>r.ticker));
+  if(prefData?.col_vis) colVis = prefData.col_vis;
+}
+
+function updateAuthUI(){
+  const chip=$('authChip'); if(!chip) return;
+  if(_currentUser){
+    chip.innerHTML='<div class="auth-user"><span class="auth-email" title="'+_currentUser.email+'">'+_currentUser.email+'</span>'
+      +'<button class="auth-logout" onclick="signOut()">יציאה</button></div>';
+  } else {
+    chip.innerHTML='<button class="btn-ghost" style="font-size:12px" onclick="toggleAuthModal()">כניסה</button>';
+  }
+}
+
+async function sendMagicLink(){
+  const email=($('authEmail')?.value||'').trim();
+  if(!email||!email.includes('@')){ toast('אימייל לא תקין'); return; }
+  $('authForm').style.display='none';
+  $('authSentEmail').textContent='הקישור נשלח ל-'+email;
+  $('authSent').style.display='block';
+  const {error}=await _sb.auth.signInWithOtp({email, options:{emailRedirectTo:location.href.split('?')[0].split('#')[0]}});
+  if(error){ $('authForm').style.display=''; $('authSent').style.display='none'; toast('שגיאה: '+error.message); }
+}
+
+async function signOut(){
+  await _sb.auth.signOut();
+  toast('יצאת מהחשבון');
+}
+
+function toggleAuthModal(){
+  if(!HAS_SUPABASE){ toast('כניסה זמינה רק בגרסה המקוונת'); return; }
+  $('authForm').style.display=''; $('authSent').style.display='none';
+  $('authModal').classList.add('open');
+  setTimeout(()=>$('authEmail')?.focus(), 100);
+}
+function closeAuthModal(){ $('authModal').classList.remove('open'); }
+
 loadUniverseCache();
+initAuth();
 </script>
 </body>
 </html>

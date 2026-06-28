@@ -28,6 +28,7 @@ jobs:
           mkdir dist
           cp "מסנן-מניות.html" dist/index.html
           cp daily90.png dist/daily90.png
+          sed -i "s|__SUPABASE_ANON__|${{ secrets.SUPABASE_ANON }}|g" dist/index.html
 
       - uses: actions/configure-pages@v4
 
