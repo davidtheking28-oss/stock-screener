@@ -638,7 +638,8 @@ async function _ohlcDraw(el){
       grid:{vertLines:{color:'rgba(255,255,255,0.035)'},horzLines:{color:'rgba(255,255,255,0.035)'}},
       rightPriceScale:{borderColor:'rgba(255,255,255,0.06)'},
       timeScale:{borderColor:'rgba(255,255,255,0.06)',rightOffset:5,fixLeftEdge:false,fixRightEdge:false},
-      handleScroll:true, handleScale:true,
+      handleScroll:{pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false,mouseWheel:false},
+      handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:{time:true,price:true}},
     });
     const toTime=t=>new Date(t*1000).toISOString().slice(0,10);
     const bs=chart.addBarSeries({upColor:'#ffffff',downColor:'#ffffff'});
