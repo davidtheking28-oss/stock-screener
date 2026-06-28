@@ -591,6 +591,43 @@ let watchlist  = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
 let sortKey = 'score', sortDir = -1, view = 'table', activeRow = -1;
 let _galleryKey = '';
 const _ohlcCache = new Map();
+let _ohlcLd = 0; const _ohlcQ = [];
+function _ohlcMsg(el,t){ el.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px">'+t+'</div>'; }
+async function _ohlcDraw(el){
+  if(!HAS_SUPABASE){ _ohlcMsg(el,'זמין לאחר חיבור'); return; }
+  const sym=el.dataset.sym;
+  try{
+    let bars=_ohlcCache.get(sym);
+    if(!bars){
+      const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON}});
+      const j=await r.json();
+      bars=Array.isArray(j.bars)?j.bars:[];
+      _ohlcCache.set(sym,bars);
+    }
+    if(!bars.length){ _ohlcMsg(el,'אין נתונים'); return; }
+    el.innerHTML='';
+    const box=document.createElement('div'); box.className='tv-lite'; el.appendChild(box);
+    const chart=LightweightCharts.createChart(box,{
+      width:box.clientWidth||el.clientWidth, height:200,
+      layout:{background:{color:'#0a1120'},textColor:'#5b6b85',fontSize:10,fontFamily:'JetBrains Mono, monospace',attributionLogo:false},
+      grid:{vertLines:{color:'rgba(255,255,255,0.035)'},horzLines:{color:'rgba(255,255,255,0.035)'}},
+      rightPriceScale:{borderColor:'rgba(255,255,255,0.06)'},
+      timeScale:{borderColor:'rgba(255,255,255,0.06)',rightOffset:2,fixLeftEdge:true,fixRightEdge:true},
+      handleScroll:false, handleScale:false,
+    });
+    const toTime=t=>new Date(t*1000).toISOString().slice(0,10);
+    const bs=chart.addBarSeries({upColor:'#ffffff',downColor:'#ffffff'});
+    bs.setData(bars.map(b=>({time:toTime(b.t),open:b.o,high:b.h,low:b.l,close:b.c})));
+    const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:''});
+    vs.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
+    vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:'rgba(255,255,255,0.25)'})));
+    chart.timeScale().fitContent();
+    new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth})).observe(box);
+  }catch(e){ _ohlcMsg(el,'שגיאה'); }
+}
+function _ohlcNext(){
+  while(_ohlcLd<6 && _ohlcQ.length){ const el=_ohlcQ.shift(); _ohlcLd++; _ohlcDraw(el).finally(()=>{ _ohlcLd--; _ohlcNext(); }); }
+}
 let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
 let searchQuery = '';
 let newToday = new Set();
@@ -827,7 +864,6 @@ async function scan(){
     $('filterPanel')?.classList.remove('open');
 
     applySectorFilter(); sortResults(); render();
-    renderGallery();  // preload gallery charts in background so they're ready before the tab is opened
     $('resultsPanel').style.display='block';
     $('colPickerWrap').style.display='';
     buildSectorFilter();
@@ -1080,45 +1116,9 @@ function renderGallery(){
       +'</div></div>';
   }).join('');
 
-  let _ld=0; const _q=[];
-  const _anon = HAS_SUPABASE ? SUPABASE_ANON : (window.__ANON||'');
-  const _msg=(el,t)=>{ el.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px">'+t+'</div>'; };
-  async function _draw(el){
-    const sym=el.dataset.sym;
-    try{
-      let bars=_ohlcCache.get(sym);
-      if(!bars){
-        const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?symbol='+encodeURIComponent(sym),{headers:{'apikey':_anon,'Authorization':'Bearer '+_anon}});
-        const j=await r.json();
-        bars=Array.isArray(j.bars)?j.bars:[];
-        _ohlcCache.set(sym,bars);
-      }
-      if(!bars.length){ _msg(el,'אין נתונים'); return; }
-      el.innerHTML='';
-      const box=document.createElement('div'); box.className='tv-lite'; el.appendChild(box);
-      const chart=LightweightCharts.createChart(box,{
-        width:box.clientWidth||el.clientWidth, height:200,
-        layout:{background:{color:'#0a1120'},textColor:'#5b6b85',fontSize:10,fontFamily:'JetBrains Mono, monospace',attributionLogo:false},
-        grid:{vertLines:{color:'rgba(255,255,255,0.035)'},horzLines:{color:'rgba(255,255,255,0.035)'}},
-        rightPriceScale:{borderColor:'rgba(255,255,255,0.06)'},
-        timeScale:{borderColor:'rgba(255,255,255,0.06)',rightOffset:2,fixLeftEdge:true,fixRightEdge:true},
-        handleScroll:false, handleScale:false,
-      });
-      const toTime=t=>new Date(t*1000).toISOString().slice(0,10);
-      const bs=chart.addBarSeries({upColor:'#ffffff',downColor:'#ffffff'});
-      bs.setData(bars.map(b=>({time:toTime(b.t),open:b.o,high:b.h,low:b.l,close:b.c})));
-      const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:''});
-      vs.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
-      vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:'rgba(255,255,255,0.25)'})));
-      chart.timeScale().fitContent();
-      new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth})).observe(box);
-    }catch(e){ _msg(el,'שגיאה'); }
-  }
-  function _next(){
-    while(_ld<6 && _q.length){ const el=_q.shift(); _ld++; _draw(el).finally(()=>{ _ld--; _next(); }); }
-  }
-  g.querySelectorAll('.tv-lazy').forEach(el=>_q.push(el));
-  _next();
+  _ohlcQ.length = 0;
+  g.querySelectorAll('.tv-lazy').forEach(el=>_ohlcQ.push(el));
+  _ohlcNext();
 }
 
 /* ════════════════════════════════════
@@ -1152,7 +1152,7 @@ function openChart(sym, ticker, name){
   const inner=document.createElement('div'); inner.style.height='100%'; cont.appendChild(inner);
   const s=document.createElement('script'); s.async=true;
   s.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-  s.innerHTML=JSON.stringify({
+  s.textContent=JSON.stringify({
     symbol:sym, interval:"D", timezone:"Etc/UTC", theme:"dark", style:"0",
     range:"6M", locale:"he_IL", autosize:true, hide_side_toolbar:false, allow_symbol_change:true,
     studies:["STD;SMA","STD;SMA","STD;SMA"],
