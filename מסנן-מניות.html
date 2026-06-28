@@ -298,12 +298,13 @@ tbody tr:last-child td { border-bottom: none; }
   flex-shrink: 0;
 }
 .score-ring svg { position: absolute; inset: 0; }
-.ring-num { position: relative; z-index: 1; line-height: 1; }
+.score-ring::before { content:""; position:absolute; inset:5px; border-radius:50%; background: radial-gradient(circle at 50% 35%, rgba(255,255,255,0.06), rgba(255,255,255,0) 70%); }
+.ring-num { position: relative; z-index: 1; line-height: 1; font-weight: 700; letter-spacing: -0.3px; font-size: 13px; }
 
 /* mini bars */
 .mini-bar-wrap { display: flex; align-items: center; gap: 6px; }
-.mini-bar { width: 52px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.07); overflow: hidden; flex-shrink: 0; }
-.mini-bar-fill { height: 100%; border-radius: 2px; }
+.mini-bar { width: 56px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); box-shadow: inset 0 1px 1px rgba(0,0,0,0.35); overflow: hidden; flex-shrink: 0; }
+.mini-bar-fill { height: 100%; border-radius: 3px; background-image: linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0)); box-shadow: 0 0 6px -1px currentColor; }
 .range-track { width: 52px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.07); position: relative; flex-shrink: 0; }
 .range-dot { position: absolute; top: -3px; width: 10px; height: 10px; border-radius: 50%; transform: translateX(-50%); border: 2px solid var(--bg2); }
 
@@ -1113,10 +1114,10 @@ function renderTable(rows){
     const hiS=Math.round(clamp((1-Math.abs(r.fromHighPct)/25),0,1)*15);
     const scTip='ציון SEPA: '+sc+'/100\nRS: '+rsS+'/40\nEPS: '+epsS+'/25\nהכנסות: '+revS+'/20\nקרבה לשיא: '+hiS+'/15';
     const arc=((sc/100)*113.097).toFixed(1);
-    const scEl='<div class="score-ring" title="'+scTip+'"><svg viewBox="0 0 44 44" width="44" height="44" style="transform:rotate(-90deg);display:block"><circle cx="22" cy="22" r="18" fill="none" stroke="'+scoreBorder(sc)+'" stroke-width="2.5"/><circle cx="22" cy="22" r="18" fill="none" stroke="'+scoreColor(sc)+'" stroke-width="3" stroke-dasharray="'+arc+' 113.097" stroke-linecap="round"/></svg><span class="ring-num" style="color:'+scoreColor(sc)+'">'+sc+'</span></div>';
+    const scEl='<div class="score-ring" title="'+scTip+'"><svg viewBox="0 0 44 44" width="44" height="44" style="transform:rotate(-90deg);display:block"><circle cx="22" cy="22" r="18" fill="none" stroke="'+scoreBorder(sc)+'" stroke-width="2.5"/><circle cx="22" cy="22" r="18" fill="none" stroke="'+scoreColor(sc)+'" stroke-width="3.5" stroke-dasharray="'+arc+' 113.097" stroke-linecap="round" style="filter:drop-shadow(0 0 3px '+scoreColor(sc)+')"/></svg><span class="ring-num" style="color:'+scoreColor(sc)+'">'+sc+'</span></div>';
 
     const rsCol=r.rs>=80?'var(--green)':r.rs>=60?'var(--amber)':'var(--text3)';
-    const rsEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+r.rs+'%;background:'+rsCol+'"></div></div><span class="mn" style="color:'+rsCol+';font-weight:600">'+r.rs+'</span></div>';
+    const rsEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+r.rs+'%;background:'+rsCol+';color:'+rsCol+'"></div></div><span class="mn" style="color:'+rsCol+';font-weight:600">'+r.rs+'</span></div>';
 
     const rPos=clamp(r.rangePos*100,2,98);
     const rCol=r.rangePos>0.7?'var(--green)':r.rangePos>0.4?'var(--amber)':'var(--red)';
@@ -1124,7 +1125,7 @@ function renderTable(rows){
 
     const vr=r.vol&&r.avgVol?r.vol/r.avgVol:null;
     const vCol=vr==null?'var(--text3)':vr>=1.5?'var(--green)':vr<0.7?'var(--red)':'var(--text2)';
-    const volEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+Math.min((vr??0)*50,100)+'%;background:'+vCol+'"></div></div><span class="mn" style="color:'+vCol+'">'+fmtVol(r.vol)+'</span></div>';
+    const volEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+Math.min((vr??0)*50,100)+'%;background:'+vCol+';color:'+vCol+'"></div></div><span class="mn" style="color:'+vCol+'">'+fmtVol(r.vol)+'</span></div>';
 
     const priceStr=r.close>=100?r.close.toFixed(0):r.close.toFixed(2);
     const isNew = newToday.has(r.ticker);
