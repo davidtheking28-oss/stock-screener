@@ -611,7 +611,9 @@ const fmtVol = v => {
 };
 const col = (key, html) => colVis[key] ? html : '';
 function esc(s){ return (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
-function toast(msg, dur=2600){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), dur); }
+const _toastQ=[]; let _toastBusy=false;
+function toast(msg, dur=2600){ _toastQ.push({msg,dur}); if(!_toastBusy) _toastNext(); }
+function _toastNext(){ if(!_toastQ.length){_toastBusy=false;return;} _toastBusy=true; const {msg,dur}=_toastQ.shift(); const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>{ t.classList.remove('show'); setTimeout(_toastNext,260); },dur); }
 async function saveWL(ticker, adding){
   if(_currentUser && _sb){
     if(adding){
@@ -830,6 +832,7 @@ async function scan(){
       ? ' \xb7 <span style="color:var(--amber);font-weight:500">שוק חלש — מעט הזדמנויות SEPA</span>'
       : '';
     $('statBar').innerHTML='<b>'+results.length+'</b> מניות עברו \xb7 מתוך <b>'+universe.length.toLocaleString()+'</b> שנסרקו'+sparseMsg;
+    saveFilterPrefs();
     toast('נמצאו '+results.length+' מניות');
     const rb=$('scanBtn'); if(rb) rb.style.display='';
   }catch(e){
@@ -1024,7 +1027,7 @@ function renderTable(rows){
 
     const priceStr=r.close>=100?r.close.toFixed(0):r.close.toFixed(2);
     const isNew = newToday.has(r.ticker);
-    return '<tr onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
+    return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button></td>'
       +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+'</div><div class="cname">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
@@ -1162,20 +1165,24 @@ function exportTickers(){
    KEYBOARD NAV  (j/k/w/Enter)
 ════════════════════════════════════ */
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape'){ closeModal(); return; }
-  if(view!=='table') return;
+  if(e.key==='Escape'){ closeModal(); closeAuthModal(); return; }
+  const tag=document.activeElement?.tagName;
+  if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA') return;
+  if(e.key==='r'&&!e.ctrlKey&&!e.metaKey){ e.preventDefault(); scan(); return; }
+  if(e.key==='?'){ toast('j/k ניווט · w מעקב · r סריקה · Enter גרף · Esc סגור',4000); return; }
+  if(view!=='table'&&view!=='watchlist') return;
   const rows=document.querySelectorAll('tbody tr');
   if(!rows.length) return;
   if(e.key==='j'||e.key==='ArrowDown'){ e.preventDefault(); activeRow=Math.min(activeRow+1,rows.length-1); }
   else if(e.key==='k'||e.key==='ArrowUp'){ e.preventDefault(); activeRow=Math.max(activeRow-1,0); }
-  else if(e.key==='Enter'&&activeRow>=0&&results[activeRow]){
-    const r=results[activeRow]; openChart(r.sym,r.ticker,r.name); return;
-  } else if(e.key==='w'&&activeRow>=0&&results[activeRow]){
-    const r=results[activeRow];
-    const adding=!watchlist.has(r.ticker);
-    adding?watchlist.add(r.ticker):watchlist.delete(r.ticker);
-    saveWL(r.ticker,adding); render();
-    toast((adding?'נוסף':'הוסר')+' ממעקב: '+r.ticker);
+  else if(e.key==='Enter'&&activeRow>=0&&rows[activeRow]){
+    const row=rows[activeRow]; openChart(row.dataset.sym,row.dataset.ticker,row.dataset.name); return;
+  } else if(e.key==='w'&&activeRow>=0&&rows[activeRow]){
+    const ticker=rows[activeRow].dataset.ticker; if(!ticker) return;
+    const adding=!watchlist.has(ticker);
+    adding?watchlist.add(ticker):watchlist.delete(ticker);
+    saveWL(ticker,adding); render();
+    toast((adding?'נוסף':'הוסר')+' ממעקב: '+ticker);
     return;
   } else return;
   rows.forEach((r,i)=>{
@@ -1252,6 +1259,31 @@ function toggleAuthModal(){
 }
 function closeAuthModal(){ $('authModal').classList.remove('open'); }
 
+function saveFilterPrefs(){
+  try {
+    localStorage.setItem('sepa_filters', JSON.stringify({
+      rsMin:num('rsMin'),fromHigh:num('fromHigh'),fromLow:num('fromLow'),
+      priceMin:num('priceMin'),mcMin:num('mcMin'),
+      epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
+      useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked
+    }));
+  } catch(e){}
+}
+
+function loadFilterPrefs(){
+  try {
+    const p=JSON.parse(localStorage.getItem('sepa_filters')||'null'); if(!p) return;
+    const set=(id,v)=>{ const el=$(id); if(el&&v!=null) el.value=v; };
+    set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
+    set('priceMin',p.priceMin); set('mcMin',p.mcMin);
+    set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
+    if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
+    if($('requireProfit')&&p.requireProfit!=null) $('requireProfit').checked=p.requireProfit;
+    toggleFundFields();
+  } catch(e){}
+}
+
+loadFilterPrefs();
 loadUniverseCache();
 initAuth();
 </script>
