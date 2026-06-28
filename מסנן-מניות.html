@@ -612,7 +612,7 @@ async function _ohlcDraw(el){
       layout:{background:{color:'#0a1120'},textColor:'#5b6b85',fontSize:10,fontFamily:'JetBrains Mono, monospace',attributionLogo:false},
       grid:{vertLines:{color:'rgba(255,255,255,0.035)'},horzLines:{color:'rgba(255,255,255,0.035)'}},
       rightPriceScale:{borderColor:'rgba(255,255,255,0.06)'},
-      timeScale:{borderColor:'rgba(255,255,255,0.06)',rightOffset:2,fixLeftEdge:true,fixRightEdge:true},
+      timeScale:{borderColor:'rgba(255,255,255,0.06)',rightOffset:5,fixLeftEdge:false,fixRightEdge:false},
       handleScroll:false, handleScale:false,
     });
     const toTime=t=>new Date(t*1000).toISOString().slice(0,10);
@@ -621,7 +621,8 @@ async function _ohlcDraw(el){
     const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:''});
     vs.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
     vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:'rgba(255,255,255,0.25)'})));
-    chart.timeScale().fitContent();
+    const twoWeeksAgo=new Date(); twoWeeksAgo.setDate(twoWeeksAgo.getDate()-14);
+    chart.timeScale().setVisibleRange({from:twoWeeksAgo.toISOString().slice(0,10),to:new Date().toISOString().slice(0,10)});
     new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth})).observe(box);
   }catch(e){ _ohlcMsg(el,'שגיאה'); }
 }
