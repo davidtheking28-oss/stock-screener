@@ -383,6 +383,19 @@ tbody tr:last-child td { border-bottom: none; }
   thead th { font-size: 10px; padding: 8px 7px; }
   tbody td { padding: 7px 7px; }
   .gallery { grid-template-columns: 1fr; }
+  /* Sticky star + ticker columns so they stay visible when scrolling horizontally */
+  thead th:nth-child(1), tbody td:nth-child(1) {
+    position: sticky; right: 0; z-index: 3;
+    background: var(--bg2);
+  }
+  thead th:nth-child(2), tbody td:nth-child(2) {
+    position: sticky; right: 28px; z-index: 3;
+    background: var(--bg2);
+    box-shadow: -4px 0 10px rgba(0,0,0,0.35);
+  }
+  /* Smaller score ring on mobile */
+  .score-ring { width: 34px; height: 34px; font-size: 10px; }
+  .score-ring svg { width: 34px; height: 34px; }
 }
 @media (max-width: 420px) {
   .topbar-sep, #breadthChip { display: none !important; }
