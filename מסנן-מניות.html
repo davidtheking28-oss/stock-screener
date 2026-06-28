@@ -9,6 +9,7 @@
 <link rel="dns-prefetch" href="https://www.tradingview.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23091525'/%3E%3Ctext x='16' y='23' font-family='monospace' font-weight='900' font-size='20' fill='%234f83ff' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -312,7 +313,7 @@ tbody tr:last-child td { border-bottom: none; }
 .badge-rs-hi  { background: rgba(46,204,113,0.14); color: var(--green); }
 .badge-rs-mid { background: rgba(245,185,74,0.14); color: var(--amber); }
 .gcard-chart { height: 200px; background: #0a1120; position: relative; overflow: hidden; }
-.gcard-chart iframe { width: calc(100% + 52px); height: 200px; margin-top: 0; margin-left: -52px; display: block; border: none; }
+.gcard-chart > .tv-lite { width: 100%; height: 200px; }
 .gcard-stats { display: grid; grid-template-columns: repeat(3,1fr); border-top: 1px solid var(--border2); }
 .gstat { padding: 7px 10px; text-align: center; border-left: 1px solid var(--border2); }
 .gstat:last-child { border-left: none; }
@@ -589,6 +590,7 @@ let _currentUser = null;
 let watchlist  = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
 let sortKey = 'score', sortDir = -1, view = 'table', activeRow = -1;
 let _galleryKey = '';
+const _ohlcCache = new Map();
 let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
 let searchQuery = '';
 let newToday = new Set();
@@ -822,6 +824,7 @@ async function scan(){
     applyFilters(universe, rsMap, {skipFund:true}).forEach(r=>{ r.score=calcScore(r); ttUniverse[r.ticker]=r; });
     saveUniverseCache();
     checkAndSaveHistory(allResults.map(r=>r.ticker));
+    $('filterPanel')?.classList.remove('open');
 
     applySectorFilter(); sortResults(); render();
     renderGallery();  // preload gallery charts in background so they're ready before the tab is opened
