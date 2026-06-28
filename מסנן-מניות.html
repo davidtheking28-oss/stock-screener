@@ -543,7 +543,7 @@ tbody tr:last-child td { border-bottom: none; }
 ════════════════════════════════════ */
 const SUPABASE_URL  = 'https://fnklrqxwyeibfptaxewf.supabase.co';
 const SUPABASE_ANON = '__SUPABASE_ANON__';
-const HAS_SUPABASE  = SUPABASE_ANON !== '__SUPABASE_ANON__';
+const HAS_SUPABASE  = !SUPABASE_ANON.startsWith('__');
 const _sb = HAS_SUPABASE ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : null;
 
 /* ════════════════════════════════════
