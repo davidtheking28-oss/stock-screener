@@ -121,38 +121,53 @@ body {
 }
 .filter-panel.open .filter-body { max-height: 700px; padding-bottom: 18px; }
 
-.presets { display: flex; gap: 7px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
-.preset-label { font-size: 11px; color: var(--text3); font-weight: 600; }
+.presets { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+.preset-label { font-size: 11px; color: var(--text3); font-weight: 600; margin-left: 2px; }
 .preset-btn {
-  padding: 4px 13px; border-radius: 20px;
+  padding: 5px 14px; border-radius: 20px;
   border: 1px solid var(--border);
-  background: transparent; color: var(--text2);
-  font: 600 12px var(--sans); cursor: pointer; transition: all 0.12s;
+  background: transparent; color: var(--text3);
+  font: 600 11px var(--sans); cursor: pointer; transition: all 0.15s;
+  letter-spacing: 0.2px;
 }
-.preset-btn:hover { border-color: var(--accent); color: var(--accent2); }
-.preset-btn.active { background: rgba(79,131,255,0.15); border-color: var(--accent); color: var(--accent2); }
+.preset-btn:hover { border-color: rgba(79,131,255,0.5); color: var(--text); background: rgba(79,131,255,0.06); }
+.preset-btn.active {
+  background: rgba(79,131,255,0.18); border-color: var(--accent);
+  color: #a8c0ff; box-shadow: 0 0 0 1px rgba(79,131,255,0.2);
+}
 
-.filter-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.filter-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 680px) { .filter-sections { grid-template-columns: 1fr; } }
-.filter-section h3 {
-  font-size: 11px; font-weight: 600; color: var(--text3);
-  text-transform: uppercase; letter-spacing: 1px;
-  margin-bottom: 11px; padding-bottom: 8px;
-  border-bottom: 1px solid var(--border2);
+.filter-section {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 14px 16px;
 }
-.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-.field { display: flex; flex-direction: column; gap: 4px; }
-.field label { font-size: 12px; color: var(--text2); font-weight: 500; }
-.field .hint { font-size: 11px; color: var(--text3); }
+.filter-section h3 {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
+  text-transform: uppercase; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.filter-section h3.tech-head { color: #7ba4ff; }
+.filter-section h3.fund-head { color: #6bcf8f; }
+.filter-section h3::after {
+  content: ''; flex: 1; height: 1px;
+  background: var(--border2);
+}
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field label { font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.2px; }
+.field .hint { font-size: 10px; color: var(--text3); margin-top: 1px; }
 
 input[type=number], select {
-  background: var(--bg2); border: 1px solid var(--border);
-  color: var(--text); border-radius: 8px;
-  padding: 7px 9px; font: 13px var(--mono-data); width: 100%;
-  transition: border-color 0.12s ease-out;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text); border-radius: 7px;
+  padding: 7px 10px; font: 600 13px var(--mono-data); width: 100%;
+  transition: border-color 0.12s ease-out, background 0.12s ease-out;
 }
-input[type=number]:hover, select:hover { border-color: rgba(255,255,255,0.14); }
-input[type=number]:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,131,255,0.12); }
+input[type=number]:hover, select:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); }
+input[type=number]:focus, select:focus { outline: none; border-color: var(--accent); background: rgba(79,131,255,0.06); box-shadow: 0 0 0 3px rgba(79,131,255,0.1); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 #fundFields { transition: opacity 0.18s ease-out; }
@@ -441,7 +456,7 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
       <div class="filter-sections">
         <div class="filter-section">
-          <h3>טכני — Trend Template</h3>
+          <h3 class="tech-head">טכני — Trend Template</h3>
           <div class="fields">
             <div class="field"><label>RS Rating מינ&#8217;</label><input type="number" id="rsMin" value="70" min="1" max="99"><span class="hint">ביצוע יחסי (0-99)</span></div>
             <div class="field"><label>מהשיא (%) מקס&#8217;</label><input type="number" id="fromHigh" value="25" min="0" max="100"><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
@@ -451,7 +466,7 @@ tbody tr:last-child td { border-bottom: none; }
           </div>
         </div>
         <div class="filter-section">
-          <h3>פונדמנטלי</h3>
+          <h3 class="fund-head">פונדמנטלי</h3>
           <div class="fields" id="fundFields">
             <div class="field"><label>EPS YoY מינ&#8217; (%)</label><input type="number" id="epsMin" value="25"><span class="hint">רבעון מול שנה קודמת</span></div>
             <div class="field"><label>הכנסות YoY מינ&#8217; (%)</label><input type="number" id="revMin" value="20"></div>
