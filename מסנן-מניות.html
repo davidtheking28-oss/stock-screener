@@ -647,7 +647,13 @@ async function _ohlcDraw(el){
     vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:'rgba(255,255,255,0.25)'})));
     chart.timeScale().fitContent();
     new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth})).observe(box);
-  }catch(e){ _ohlcMsg(el,'שגיאה'); }
+  }catch(e){ _ohlcMsg(el,'<span>שגיאה</span> <button onclick="event.stopPropagation();_ohlcRetry(this)" style="margin-right:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text2);border-radius:5px;padding:2px 8px;font:600 11px var(--sans);cursor:pointer">↻</button>'); }
+}
+function _ohlcRetry(btn){
+  const el=btn.closest('.tv-lazy'); const sym=el.dataset.sym;
+  _ohlcCache.delete(sym); try{sessionStorage.removeItem('ohlc_'+sym);}catch(e){}
+  _ohlcMsg(el,'<div style="opacity:0.25"><span class="spinner"></span></div>');
+  _ohlcDraw(el);
 }
 function _ohlcNext(){
   while(_ohlcLd<6 && _ohlcQ.length){ const el=_ohlcQ.shift(); _ohlcLd++; _ohlcDraw(el).finally(()=>{ _ohlcLd--; _ohlcNext(); }); }
@@ -884,6 +890,7 @@ async function scan(){
   if(!validateInputs()) return;
   _setScanLoading(true);
   newToday = new Set();
+  try{ localStorage.removeItem('sepa_sector'); }catch(e){}
   showSkeleton();
   $('statBar').innerHTML='<span class="spinner"></span> מושך נתונים מ-TradingView...';
   try{
@@ -1214,7 +1221,7 @@ function openChart(sym, ticker, name){
   s.textContent=JSON.stringify({
     symbol:sym, interval:"D", timezone:"Etc/UTC", theme:"dark", style:"1",
     range:"6M", locale:"he_IL", autosize:true, hide_side_toolbar:false, allow_symbol_change:true,
-    studies:["STD;SMA","STD;SMA","STD;SMA"],
+    studies:[{id:"STD;SMA",inputs:{length:50}},{id:"STD;SMA",inputs:{length:150}},{id:"STD;SMA",inputs:{length:200}}],
     overrides:{"paneProperties.background":"#0a1120","paneProperties.backgroundType":"solid"},
     support_host:"https://www.tradingview.com"
   });
