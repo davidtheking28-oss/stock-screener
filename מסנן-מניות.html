@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -1080,23 +1080,45 @@ function renderGallery(){
       +'</div></div>';
   }).join('');
 
-  let _tvLoading=0; const _tvQueue=[];
-  const _to=Math.floor(Date.now()/1000), _from=_to-90*24*60*60;
-  const TV_SRC=sym=>'https://www.tradingview.com/widgetembed/?symbol='+encodeURIComponent(sym)+'&interval=D&theme=dark&style=0&hidesidetoolbar=1&hidetoptoolbar=1&hide_top_toolbar=1&no_bgcolor=1&saveimage=0&calendar=0&news=0&hide_legend=1&from='+_from+'&to='+_to+'&locale=en&timezone=Etc%2FUTC&overrides=%7B%22mainSeriesProperties.barStyle.upColor%22%3A%22%23ffffff%22%2C%22mainSeriesProperties.barStyle.downColor%22%3A%22%23ffffff%22%7D&studies_overrides=%7B%22volume.volume.color.0%22%3A%22%23ffffff%22%2C%22volume.volume.color.1%22%3A%22%23ffffff%22%7D';
-  function _tvNext(){
-    while(_tvLoading<3&&_tvQueue.length){
-      const el=_tvQueue.shift(); _tvLoading++;
-      const iframe=document.createElement('iframe');
-      iframe.style.cssText='border:none;width:calc(100% + 52px);height:200px;margin-left:-52px;display:block';
-      iframe.title=el.dataset.ticker;
-      const done=()=>{ _tvLoading--; _tvNext(); };
-      iframe.onload=done; iframe.onerror=done;
-      iframe.src=TV_SRC(el.dataset.sym);
-      el.innerHTML=''; el.appendChild(iframe);
-    }
+  let _ld=0; const _q=[];
+  const _anon = HAS_SUPABASE ? SUPABASE_ANON : (window.__ANON||'');
+  const _msg=(el,t)=>{ el.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px">'+t+'</div>'; };
+  async function _draw(el){
+    const sym=el.dataset.sym;
+    try{
+      let bars=_ohlcCache.get(sym);
+      if(!bars){
+        const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?symbol='+encodeURIComponent(sym),{headers:{'apikey':_anon,'Authorization':'Bearer '+_anon}});
+        const j=await r.json();
+        bars=Array.isArray(j.bars)?j.bars:[];
+        _ohlcCache.set(sym,bars);
+      }
+      if(!bars.length){ _msg(el,'אין נתונים'); return; }
+      el.innerHTML='';
+      const box=document.createElement('div'); box.className='tv-lite'; el.appendChild(box);
+      const chart=LightweightCharts.createChart(box,{
+        width:box.clientWidth||el.clientWidth, height:200,
+        layout:{background:{color:'#0a1120'},textColor:'#5b6b85',fontSize:10,fontFamily:'JetBrains Mono, monospace'},
+        grid:{vertLines:{color:'rgba(255,255,255,0.035)'},horzLines:{color:'rgba(255,255,255,0.035)'}},
+        rightPriceScale:{borderColor:'rgba(255,255,255,0.06)'},
+        timeScale:{borderColor:'rgba(255,255,255,0.06)',rightOffset:1,fixLeftEdge:true,fixRightEdge:true},
+        handleScroll:false, handleScale:false,
+      });
+      const toTime=t=>new Date(t*1000).toISOString().slice(0,10);
+      const bs=chart.addBarSeries({upColor:'#ffffff',downColor:'#ffffff'});
+      bs.setData(bars.map(b=>({time:toTime(b.t),open:b.o,high:b.h,low:b.l,close:b.c})));
+      const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:''});
+      vs.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
+      vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:'rgba(255,255,255,0.25)'})));
+      chart.timeScale().fitContent();
+      new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth})).observe(box);
+    }catch(e){ _msg(el,'שגיאה'); }
   }
-  g.querySelectorAll('.tv-lazy').forEach(el=>_tvQueue.push(el));
-  _tvNext();
+  function _next(){
+    while(_ld<6 && _q.length){ const el=_q.shift(); _ld++; _draw(el).finally(()=>{ _ld--; _next(); }); }
+  }
+  g.querySelectorAll('.tv-lazy').forEach(el=>_q.push(el));
+  _next();
 }
 
 /* ════════════════════════════════════
