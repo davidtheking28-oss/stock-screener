@@ -345,6 +345,31 @@ tbody tr:last-child td { border-bottom: none; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
 
+/* ── Skeleton ── */
+@keyframes shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
+.skel { border-radius: 4px; background: linear-gradient(90deg, var(--bg3) 25%, rgba(255,255,255,0.04) 50%, var(--bg3) 75%); background-size: 400px 100%; animation: shimmer 1.4s ease infinite; }
+.skel-row td { padding: 10px 11px; border-bottom: 1px solid var(--border2); vertical-align: middle; }
+
+/* ── Mobile ── */
+@media (max-width: 680px) {
+  .topbar { padding: 0 14px; gap: 10px; height: auto; min-height: 54px; padding-top: 8px; padding-bottom: 8px; }
+  .main { padding: 12px 14px; }
+  #statBar { font-size: 11px; }
+  .results-header { padding: 10px 12px; gap: 8px; }
+  .view-tab { padding: 5px 9px; font-size: 11px; }
+  .kbd-hint { display: none; }
+  .table-wrap { max-height: 62vh; }
+  thead th { font-size: 10px; padding: 8px 7px; }
+  tbody td { padding: 7px 7px; }
+  .gallery { grid-template-columns: 1fr; }
+}
+@media (max-width: 420px) {
+  .topbar-sep, #breadthChip { display: none !important; }
+  .logo-mark { font-size: 12px; letter-spacing: 1px; }
+  .auth-email { max-width: 80px; }
+  .btn-rescan { padding: 4px 8px; font-size: 11px; }
+}
+
 /* ── Auth ── */
 .auth-user { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
 .auth-email { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
@@ -698,9 +723,49 @@ function _setScanLoading(on){
   const top=$('scanBtn'); if(top) top.disabled=on;
 }
 
+function showSkeleton(){
+  const tv=$('tableView'); if(!tv) return;
+  $('resultsPanel').style.display='block';
+  const skRow='<tr class="skel-row">'
+    +'<td><div class="skel" style="width:22px;height:22px;border-radius:50%"></div></td>'
+    +'<td><div class="skel" style="width:72px;height:13px;margin-bottom:5px"></div><div class="skel" style="width:110px;height:10px"></div></td>'
+    +'<td><div class="skel" style="width:48px;height:13px"></div></td>'
+    +'<td><div class="skel" style="width:36px;height:36px;border-radius:50%"></div></td>'
+    +'<td><div class="skel" style="width:62px;height:10px"></div></td>'
+    +'<td><div class="skel" style="width:52px;height:13px"></div></td>'
+    +'<td><div class="skel" style="width:52px;height:13px"></div></td>'
+    +'</tr>';
+  tv.innerHTML='<table><tbody>'+skRow.repeat(10)+'</tbody></table>';
+}
+
+async function checkAndSaveHistory(tickers){
+  if(!_currentUser || !_sb || !tickers.length) return;
+  const today = new Date().toISOString().slice(0,10);
+  const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
+  const currentSet = new Set(tickers);
+  if(watchlist.size > 0){
+    const {data:prev} = await _sb.from('screener_history')
+      .select('ticker,last_seen').eq('user_id',_currentUser.id).in('ticker',[...watchlist]);
+    if(prev){
+      const exits = prev.filter(h=>!currentSet.has(h.ticker) && h.last_seen >= yesterday).map(h=>h.ticker);
+      if(exits.length) toast('יצאו מהסינון: '+exits.join(', '), 6000);
+    }
+  }
+  await _sb.from('screener_history').upsert(
+    tickers.map(t=>({user_id:_currentUser.id, ticker:t, first_seen:today, last_seen:today})),
+    {onConflict:'user_id,ticker'}
+  );
+  if(watchlist.size > 0){
+    const {data:newIn} = await _sb.from('screener_history')
+      .select('ticker').eq('user_id',_currentUser.id).eq('first_seen',today).in('ticker',[...watchlist]);
+    if(newIn && newIn.length) toast('נכנסו לסינון היום: '+newIn.map(h=>h.ticker).join(', '), 6000);
+  }
+}
+
 async function scan(){
   if(!validateInputs()) return;
   _setScanLoading(true);
+  showSkeleton();
   $('statBar').innerHTML='<span class="spinner"></span> מושך נתונים מ-TradingView...';
   try{
     const universe = await fetchUniverse();
@@ -723,6 +788,7 @@ async function scan(){
     ttUniverse = {};
     applyFilters(universe, rsMap, {skipFund:true}).forEach(r=>{ r.score=calcScore(r); ttUniverse[r.ticker]=r; });
     saveUniverseCache();
+    checkAndSaveHistory(allResults.map(r=>r.ticker));
 
     applySectorFilter(); sortResults(); render();
     renderGallery();  // preload gallery charts in background so they're ready before the tab is opened
