@@ -329,10 +329,8 @@ tbody tr:last-child td { border-bottom: none; }
 .gcard-price { font: 600 12px var(--mono-data); color: var(--text2); font-variant-numeric: tabular-nums; }
 .gcard-name { font: 500 10.5px var(--sans); color: var(--text3); margin-top: 2px; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
 .gcard-badges { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-.gcard-score { display: inline-grid; place-items: center; min-width: 25px; height: 22px; padding: 0 6px; border-radius: 6px; font: 700 12.5px var(--mono-data); font-variant-numeric: tabular-nums; }
-.badge { padding: 3px 8px; border-radius: 6px; font: 700 10.5px var(--mono); letter-spacing: 0.3px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); }
-.badge-rs-hi  { background: rgba(46,204,113,0.14); color: var(--green); }
-.badge-rs-mid { background: rgba(245,185,74,0.14); color: var(--amber); }
+.gbadge { display: inline-flex; align-items: baseline; gap: 4px; height: 22px; padding: 0 8px; border-radius: 6px; font: 700 9.5px var(--sans); letter-spacing: 0.6px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }
+.gbadge b { font: 700 13px var(--mono-data); letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .gcard-chart { height: 200px; background: #0a1120; position: relative; overflow: hidden; }
 .gcard-chart > .tv-lite { width: 100%; height: 200px; }
 .gcard-stats { display: grid; grid-template-columns: repeat(3,1fr); border-top: 1px solid var(--border2); background: linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0)); }
@@ -871,6 +869,7 @@ function calcScore(r){
 }
 function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var(--text3)'; }
 function scoreBorder(s)  { return s>=80?'rgba(46,204,113,0.28)':s>=60?'rgba(245,185,74,0.28)':'rgba(117,137,168,0.22)'; }
+function scoreBg(s)      { return s>=80?'rgba(46,204,113,0.13)':s>=60?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)'; }
 
 function toggleFundFields(){
   const ff=$('fundFields'); if(!ff) return;
@@ -1287,10 +1286,15 @@ function renderGallery(){
       return '<div class="gstat" title="'+tip+'"><div class="gstat-lbl">'+lbl+'</div><div class="gstat-val '+cls+'">'+arrow+pct(v)+'</div></div>';
     };
     const fhUp = r.fromHighPct>=-8;
+    const rsHi=r.rs>=80, rsMid=r.rs>=60;
+    const rsC = rsHi?'var(--green)':rsMid?'var(--amber)':'var(--text3)';
+    const rsBg = rsHi?'rgba(46,204,113,0.13)':rsMid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
     return '<div class="gcard" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button>'
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name">'+esc(r.name)+'</div></div></div>'
-      +'<div class="gcard-badges">'+vcpB+earnB+'<span class="gcard-score" style="color:'+scoreColor(r.score)+';box-shadow:inset 0 0 0 1px '+scoreBorder(r.score)+'" title="ציון SEPA '+r.score+'/100">'+r.score+'</span><span class="badge '+(r.rs>=80?'badge-rs-hi':'badge-rs-mid')+'">RS '+r.rs+'</span></div></div>'
+      +'<div class="gcard-badges">'+vcpB+earnB
+      +'<span class="gbadge" style="color:'+scoreColor(r.score)+';background:'+scoreBg(r.score)+'" title="ציון SEPA '+r.score+'/100 — RS 40% + EPS 25% + הכנסות 20% + קרבה לשיא 15%">SEPA <b>'+r.score+'</b></span>'
+      +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — ביצוע יחסי מול השוק">RS <b>'+r.rs+'</b></span></div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
