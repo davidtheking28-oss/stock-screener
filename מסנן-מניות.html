@@ -135,6 +135,19 @@ body {
   background: rgba(79,131,255,0.18); border-color: var(--accent);
   color: #a8c0ff; box-shadow: 0 0 0 1px rgba(79,131,255,0.2);
 }
+.mc-tier-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.mc-tier-btn {
+  padding: 4px 9px; border-radius: 16px;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text3);
+  font: 600 10px var(--sans); cursor: pointer; transition: all 0.12s;
+  white-space: nowrap;
+}
+.mc-tier-btn:hover { border-color: rgba(79,131,255,0.5); color: var(--text); background: rgba(79,131,255,0.06); }
+.mc-tier-btn.active {
+  background: rgba(79,131,255,0.18); border-color: var(--accent);
+  color: #a8c0ff; box-shadow: 0 0 0 1px rgba(79,131,255,0.2);
+}
 
 .filter-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 680px) { .filter-sections { grid-template-columns: 1fr; } }
@@ -542,14 +555,17 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><input type="number" id="fromHigh" value="25" min="0" max="100"><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
             <div class="field"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><input type="number" id="fromLow" value="25" min="0" max="500"><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field"><label for="priceMin">מחיר מינ&#8217; ($)</label><input type="number" id="priceMin" value="10" min="0"></div>
-            <div class="field"><label for="mcMin">שווי שוק מינ&#8217;</label><select id="mcMin">
-              <option value="0">הכל</option>
-              <option value="0.05">מיקרו+ · $50M ומעלה</option>
-              <option value="0.3">קטן+ · $300M ומעלה</option>
-              <option value="2" selected>בינוני+ · $2B ומעלה</option>
-              <option value="10">גדול+ · $10B ומעלה</option>
-              <option value="200">ענק · $200B ומעלה</option>
-            </select><span class="hint">סינון לפי קטגוריית גודל</span></div>
+            <div class="field"><label>שווי שוק מינ&#8217;</label>
+              <input type="hidden" id="mcMin" value="2">
+              <div class="mc-tier-picker">
+                <button type="button" class="mc-tier-btn" data-val="0" onclick="setMcTier(this)">הכל</button>
+                <button type="button" class="mc-tier-btn" data-val="0.05" onclick="setMcTier(this)">$50M+</button>
+                <button type="button" class="mc-tier-btn" data-val="0.3" onclick="setMcTier(this)">$300M+</button>
+                <button type="button" class="mc-tier-btn active" data-val="2" onclick="setMcTier(this)">$2B+</button>
+                <button type="button" class="mc-tier-btn" data-val="10" onclick="setMcTier(this)">$10B+</button>
+                <button type="button" class="mc-tier-btn" data-val="200" onclick="setMcTier(this)">$200B+</button>
+              </div>
+              <span class="hint">סינון לפי קטגוריית גודל</span></div>
             <div class="field"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()"><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
             <div class="field"><label for="earnDays">חסום דוח בעוד (ימים)</label><input type="number" id="earnDays" value="5" min="0"><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
           </div>
@@ -922,6 +938,17 @@ function updUnitHints(){
   const lh=$('liqHint'); if(lh) lh.textContent='נפח דולרי ממוצע · ≈ '+fmtMoneyM(num('liqMin'))+' ליום';
 }
 
+function setMcTier(btn){
+  document.querySelectorAll('.mc-tier-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  $('mcMin').value=btn.dataset.val;
+}
+function syncMcTierUI(){
+  const v=$('mcMin').value;
+  document.querySelectorAll('.mc-tier-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.val===String(v));
+  });
+}
 function toggleFundFields(){
   const ff=$('fundFields'); if(!ff) return;
   const on=$('useFund').checked;
@@ -948,6 +975,7 @@ function applyPreset(key, btn){
   Object.entries(p).forEach(([k,v])=>{ const el=$(k); if(el) el.value=v; });
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  syncMcTierUI();
   updUnitHints();
   const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+PRESET_NAMES[key];
 }
@@ -1560,6 +1588,7 @@ function loadFilterPrefs(){
     if($('requireProfit')&&p.requireProfit!=null) $('requireProfit').checked=p.requireProfit;
     if($('vcpOnly')&&p.vcpOnly!=null) $('vcpOnly').checked=p.vcpOnly;
     toggleFundFields();
+    syncMcTierUI();
   } catch(e){}
 }
 
