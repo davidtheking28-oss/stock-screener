@@ -143,7 +143,18 @@ body {
   border: 1px solid var(--border2);
   border-radius: 12px;
   padding: 14px 16px;
+  display: flex; flex-direction: column;
 }
+.fund-note {
+  margin-top: auto; padding-top: 14px;
+}
+.fund-note-inner {
+  border-top: 1px dashed var(--border2); padding-top: 12px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.fund-note-title { font: 700 9.5px var(--sans); letter-spacing: 1px; text-transform: uppercase; color: var(--text2); }
+.fund-note p { font-size: 11px; line-height: 1.65; color: var(--text3); }
+.fund-note b { color: var(--text2); font-weight: 700; }
 .filter-section h3 {
   font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
   text-transform: uppercase; margin-bottom: 14px;
@@ -465,6 +476,16 @@ tbody tr:last-child td { border-bottom: none; }
 .ss-bar { position: absolute; right: 0; top: 0; bottom: 0; z-index: 0; border-radius: 7px 0 0 7px; transition: width .25s ease; }
 .ss-name, .ss-num { position: relative; z-index: 1; }
 .ss-num { font: 700 11.5px var(--mono-data); }
+
+.results-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 8px 18px; border-bottom: 1px solid var(--border); background: var(--bg2); font: 500 11px var(--sans); color: var(--text3); }
+.results-legend:empty { display: none; }
+.lg-grp { display: inline-flex; align-items: center; gap: 6px; }
+.lg-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; box-shadow: 0 0 5px -1px currentColor; }
+.lg-hi { background: var(--green); color: var(--green); }
+.lg-mid { background: var(--amber); color: var(--amber); }
+.lg-lo { background: var(--text3); color: var(--text3); }
+.lg-sep { width: 1px; height: 13px; background: var(--border); }
+.results-legend .vcp-badge, .results-legend .earn-badge { margin: 0; }
 @media (max-width: 640px) {
   .ss-chip { min-height: 40px; padding: 8px 12px; }
   .results-controls .btn-ghost, .view-tab { min-height: 40px; }
@@ -535,6 +556,12 @@ tbody tr:last-child td { border-bottom: none; }
             <label class="toggle"><input type="checkbox" id="requireProfit" checked> שולי רווח חיוביים</label>
             <label class="toggle"><input type="checkbox" id="vcpOnly"> רק קרוב לנקודת קנייה (VCP)</label>
           </div>
+          <div class="fund-note">
+            <div class="fund-note-inner">
+              <div class="fund-note-title">איך מחושב ציון SEPA</div>
+              <p><b>RS 40%</b> · <b>EPS 25%</b> · <b>הכנסות 20%</b> · <b>קרבה לשיא 15%</b>. ה-Trend Template דורש מבנה <b>MA50&gt;MA150&gt;MA200</b> והמחיר מעליהם.</p>
+            </div>
+          </div>
         </div>
       </div>
       <div class="filter-actions">
@@ -568,6 +595,14 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
     </div>
     <div id="sectorStrength" class="sector-strength"></div>
+    <div class="results-legend">
+      <span class="lg-grp"><i class="lg-dot lg-hi"></i>חזק 80+</span>
+      <span class="lg-grp"><i class="lg-dot lg-mid"></i>בינוני 60–79</span>
+      <span class="lg-grp"><i class="lg-dot lg-lo"></i>חלש מתחת 60</span>
+      <span class="lg-sep"></span>
+      <span class="lg-grp"><span class="vcp-badge">VCP</span> קרוב לנקודת קנייה</span>
+      <span class="lg-grp"><span class="earn-badge soon">דוח 5י</span> דוח כספי קרוב</span>
+    </div>
     <div id="tableView" class="table-wrap"></div>
     <div id="galleryView" class="gallery" style="display:none"></div>
   </div>
