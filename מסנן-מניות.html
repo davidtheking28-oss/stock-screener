@@ -449,16 +449,21 @@ tbody tr:last-child td { border-bottom: none; }
 .ss-title { font: 600 10px var(--sans); letter-spacing: 1px; text-transform: uppercase; color: var(--text3); margin-left: 4px; }
 .ss-chip {
   position: relative; overflow: hidden; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 7px;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 30px;
   background: rgba(255,255,255,0.03); border: 1px solid var(--border);
-  border-radius: 7px; padding: 5px 9px; font: 600 11px var(--sans); color: var(--text2);
+  border-radius: 7px; padding: 5px 10px; font: 600 11px var(--sans); color: var(--text2);
   transition: border-color .15s, background .15s;
 }
-.ss-chip:hover { border-color: rgba(79,131,255,0.4); background: rgba(79,131,255,0.06); }
-.ss-chip.on { border-color: var(--accent2); background: rgba(79,131,255,0.1); color: var(--text); }
-.ss-bar { position: absolute; right: 0; top: 0; bottom: 0; background: rgba(79,131,255,0.1); z-index: 0; }
+.ss-chip:hover { border-color: rgba(79,131,255,0.4); }
+.ss-chip.on { border-color: var(--accent2); color: var(--text); }
+.ss-chip.strong:hover { border-color: rgba(46,204,113,0.45); }
+.ss-bar { position: absolute; right: 0; top: 0; bottom: 0; z-index: 0; border-radius: 7px 0 0 7px; transition: width .25s ease; }
 .ss-name, .ss-num { position: relative; z-index: 1; }
-.ss-num { font: 700 11px var(--mono-data); color: var(--accent2); }
+.ss-num { font: 700 11.5px var(--mono-data); }
+@media (max-width: 640px) {
+  .ss-chip { min-height: 40px; padding: 8px 12px; }
+  .results-controls .btn-ghost, .view-tab { min-height: 40px; }
+}
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
@@ -504,21 +509,21 @@ tbody tr:last-child td { border-bottom: none; }
         <div class="filter-section">
           <h3 class="tech-head">טכני — Trend Template</h3>
           <div class="fields">
-            <div class="field"><label>RS Rating מינ&#8217;</label><input type="number" id="rsMin" value="70" min="1" max="99"><span class="hint">ביצוע יחסי (0-99)</span></div>
-            <div class="field"><label>מהשיא (%) מקס&#8217;</label><input type="number" id="fromHigh" value="25" min="0" max="100"><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
-            <div class="field"><label>מעל השפל (%) מינ&#8217;</label><input type="number" id="fromLow" value="25" min="0" max="500"><span class="hint">% מעל שפל 52ש&#8217;</span></div>
-            <div class="field"><label>מחיר מינ&#8217; ($)</label><input type="number" id="priceMin" value="10" min="0"></div>
-            <div class="field"><label>שווי שוק מינ&#8217; ($M)</label><input type="number" id="mcMin" value="1000" min="0" step="100"></div>
-            <div class="field"><label>נזילות מינ&#8217; ($M/יום)</label><input type="number" id="liqMin" value="20" min="0"><span class="hint">נפח דולרי ממוצע 10 ימים</span></div>
-            <div class="field"><label>חסום דוח בעוד (ימים)</label><input type="number" id="earnDays" value="5" min="0"><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
+            <div class="field"><label for="rsMin">RS Rating מינ&#8217;</label><input type="number" id="rsMin" value="70" min="1" max="99"><span class="hint">ביצוע יחסי (0-99)</span></div>
+            <div class="field"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><input type="number" id="fromHigh" value="25" min="0" max="100"><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
+            <div class="field"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><input type="number" id="fromLow" value="25" min="0" max="500"><span class="hint">% מעל שפל 52ש&#8217;</span></div>
+            <div class="field"><label for="priceMin">מחיר מינ&#8217; ($)</label><input type="number" id="priceMin" value="10" min="0"></div>
+            <div class="field"><label for="mcMin">שווי שוק מינ&#8217; ($M)</label><input type="number" id="mcMin" value="1000" min="0" step="100"></div>
+            <div class="field"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><input type="number" id="liqMin" value="20" min="0"><span class="hint">נפח דולרי ממוצע 10 ימים</span></div>
+            <div class="field"><label for="earnDays">חסום דוח בעוד (ימים)</label><input type="number" id="earnDays" value="5" min="0"><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
           </div>
         </div>
         <div class="filter-section">
           <h3 class="fund-head">פונדמנטלי</h3>
           <div class="fields" id="fundFields">
-            <div class="field"><label>EPS YoY מינ&#8217; (%)</label><input type="number" id="epsMin" value="25"><span class="hint">רבעון מול שנה קודמת</span></div>
-            <div class="field"><label>הכנסות YoY מינ&#8217; (%)</label><input type="number" id="revMin" value="20"></div>
-            <div class="field"><label>ROE מינ&#8217; (%)</label><input type="number" id="roeMin" value="15"></div>
+            <div class="field"><label for="epsMin">EPS YoY מינ&#8217; (%)</label><input type="number" id="epsMin" value="25"><span class="hint">רבעון מול שנה קודמת</span></div>
+            <div class="field"><label for="revMin">הכנסות YoY מינ&#8217; (%)</label><input type="number" id="revMin" value="20"></div>
+            <div class="field"><label for="roeMin">ROE מינ&#8217; (%)</label><input type="number" id="roeMin" value="15"></div>
           </div>
           <div class="filter-toggles">
             <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
@@ -1113,13 +1118,16 @@ function renderSectorStrength(){
   const max=ranked[0][1];
   const active=$('sectorFilter')?.value||'';
   wrap.innerHTML='<span class="ss-title">עוצמת סקטורים</span>'
-    +ranked.slice(0,8).map(([s,n])=>{
+    +ranked.slice(0,8).map(([s,n],i)=>{
       const pct=Math.round(n/max*100);
       const on=active===s;
-      return '<button class="ss-chip'+(on?' on':'')+'" onclick="selectSector(\''+(on?'':esc(s))+'\')" title="'+esc(s)+' — '+n+' מניות עוברות">'
-        +'<span class="ss-bar" style="width:'+pct+'%"></span>'
+      const strong=n>=max*0.66;
+      const barCol=strong?'rgba(46,204,113,0.20)':'rgba(79,131,255,0.16)';
+      const numCol=strong?'var(--green)':'var(--accent2)';
+      return '<button class="ss-chip'+(on?' on':'')+(strong?' strong':'')+'" onclick="selectSector(\''+(on?'':esc(s))+'\')" title="'+esc(s)+' — '+n+' מניות עוברות את הסינון">'
+        +'<span class="ss-bar" style="width:'+pct+'%;background:'+barCol+'"></span>'
         +'<span class="ss-name">'+esc(s.split(' ').slice(0,2).join(' '))+'</span>'
-        +'<span class="ss-num">'+n+'</span></button>';
+        +'<span class="ss-num" style="color:'+numCol+'">'+n+'</span></button>';
     }).join('');
 }
 
