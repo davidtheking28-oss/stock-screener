@@ -539,8 +539,8 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><input type="number" id="fromHigh" value="25" min="0" max="100"><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
             <div class="field"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><input type="number" id="fromLow" value="25" min="0" max="500"><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field"><label for="priceMin">מחיר מינ&#8217; ($)</label><input type="number" id="priceMin" value="10" min="0"></div>
-            <div class="field"><label for="mcMin">שווי שוק מינ&#8217; ($M)</label><input type="number" id="mcMin" value="1000" min="0" step="100"></div>
-            <div class="field"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><input type="number" id="liqMin" value="20" min="0"><span class="hint">נפח דולרי ממוצע 10 ימים</span></div>
+            <div class="field"><label for="mcMin">שווי שוק מינ&#8217; ($M)</label><input type="number" id="mcMin" value="1000" min="0" step="100" oninput="updUnitHints()"><span class="hint" id="mcHint"></span></div>
+            <div class="field"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()"><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
             <div class="field"><label for="earnDays">חסום דוח בעוד (ימים)</label><input type="number" id="earnDays" value="5" min="0"><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
           </div>
         </div>
@@ -907,6 +907,12 @@ function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var
 function scoreBorder(s)  { return s>=80?'rgba(46,204,113,0.28)':s>=60?'rgba(245,185,74,0.28)':'rgba(117,137,168,0.22)'; }
 function scoreBg(s)      { return s>=80?'rgba(46,204,113,0.13)':s>=60?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)'; }
 
+function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : '$'+m+'M'; }
+function updUnitHints(){
+  const mh=$('mcHint'); if(mh) mh.textContent='≈ '+fmtMoneyM(num('mcMin'))+' שווי שוק';
+  const lh=$('liqHint'); if(lh) lh.textContent='נפח דולרי ממוצע · ≈ '+fmtMoneyM(num('liqMin'))+' ליום';
+}
+
 function toggleFundFields(){
   const ff=$('fundFields'); if(!ff) return;
   const on=$('useFund').checked;
@@ -933,6 +939,7 @@ function applyPreset(key, btn){
   Object.entries(p).forEach(([k,v])=>{ const el=$(k); if(el) el.value=v; });
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  updUnitHints();
   const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+PRESET_NAMES[key];
 }
 
@@ -1211,7 +1218,7 @@ function setView(v){
 ════════════════════════════════════ */
 function arr(k){
   const a=sortDir<0?'↓':'↑';
-  return sortKey===k ? '<span class="sort-arr">'+a+'</span>' : '<span class="sort-arr" style="opacity:0.3">↕</span>';
+  return sortKey===k ? '<span class="sort-arr">'+a+'</span>' : '';
 }
 function th(label,key,tip){
   const t=tip?' title="'+tip+'"':'';
@@ -1543,6 +1550,7 @@ function loadFilterPrefs(){
 }
 
 loadFilterPrefs();
+updUnitHints();
 loadUniverseCache();
 loadResultsCache();
 initAuth();
