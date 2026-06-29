@@ -427,6 +427,38 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 1px 5px; border-radius: 4px; letter-spacing: 0.5px;
   text-transform: uppercase; margin-right: 4px; vertical-align: middle;
 }
+.vcp-badge {
+  display: inline-block; font: 700 9px var(--sans); color: var(--accent2);
+  background: rgba(79,131,255,0.14); border: 1px solid rgba(79,131,255,0.32);
+  padding: 1px 5px; border-radius: 4px; letter-spacing: 0.5px;
+  margin-right: 5px; vertical-align: middle;
+}
+.earn-badge {
+  display: inline-block; font: 700 9px var(--sans); color: var(--text3);
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  padding: 1px 5px; border-radius: 4px; letter-spacing: 0.3px;
+  margin-right: 5px; vertical-align: middle;
+}
+.earn-badge.soon { color: var(--amber); background: rgba(245,185,74,0.12); border-color: rgba(245,185,74,0.3); }
+
+.sector-strength {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 10px 18px; border-bottom: 1px solid var(--border); background: var(--bg2);
+}
+.sector-strength:empty { display: none; }
+.ss-title { font: 600 10px var(--sans); letter-spacing: 1px; text-transform: uppercase; color: var(--text3); margin-left: 4px; }
+.ss-chip {
+  position: relative; overflow: hidden; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+  border-radius: 7px; padding: 5px 9px; font: 600 11px var(--sans); color: var(--text2);
+  transition: border-color .15s, background .15s;
+}
+.ss-chip:hover { border-color: rgba(79,131,255,0.4); background: rgba(79,131,255,0.06); }
+.ss-chip.on { border-color: var(--accent2); background: rgba(79,131,255,0.1); color: var(--text); }
+.ss-bar { position: absolute; right: 0; top: 0; bottom: 0; background: rgba(79,131,255,0.1); z-index: 0; }
+.ss-name, .ss-num { position: relative; z-index: 1; }
+.ss-num { font: 700 11px var(--mono-data); color: var(--accent2); }
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
@@ -477,6 +509,8 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field"><label>מעל השפל (%) מינ&#8217;</label><input type="number" id="fromLow" value="25" min="0" max="500"><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field"><label>מחיר מינ&#8217; ($)</label><input type="number" id="priceMin" value="10" min="0"></div>
             <div class="field"><label>שווי שוק מינ&#8217; ($M)</label><input type="number" id="mcMin" value="1000" min="0" step="100"></div>
+            <div class="field"><label>נזילות מינ&#8217; ($M/יום)</label><input type="number" id="liqMin" value="20" min="0"><span class="hint">נפח דולרי ממוצע 10 ימים</span></div>
+            <div class="field"><label>חסום דוח בעוד (ימים)</label><input type="number" id="earnDays" value="5" min="0"><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
           </div>
         </div>
         <div class="filter-section">
@@ -489,6 +523,7 @@ tbody tr:last-child td { border-bottom: none; }
           <div class="filter-toggles">
             <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
             <label class="toggle"><input type="checkbox" id="requireProfit" checked> שולי רווח חיוביים</label>
+            <label class="toggle"><input type="checkbox" id="vcpOnly"> רק קרוב לנקודת קנייה (VCP)</label>
           </div>
         </div>
       </div>
@@ -522,6 +557,7 @@ tbody tr:last-child td { border-bottom: none; }
         <span class="kbd-hint" id="kbdHint" title="ניווט מקלדת: j/k לזוז · Enter לפתוח גרף · w להוסיף/הסיר ממעקב · Esc לסגור">j/k/w &#8629;</span>
       </div>
     </div>
+    <div id="sectorStrength" class="sector-strength"></div>
     <div id="tableView" class="table-wrap"></div>
     <div id="galleryView" class="gallery" style="display:none"></div>
   </div>
@@ -584,14 +620,15 @@ const COLUMNS = [
   "earnings_per_share_diluted_yoy_growth_fq",
   "total_revenue_yoy_growth_fq","return_on_equity_fq",
   "net_margin","sector","market_cap_basic","volume",
-  "exchange","average_volume_10d_calc"
+  "exchange","average_volume_10d_calc",
+  "earnings_release_next_date","Volatility.D","Volatility.M"
 ];
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
 const PRESETS = {
-  classic:      {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:1000,epsMin:25,revMin:20,roeMin:15},
-  aggressive:   {rsMin:80,fromHigh:15,fromLow:30,priceMin:15,mcMin:2000,epsMin:40,revMin:30,roeMin:20},
-  conservative: {rsMin:60,fromHigh:35,fromLow:15,priceMin:5, mcMin:500, epsMin:10,revMin:10,roeMin:8},
+  classic:      {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:1000,liqMin:20,earnDays:5,epsMin:25,revMin:20,roeMin:15},
+  aggressive:   {rsMin:80,fromHigh:15,fromLow:30,priceMin:15,mcMin:2000,liqMin:30,earnDays:7,epsMin:40,revMin:30,roeMin:20},
+  conservative: {rsMin:60,fromHigh:35,fromLow:15,priceMin:5, mcMin:500, liqMin:10,earnDays:0,epsMin:10,revMin:10,roeMin:8},
 };
 
 const COL_DEFS = [
@@ -605,6 +642,7 @@ const COL_DEFS = [
   {key:'roe',    label:'ROE %',      defaultOn:false},
   {key:'nm',     label:'מרווח נקי',  defaultOn:false},
   {key:'vol',    label:'נפח',        defaultOn:false},
+  {key:'liq',    label:'נזילות $',   defaultOn:false},
   {key:'mc',     label:'שווי שוק',   defaultOn:false},
   {key:'sector', label:'סקטור',      defaultOn:false},
 ];
@@ -997,8 +1035,11 @@ function computeRS(universe){
 function applyFilters(universe, rsMap, opts={}){
   const rsMin=num('rsMin'), fhPct=num('fromHigh')/100, flPct=num('fromLow')/100;
   const mcMin=num('mcMin')*1e6, priceMin=num('priceMin');
+  const liqMin=opts.skipFund?0:num('liqMin')*1e6, earnGap=opts.skipFund?0:num('earnDays');
+  const vcpOnly=opts.skipFund?false:!!$('vcpOnly')?.checked;
   const useFund=opts.skipFund?false:$('useFund').checked, reqProfit=opts.skipFund?false:$('requireProfit').checked;
   const epsMin=num('epsMin'), revMin=num('revMin'), roeMin=num('roeMin');
+  const nowSec=Date.now()/1000;
   const out=[];
 
   for(const r of universe){
@@ -1007,6 +1048,9 @@ function applyFilters(universe, rsMap, opts={}){
     const hi=d[C.price_52_week_high],lo=d[C.price_52_week_low],mc=d[C.market_cap_basic];
     if([close,s50,s150,s200,hi,lo].some(v=>v==null)) continue;
     if(close<priceMin||mc<mcMin) continue;
+    const avgVol=d[C.average_volume_10d_calc], vol=d[C.volume];
+    const dollarVol=(avgVol!=null)?close*avgVol:null;
+    if(liqMin>0 && (dollarVol==null||dollarVol<liqMin)) continue;
     const rs=rsMap[r.s]??0;
     const t1=close>s150&&close>s200, t2=s150>s200, t3=s50>s150&&s50>s200;
     const t5=close>s50, t6=close>=lo*(1+flPct), t7=close>=hi*(1-fhPct), t8=rs>=rsMin;
@@ -1016,11 +1060,19 @@ function applyFilters(universe, rsMap, opts={}){
           roe=d[C.return_on_equity_fq], nm=d[C.net_margin];
     if(useFund){ if(eps==null||eps<epsMin||rev==null||rev<revMin||roe==null||roe<roeMin) continue; }
     if(reqProfit&&(nm==null||nm<=0)) continue;
+    const earnTs=d[C['earnings_release_next_date']];
+    const earnIn=(earnTs!=null && earnTs>0)?Math.round((earnTs-nowSec)/86400):null;
+    if(earnGap>0 && earnIn!=null && earnIn>=0 && earnIn<=earnGap) continue;
+    const fromHighPct=(close/hi-1)*100;
+    const volD=d[C['Volatility.D']], volM=d[C['Volatility.M']];
+    const vr=(vol!=null&&avgVol)?vol/avgVol:null;
+    const vcp = fromHighPct>=-12 && volD!=null && volM!=null && volD<volM && vr!=null && vr<1.0;
+    if(vcpOnly && !vcp) continue;
     out.push({
       sym:r.s, ticker:d[C.name], name:d[C.description]||'', exch:d[C.exchange],
       close, rs, sector:d[C.sector]||'—', mc,
-      vol:d[C.volume], avgVol:d[C.average_volume_10d_calc],
-      fromHighPct:(close/hi-1)*100, fromLowPct:(close/lo-1)*100,
+      vol, avgVol, dollarVol, earnIn, vcp,
+      fromHighPct, fromLowPct:(close/lo-1)*100,
       rangePos:(close-lo)/(hi-lo), perfY:d[C['Perf.Y']],
       eps, rev, roe, nm, score:0, checks:{t1,t2,t3,t5,t6,t7,t8}
     });
@@ -1037,11 +1089,38 @@ function buildSectorFilter(){
   const sectors=[...new Set(allResults.map(r=>r.sector))].sort();
   const saved=localStorage.getItem('sepa_sector')||'';
   const wrap=$('sectorWrap'); if(!wrap) return;
-  wrap.innerHTML='<select id="sectorFilter" class="filter-select" onchange="applySectorFilter();sortResults();render();try{localStorage.setItem(\'sepa_sector\',this.value)}catch(e){}">'
+  wrap.innerHTML='<select id="sectorFilter" class="filter-select" onchange="applySectorFilter();sortResults();render();renderSectorStrength();try{localStorage.setItem(\'sepa_sector\',this.value)}catch(e){}">'
     +'<option value="" '+(saved?'':'selected')+'>כל הסקטורים ('+allResults.length+')</option>'
     +sectors.map(s=>'<option value="'+s+'" '+(saved===s?'selected':'')+'>'+s+' ('+allResults.filter(r=>r.sector===s).length+')</option>').join('')
     +'</select>';
   if(saved && sectors.includes(saved)){ applySectorFilter(); sortResults(); render(); }
+  renderSectorStrength();
+}
+
+function selectSector(s){
+  const sel=$('sectorFilter'); if(!sel) return;
+  sel.value=s; applySectorFilter(); sortResults(); render();
+  try{ localStorage.setItem('sepa_sector', s); }catch(e){}
+  renderSectorStrength();
+}
+
+function renderSectorStrength(){
+  const wrap=$('sectorStrength'); if(!wrap) return;
+  if(!allResults.length){ wrap.innerHTML=''; return; }
+  const counts={};
+  allResults.forEach(r=>{ counts[r.sector]=(counts[r.sector]||0)+1; });
+  const ranked=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const max=ranked[0][1];
+  const active=$('sectorFilter')?.value||'';
+  wrap.innerHTML='<span class="ss-title">עוצמת סקטורים</span>'
+    +ranked.slice(0,8).map(([s,n])=>{
+      const pct=Math.round(n/max*100);
+      const on=active===s;
+      return '<button class="ss-chip'+(on?' on':'')+'" onclick="selectSector(\''+(on?'':esc(s))+'\')" title="'+esc(s)+' — '+n+' מניות עוברות">'
+        +'<span class="ss-bar" style="width:'+pct+'%"></span>'
+        +'<span class="ss-name">'+esc(s.split(' ').slice(0,2).join(' '))+'</span>'
+        +'<span class="ss-num">'+n+'</span></button>';
+    }).join('');
 }
 
 /* ════════════════════════════════════
@@ -1049,7 +1128,7 @@ function buildSectorFilter(){
 ════════════════════════════════════ */
 const SORTS={
   ticker:r=>r.ticker, close:r=>r.close, rs:r=>r.rs, score:r=>r.score,
-  mc:r=>r.mc, vol:r=>r.vol??0, fromHigh:r=>r.fromHighPct,
+  mc:r=>r.mc, vol:r=>r.vol??0, liq:r=>r.dollarVol??0, fromHigh:r=>r.fromHighPct,
   perfY:r=>r.perfY??-1e9, eps:r=>r.eps??-1e9,
   rev:r=>r.rev??-1e9, roe:r=>r.roe??-1e9, nm:r=>r.nm??-1e9, range:r=>r.rangePos
 };
@@ -1115,6 +1194,7 @@ function renderTable(rows){
     +(colVis.roe   ? th('ROE %','roe','תשואה על ההון') : '')
     +(colVis.nm    ? th('מרווח נקי','nm','Net Margin') : '')
     +(colVis.vol   ? th('נפח','vol','נפח מסחר יומי') : '')
+    +(colVis.liq   ? th('נזילות $','liq','נפח דולרי ממוצע ליום (מחיר × נפח ממוצע 10 ימים)') : '')
     +(colVis.mc    ? th('שווי שוק','mc','שווי שוק בדולרים') : '')
     +(colVis.sector? '<th>סקטור</th>' : '')
     +'</tr>';
@@ -1143,9 +1223,11 @@ function renderTable(rows){
 
     const priceStr=r.close>=100?r.close.toFixed(0):r.close.toFixed(2);
     const isNew = newToday.has(r.ticker);
+    const vcpB = r.vcp ? '<span class="vcp-badge" title="התכווצות תנודתיות קרוב לשיא — נקודת קנייה אפשרית">VCP</span>' : '';
+    const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button></td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+'</div><div class="cname">'+esc(r.name)+'</div></td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+vcpB+earnB+'</div><div class="cname">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
@@ -1156,6 +1238,7 @@ function renderTable(rows){
       +col('roe',    '<td><span class="mn">'+pct(r.roe)+'</span></td>')
       +col('nm',     '<td><span class="mn '+((r.nm??0)>=0?'pos':'neg')+'">'+pct(r.nm)+'</span></td>')
       +col('vol',    '<td>'+volEl+'</td>')
+      +col('liq',    '<td><span class="mn">$'+fmtB(r.dollarVol)+'</span></td>')
       +col('mc',     '<td><span class="mn">'+fmtB(r.mc)+'</span></td>')
       +col('sector', '<td><span class="sector-tag">'+r.sector.split(' ').slice(0,2).join(' ')+'</span></td>')
       +'</tr>';
@@ -1181,9 +1264,11 @@ function renderGallery(){
   _galleryKey=_key;
   g.innerHTML=results.map(r=>{
     const wl=watchlist.has(r.ticker);
+    const vcpB = r.vcp ? '<span class="vcp-badge" title="התכווצות תנודתיות קרוב לשיא — נקודת קנייה אפשרית">VCP</span>' : '';
+    const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     return '<div class="gcard" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button><div><span class="gcard-sym">'+r.ticker+'</span> <span class="gcard-price">$'+(r.close>=100?r.close.toFixed(0):r.close.toFixed(2))+'</span></div></div>'
-      +'<div class="gcard-badges"><span style="font:700 13px var(--mono-data);color:'+scoreColor(r.score)+'" title="ציון SEPA '+r.score+'/100">'+r.score+'</span><span class="badge '+(r.rs>=80?'badge-rs-hi':'badge-rs-mid')+'">RS '+r.rs+'</span></div></div>'
+      +'<div class="gcard-badges">'+vcpB+earnB+'<span style="font:700 13px var(--mono-data);color:'+scoreColor(r.score)+'" title="ציון SEPA '+r.score+'/100">'+r.score+'</span><span class="badge '+(r.rs>=80?'badge-rs-hi':'badge-rs-mid')+'">RS '+r.rs+'</span></div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +'<div class="gstat"><div class="gstat-lbl">ביצֹ 1Y</div><div class="gstat-val '+((r.perfY??0)>=0?'pos':'neg')+'">'+pct(r.perfY)+'</div></div>'
@@ -1373,8 +1458,9 @@ function saveFilterPrefs(){
     localStorage.setItem('sepa_filters', JSON.stringify({
       rsMin:num('rsMin'),fromHigh:num('fromHigh'),fromLow:num('fromLow'),
       priceMin:num('priceMin'),mcMin:num('mcMin'),
+      liqMin:num('liqMin'),earnDays:num('earnDays'),
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
-      useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked
+      useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,vcpOnly:$('vcpOnly')?.checked
     }));
   } catch(e){}
 }
@@ -1385,9 +1471,11 @@ function loadFilterPrefs(){
     const set=(id,v)=>{ const el=$(id); if(el&&v!=null) el.value=v; };
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
     set('priceMin',p.priceMin); set('mcMin',p.mcMin);
+    set('liqMin',p.liqMin); set('earnDays',p.earnDays);
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
     if($('requireProfit')&&p.requireProfit!=null) $('requireProfit').checked=p.requireProfit;
+    if($('vcpOnly')&&p.vcpOnly!=null) $('vcpOnly').checked=p.vcpOnly;
     toggleFundFields();
   } catch(e){}
 }
