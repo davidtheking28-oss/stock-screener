@@ -123,6 +123,20 @@ body {
 
 .presets { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
 .preset-label { font-size: 11px; color: var(--text3); font-weight: 600; margin-left: 2px; }
+.screeners { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+.screener-btn {
+  padding: 7px 16px; border-radius: 9px;
+  border: 1px solid var(--border); background: rgba(255,255,255,0.02); color: var(--text2);
+  font: 700 12px var(--sans); cursor: pointer; transition: all 0.15s; letter-spacing: 0.2px;
+}
+.screener-btn:hover { border-color: rgba(79,131,255,0.5); color: var(--text); background: rgba(79,131,255,0.06); }
+.screener-btn.active {
+  background: rgba(79,131,255,0.16); border-color: var(--accent);
+  color: #c4d4ff; box-shadow: inset 0 0 0 1px rgba(79,131,255,0.25);
+}
+#filterPanel.panel-momentum .f-sepa, #filterPanel.panel-power .f-sepa { display: none; }
+#filterPanel.panel-sepa .f-power, #filterPanel.panel-momentum .f-power { display: none; }
+.filter-sections.single { grid-template-columns: 1fr; }
 .preset-btn {
   padding: 5px 14px; border-radius: 20px;
   border: 1px solid var(--border);
@@ -541,19 +555,26 @@ tbody tr:last-child td { border-bottom: none; }
       <span class="filter-arrow">&#9660;</span>
     </div>
     <div class="filter-body">
-      <div class="presets">
+      <div class="screeners">
+        <span class="preset-label">מסנן:</span>
+        <button class="screener-btn active" data-screener="sepa" onclick="setScreener('sepa')">Minervini SEPA</button>
+        <button class="screener-btn" data-screener="momentum" onclick="setScreener('momentum')">פריצת שיא</button>
+        <button class="screener-btn" data-screener="power" onclick="setScreener('power')">Power Play</button>
+      </div>
+      <div class="presets f-sepa">
         <span class="preset-label">פריסט:</span>
         <button class="preset-btn active" onclick="applyPreset('classic',this)">קלאסי Minervini</button>
         <button class="preset-btn" onclick="applyPreset('aggressive',this)">אגרסיבי</button>
         <button class="preset-btn" onclick="applyPreset('conservative',this)">שמרני</button>
       </div>
-      <div class="filter-sections">
+      <div class="filter-sections" id="filterSections">
         <div class="filter-section">
-          <h3 class="tech-head">טכני — Trend Template</h3>
+          <h3 class="tech-head" id="techHead">טכני — Trend Template</h3>
           <div class="fields">
             <div class="field"><label for="rsMin">RS Rating מינ&#8217;</label><input type="number" id="rsMin" value="70" min="1" max="99"><span class="hint">ביצוע יחסי (0-99)</span></div>
             <div class="field"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><input type="number" id="fromHigh" value="25" min="0" max="100"><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
-            <div class="field"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><input type="number" id="fromLow" value="25" min="0" max="500"><span class="hint">% מעל שפל 52ש&#8217;</span></div>
+            <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><input type="number" id="fromLow" value="25" min="0" max="500"><span class="hint">% מעל שפל 52ש&#8217;</span></div>
+            <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><input type="number" id="runMin" value="100" min="0"><span class="hint">עליית מחיר נפיצה ב-3-6ח&#8217;</span></div>
             <div class="field"><label for="priceMin">מחיר מינ&#8217; ($)</label><input type="number" id="priceMin" value="10" min="0"></div>
             <div class="field"><label>שווי שוק מינ&#8217;</label>
               <input type="hidden" id="mcMin" value="2">
@@ -570,7 +591,7 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field"><label for="earnDays">חסום דוח בעוד (ימים)</label><input type="number" id="earnDays" value="5" min="0"><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
           </div>
         </div>
-        <div class="filter-section">
+        <div class="filter-section f-sepa">
           <h3 class="fund-head">פונדמנטלי</h3>
           <div class="fields" id="fundFields">
             <div class="field"><label for="epsMin">EPS YoY מינ&#8217; (%)</label><input type="number" id="epsMin" value="25"><span class="hint">רבעון מול שנה קודמת</span></div>
@@ -692,7 +713,8 @@ const COLUMNS = [
   "total_revenue_yoy_growth_fq","return_on_equity_fq",
   "net_margin","sector","market_cap_basic","volume",
   "exchange","average_volume_10d_calc",
-  "earnings_release_next_date","Volatility.D","Volatility.M"
+  "earnings_release_next_date","Volatility.D","Volatility.M",
+  "Perf.3M","Perf.6M"
 ];
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
@@ -701,6 +723,18 @@ const PRESETS = {
   aggressive:   {rsMin:80,fromHigh:15,fromLow:30,priceMin:15,mcMin:10, liqMin:30,earnDays:7,epsMin:40,revMin:30,roeMin:20},
   conservative: {rsMin:60,fromHigh:35,fromLow:15,priceMin:5, mcMin:0.3,liqMin:10,earnDays:0,epsMin:10,revMin:10,roeMin:8},
 };
+
+const SCREENERS = {
+  sepa:     {name:'Minervini SEPA',      sub:'Trend Template + SEPA',  fund:true,  presets:true},
+  momentum: {name:'פריצת שיא',           sub:'פריצת שיא 52ש׳ · מומנטום', fund:false, presets:false},
+  power:    {name:'Power Play',           sub:'ריצה נפיצה + דשדוש הדוק', fund:false, presets:false},
+};
+const SCREENER_DEFAULTS = {
+  sepa:     {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
+  momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
+  power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100},
+};
+let activeScreener = localStorage.getItem('sepa_screener') || 'sepa';
 
 const COL_DEFS = [
   {key:'price',  label:'מחיר',       defaultOn:true},
@@ -980,6 +1014,26 @@ function applyPreset(key, btn){
   const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+PRESET_NAMES[key];
 }
 
+const SCREENER_HEADS = {sepa:'טכני — Trend Template', momentum:'טכני — מומנטום', power:'טכני — Power Play'};
+function setScreener(key, applyDef=true){
+  if(!SCREENERS[key]) return;
+  activeScreener=key;
+  try{ localStorage.setItem('sepa_screener', key); }catch(e){}
+  const cfg=SCREENERS[key], panel=$('filterPanel');
+  ['sepa','momentum','power'].forEach(k=>panel.classList.remove('panel-'+k));
+  panel.classList.add('panel-'+key);
+  $('filterSections').classList.toggle('single', !cfg.fund);
+  const sub=$('filterSub'); if(sub) sub.textContent=cfg.sub;
+  const th=$('techHead'); if(th) th.textContent=SCREENER_HEADS[key];
+  document.querySelectorAll('.screener-btn').forEach(b=>b.classList.toggle('active', b.dataset.screener===key));
+  if(applyDef){
+    Object.entries(SCREENER_DEFAULTS[key]||{}).forEach(([k,v])=>{ const el=$(k); if(el) el.value=v; });
+    if(key==='sepa') document.querySelectorAll('.preset-btn').forEach((b,i)=>b.classList.toggle('active', i===0));
+    syncMcTierUI();
+    updUnitHints();
+  }
+}
+
 /* ════════════════════════════════════
    SCAN
 ════════════════════════════════════ */
@@ -1123,9 +1177,11 @@ function computeRS(universe){
    FILTER
 ════════════════════════════════════ */
 function applyFilters(universe, rsMap, opts={}){
+  const scr = opts.skipFund ? 'sepa' : activeScreener;
   const rsMin=num('rsMin'), fhPct=num('fromHigh')/100, flPct=num('fromLow')/100;
-  const mcMin=num('mcMin')*1e9, priceMin=num('priceMin');
+  const mcMin=opts.skipFund?0:num('mcMin')*1e9, priceMin=num('priceMin');
   const liqMin=opts.skipFund?0:num('liqMin')*1e6, earnGap=opts.skipFund?0:num('earnDays');
+  const runMin=num('runMin');
   const vcpOnly=opts.skipFund?false:!!$('vcpOnly')?.checked;
   const useFund=opts.skipFund?false:$('useFund').checked, reqProfit=opts.skipFund?false:$('requireProfit').checked;
   const epsMin=num('epsMin'), revMin=num('revMin'), roeMin=num('roeMin');
@@ -1142,14 +1198,6 @@ function applyFilters(universe, rsMap, opts={}){
     const dollarVol=(avgVol!=null)?close*avgVol:null;
     if(liqMin>0 && (dollarVol==null||dollarVol<liqMin)) continue;
     const rs=rsMap[r.s]??0;
-    const t1=close>s150&&close>s200, t2=s150>s200, t3=s50>s150&&s50>s200;
-    const t5=close>s50, t6=close>=lo*(1+flPct), t7=close>=hi*(1-fhPct), t8=rs>=rsMin;
-    if(![t1,t2,t3,t5,t6,t7,t8].every(Boolean)) continue;
-    const eps=d[C.earnings_per_share_diluted_yoy_growth_fq],
-          rev=d[C.total_revenue_yoy_growth_fq],
-          roe=d[C.return_on_equity_fq], nm=d[C.net_margin];
-    if(useFund){ if(eps==null||eps<epsMin||rev==null||rev<revMin||roe==null||roe<roeMin) continue; }
-    if(reqProfit&&(nm==null||nm<=0)) continue;
     const earnTs=d[C['earnings_release_next_date']];
     const earnIn=(earnTs!=null && earnTs>0)?Math.round((earnTs-nowSec)/86400):null;
     if(earnGap>0 && earnIn!=null && earnIn>=0 && earnIn<=earnGap) continue;
@@ -1157,14 +1205,45 @@ function applyFilters(universe, rsMap, opts={}){
     const volD=d[C['Volatility.D']], volM=d[C['Volatility.M']];
     const vr=(vol!=null&&avgVol)?vol/avgVol:null;
     const vcp = fromHighPct>=-12 && volD!=null && volM!=null && volD<volM && vr!=null && vr<1.0;
-    if(vcpOnly && !vcp) continue;
+    const perfY=d[C['Perf.Y']], perf3=d[C['Perf.3M']], perf6=d[C['Perf.6M']];
+    const eps=d[C.earnings_per_share_diluted_yoy_growth_fq],
+          rev=d[C.total_revenue_yoy_growth_fq],
+          roe=d[C.return_on_equity_fq], nm=d[C.net_margin];
+
+    let pass=false, checks={};
+    if(scr==='momentum'){
+      const up=close>s50 && s50>s200 && close>s200;
+      const near=close>=hi*(1-fhPct);
+      const strong=rs>=rsMin;
+      const perfPos=perfY!=null && perfY>0;
+      checks={up,near,strong,perfPos};
+      pass=up&&near&&strong&&perfPos;
+    } else if(scr==='power'){
+      const run=(perf3!=null && perf3>=runMin) || (perf6!=null && perf6>=runMin);
+      const near=fromHighPct>=-num('fromHigh');
+      const tight=volD!=null && volM!=null && volD<volM;
+      const up=close>s50;
+      const strong=rs>=rsMin;
+      checks={run,near,tight,up,strong};
+      pass=run&&near&&tight&&up&&strong;
+    } else {
+      const t1=close>s150&&close>s200, t2=s150>s200, t3=s50>s150&&s50>s200;
+      const t5=close>s50, t6=close>=lo*(1+flPct), t7=close>=hi*(1-fhPct), t8=rs>=rsMin;
+      checks={t1,t2,t3,t5,t6,t7,t8};
+      pass=[t1,t2,t3,t5,t6,t7,t8].every(Boolean);
+      if(pass && useFund && (eps==null||eps<epsMin||rev==null||rev<revMin||roe==null||roe<roeMin)) pass=false;
+      if(pass && reqProfit && (nm==null||nm<=0)) pass=false;
+      if(pass && vcpOnly && !vcp) pass=false;
+    }
+    if(!pass) continue;
+
     out.push({
       sym:r.s, ticker:d[C.name], name:d[C.description]||'', exch:d[C.exchange],
       close, rs, sector:d[C.sector]||'—', mc,
       vol, avgVol, dollarVol, earnIn, vcp,
       fromHighPct, fromLowPct:(close/lo-1)*100,
-      rangePos:(close-lo)/(hi-lo), perfY:d[C['Perf.Y']],
-      eps, rev, roe, nm, score:0, checks:{t1,t2,t3,t5,t6,t7,t8}
+      rangePos:(close-lo)/(hi-lo), perfY, perf3, perf6,
+      eps, rev, roe, nm, score:0, checks
     });
   }
   return out;
@@ -1564,7 +1643,7 @@ function saveFilterPrefs(){
     localStorage.setItem('sepa_filters', JSON.stringify({
       rsMin:num('rsMin'),fromHigh:num('fromHigh'),fromLow:num('fromLow'),
       priceMin:num('priceMin'),mcMin:num('mcMin'),
-      liqMin:num('liqMin'),earnDays:num('earnDays'),
+      liqMin:num('liqMin'),earnDays:num('earnDays'),runMin:num('runMin'),
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
       useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,vcpOnly:$('vcpOnly')?.checked
     }));
@@ -1582,7 +1661,7 @@ function loadFilterPrefs(){
       const tiers=[0,0.05,0.3,2,10,200];
       $('mcMin').value=String(tiers.filter(t=>t<=v).pop() ?? 0);
     }
-    set('liqMin',p.liqMin); set('earnDays',p.earnDays);
+    set('liqMin',p.liqMin); set('earnDays',p.earnDays); set('runMin',p.runMin);
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
     if($('requireProfit')&&p.requireProfit!=null) $('requireProfit').checked=p.requireProfit;
@@ -1593,6 +1672,7 @@ function loadFilterPrefs(){
 }
 
 loadFilterPrefs();
+setScreener(activeScreener, false);
 updUnitHints();
 loadUniverseCache();
 loadResultsCache();
