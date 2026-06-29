@@ -541,7 +541,14 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><input type="number" id="fromHigh" value="25" min="0" max="100"><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
             <div class="field"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><input type="number" id="fromLow" value="25" min="0" max="500"><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field"><label for="priceMin">מחיר מינ&#8217; ($)</label><input type="number" id="priceMin" value="10" min="0"></div>
-            <div class="field"><label for="mcMin">שווי שוק מינ&#8217; ($M)</label><input type="number" id="mcMin" value="1000" min="0" step="100" oninput="updUnitHints()"><span class="hint" id="mcHint"></span></div>
+            <div class="field"><label for="mcMin">שווי שוק מינ&#8217;</label><select id="mcMin">
+              <option value="0">הכל</option>
+              <option value="0.05">מיקרו+ · $50M ומעלה</option>
+              <option value="0.3">קטן+ · $300M ומעלה</option>
+              <option value="2" selected>בינוני+ · $2B ומעלה</option>
+              <option value="10">גדול+ · $10B ומעלה</option>
+              <option value="200">ענק · $200B ומעלה</option>
+            </select><span class="hint">סינון לפי קטגוריית גודל</span></div>
             <div class="field"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()"><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
             <div class="field"><label for="earnDays">חסום דוח בעוד (ימים)</label><input type="number" id="earnDays" value="5" min="0"><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
           </div>
@@ -673,9 +680,9 @@ const COLUMNS = [
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
 const PRESETS = {
-  classic:      {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:1000,liqMin:20,earnDays:5,epsMin:25,revMin:20,roeMin:15},
-  aggressive:   {rsMin:80,fromHigh:15,fromLow:30,priceMin:15,mcMin:2000,liqMin:30,earnDays:7,epsMin:40,revMin:30,roeMin:20},
-  conservative: {rsMin:60,fromHigh:35,fromLow:15,priceMin:5, mcMin:500, liqMin:10,earnDays:0,epsMin:10,revMin:10,roeMin:8},
+  classic:      {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:2,  liqMin:20,earnDays:5,epsMin:25,revMin:20,roeMin:15},
+  aggressive:   {rsMin:80,fromHigh:15,fromLow:30,priceMin:15,mcMin:10, liqMin:30,earnDays:7,epsMin:40,revMin:30,roeMin:20},
+  conservative: {rsMin:60,fromHigh:35,fromLow:15,priceMin:5, mcMin:0.3,liqMin:10,earnDays:0,epsMin:10,revMin:10,roeMin:8},
 };
 
 const COL_DEFS = [
@@ -911,7 +918,6 @@ function scoreBg(s)      { return s>=80?'rgba(46,204,113,0.13)':s>=60?'rgba(245,
 
 function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : '$'+m+'M'; }
 function updUnitHints(){
-  const mh=$('mcHint'); if(mh) mh.textContent='≈ '+fmtMoneyM(num('mcMin'))+' שווי שוק';
   const lh=$('liqHint'); if(lh) lh.textContent='נפח דולרי ממוצע · ≈ '+fmtMoneyM(num('liqMin'))+' ליום';
 }
 
@@ -1089,7 +1095,7 @@ function computeRS(universe){
 ════════════════════════════════════ */
 function applyFilters(universe, rsMap, opts={}){
   const rsMin=num('rsMin'), fhPct=num('fromHigh')/100, flPct=num('fromLow')/100;
-  const mcMin=num('mcMin')*1e6, priceMin=num('priceMin');
+  const mcMin=num('mcMin')*1e9, priceMin=num('priceMin');
   const liqMin=opts.skipFund?0:num('liqMin')*1e6, earnGap=opts.skipFund?0:num('earnDays');
   const vcpOnly=opts.skipFund?false:!!$('vcpOnly')?.checked;
   const useFund=opts.skipFund?false:$('useFund').checked, reqProfit=opts.skipFund?false:$('requireProfit').checked;
@@ -1541,7 +1547,12 @@ function loadFilterPrefs(){
     const p=JSON.parse(localStorage.getItem('sepa_filters')||'null'); if(!p) return;
     const set=(id,v)=>{ const el=$(id); if(el&&v!=null) el.value=v; };
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
-    set('priceMin',p.priceMin); set('mcMin',p.mcMin);
+    set('priceMin',p.priceMin);
+    if(p.mcMin!=null){
+      let v=p.mcMin; if(v>=50) v=v/1000;  // migrate old $M values to $B
+      const tiers=[0,0.05,0.3,2,10,200];
+      $('mcMin').value=String(tiers.filter(t=>t<=v).pop() ?? 0);
+    }
     set('liqMin',p.liqMin); set('earnDays',p.earnDays);
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
