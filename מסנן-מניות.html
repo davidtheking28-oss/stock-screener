@@ -320,21 +320,27 @@ tbody tr:last-child td { border-bottom: none; }
 .gcard { background: var(--bg3); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color 0.18s ease-out, transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s ease-out; }
 .gcard:hover { border-color: oklch(64% 0.2 258 / 0.45); transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.4), 0 0 0 1px oklch(64% 0.2 258 / 0.08); }
 .gcard:active { transform: translateY(-1px); }
-.gcard-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 10px; }
-.gcard-left { display: flex; align-items: center; gap: 7px; }
-.gcard-sym { font: 700 15px var(--mono); letter-spacing: 0.3px; color: var(--text); }
-.gcard-price { font: 600 12.5px var(--mono); color: var(--text2); margin-right: 2px; }
-.gcard-badges { display: flex; gap: 5px; }
+.gcard-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 12px 14px 11px; }
+.gcard-left { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.gcard-left .star-btn { margin-top: 1px; flex-shrink: 0; }
+.gcard-id { min-width: 0; }
+.gcard-symline { display: flex; align-items: baseline; gap: 7px; }
+.gcard-sym { font: 700 15.5px var(--mono); letter-spacing: 0.3px; color: var(--text); }
+.gcard-price { font: 600 12px var(--mono-data); color: var(--text2); font-variant-numeric: tabular-nums; }
+.gcard-name { font: 500 10.5px var(--sans); color: var(--text3); margin-top: 2px; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.gcard-badges { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.gcard-score { display: inline-grid; place-items: center; min-width: 25px; height: 22px; padding: 0 6px; border-radius: 6px; font: 700 12.5px var(--mono-data); font-variant-numeric: tabular-nums; }
 .badge { padding: 3px 8px; border-radius: 6px; font: 700 10.5px var(--mono); letter-spacing: 0.3px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); }
 .badge-rs-hi  { background: rgba(46,204,113,0.14); color: var(--green); }
 .badge-rs-mid { background: rgba(245,185,74,0.14); color: var(--amber); }
 .gcard-chart { height: 200px; background: #0a1120; position: relative; overflow: hidden; }
 .gcard-chart > .tv-lite { width: 100%; height: 200px; }
-.gcard-stats { display: grid; grid-template-columns: repeat(3,1fr); border-top: 1px solid var(--border2); background: rgba(255,255,255,0.015); }
-.gstat { padding: 9px 10px; text-align: center; border-left: 1px solid var(--border2); }
+.gcard-stats { display: grid; grid-template-columns: repeat(3,1fr); border-top: 1px solid var(--border2); background: linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0)); }
+.gstat { padding: 10px 8px 11px; text-align: center; border-left: 1px solid var(--border2); }
 .gstat:last-child { border-left: none; }
-.gstat-lbl { font-size: 9px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; opacity: 0.85; }
-.gstat-val { font: 700 13px var(--mono); margin-top: 3px; letter-spacing: -0.2px; }
+.gstat-lbl { font: 600 8.5px var(--sans); color: var(--text3); text-transform: uppercase; letter-spacing: 1.1px; }
+.gstat-val { font: 700 14px var(--mono-data); margin-top: 5px; letter-spacing: -0.2px; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 3px; justify-content: center; }
+.gstat-arrow { font-size: 8px; line-height: 1; opacity: 0.9; }
 
 /* ── Modal ── */
 @keyframes modalBackdrop { from { opacity:0; } to { opacity:1; } }
@@ -1274,14 +1280,22 @@ function renderGallery(){
     const wl=watchlist.has(r.ticker);
     const vcpB = r.vcp ? '<span class="vcp-badge" title="התכווצות תנודתיות קרוב לשיא — נקודת קנייה אפשרית">VCP</span>' : '';
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
+    const priceStr = r.close>=100 ? Math.round(r.close).toLocaleString('en-US') : r.close.toFixed(2);
+    const stat=(lbl,v,tip)=>{
+      const up=(v??0)>=0, cls=up?'pos':'neg';
+      const arrow = v==null ? '' : '<span class="gstat-arrow">'+(up?'▲':'▼')+'</span>';
+      return '<div class="gstat" title="'+tip+'"><div class="gstat-lbl">'+lbl+'</div><div class="gstat-val '+cls+'">'+arrow+pct(v)+'</div></div>';
+    };
+    const fhUp = r.fromHighPct>=-8;
     return '<div class="gcard" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')">'
-      +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button><div><span class="gcard-sym">'+r.ticker+'</span> <span class="gcard-price">$'+(r.close>=100?r.close.toFixed(0):r.close.toFixed(2))+'</span></div></div>'
-      +'<div class="gcard-badges">'+vcpB+earnB+'<span style="font:700 13px var(--mono-data);color:'+scoreColor(r.score)+'" title="ציון SEPA '+r.score+'/100">'+r.score+'</span><span class="badge '+(r.rs>=80?'badge-rs-hi':'badge-rs-mid')+'">RS '+r.rs+'</span></div></div>'
+      +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button>'
+      +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name">'+esc(r.name)+'</div></div></div>'
+      +'<div class="gcard-badges">'+vcpB+earnB+'<span class="gcard-score" style="color:'+scoreColor(r.score)+';box-shadow:inset 0 0 0 1px '+scoreBorder(r.score)+'" title="ציון SEPA '+r.score+'/100">'+r.score+'</span><span class="badge '+(r.rs>=80?'badge-rs-hi':'badge-rs-mid')+'">RS '+r.rs+'</span></div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
-      +'<div class="gstat"><div class="gstat-lbl">ביצֹ 1Y</div><div class="gstat-val '+((r.perfY??0)>=0?'pos':'neg')+'">'+pct(r.perfY)+'</div></div>'
-      +'<div class="gstat"><div class="gstat-lbl">EPS YoY</div><div class="gstat-val '+((r.eps??0)>=0?'pos':'neg')+'">'+pct(r.eps)+'</div></div>'
-      +'<div class="gstat"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(r.fromHighPct>=-5?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>'
+      +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
+      +stat('EPS שנה', r.eps, 'צמיחת רווח למניה שנה/שנה')
+      +'<div class="gstat" title="מרחק מהשיא של 52 שבועות"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(fhUp?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>'
       +'</div></div>';
   }).join('');
 
