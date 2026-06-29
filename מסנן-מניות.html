@@ -177,6 +177,8 @@ input[type=number], select {
   padding: 7px 10px; font: 600 13px var(--mono-data); width: 100%;
   transition: border-color 0.12s ease-out, background 0.12s ease-out;
 }
+input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 input[type=number]:hover, select:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); }
 input[type=number]:focus, select:focus { outline: none; border-color: var(--accent); background: rgba(79,131,255,0.06); box-shadow: 0 0 0 3px rgba(79,131,255,0.1); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
