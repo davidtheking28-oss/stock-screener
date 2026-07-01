@@ -486,6 +486,12 @@ tbody tr:last-child td { border-bottom: none; }
   margin-right: 5px; vertical-align: middle;
 }
 .earn-badge.soon { color: var(--amber); background: rgba(245,185,74,0.12); border-color: rgba(245,185,74,0.3); }
+.ext-badge {
+  display: inline-block; font: 700 9px var(--sans); color: var(--amber);
+  background: rgba(245,185,74,0.12); border: 1px solid rgba(245,185,74,0.3);
+  padding: 1px 5px; border-radius: 4px; letter-spacing: 0.3px;
+  margin-right: 5px; vertical-align: middle;
+}
 
 .sector-strength {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -540,7 +546,7 @@ tbody tr:last-child td { border-bottom: none; }
   <div id="statBar"><span style="color:var(--text3)">8 תנאי Trend Template · RS Rating · EPS · הכנסות · ROE</span></div>
   <div class="topbar-end">
     <span id="scanTime"></span>
-    <button class="btn-rescan" id="scanBtn" onclick="scan()" style="display:none">&#8635; סרוק שנית</button>
+    <button class="btn-rescan" id="scanBtn" onclick="scan(true)" style="display:none">&#8635; סרוק שנית</button>
     <div id="authChip"><button class="btn-ghost" style="font-size:12px" onclick="toggleAuthModal()">כניסה</button></div>
   </div>
 </div>
@@ -650,6 +656,7 @@ tbody tr:last-child td { border-bottom: none; }
       <span class="lg-sep"></span>
       <span class="lg-grp"><span class="vcp-badge">VCP</span> קרוב לנקודת קנייה</span>
       <span class="lg-grp"><span class="earn-badge soon">דוח 5י</span> דוח כספי קרוב</span>
+      <span class="lg-grp"><span class="ext-badge">מתוח</span> 25%+ מעל MA50 — לא לרדוף</span>
     </div>
     <div id="tableView" class="table-wrap"></div>
     <div id="galleryView" class="gallery" style="display:none"></div>
@@ -744,6 +751,7 @@ const COL_DEFS = [
   {key:'score',  label:'ציון SEPA',  defaultOn:true},
   {key:'rs',     label:'RS',         defaultOn:true},
   {key:'perfY',  label:'ביצʹ 1Y',  defaultOn:true},
+  {key:'perf3',  label:'ביצʹ 3M',  defaultOn:false},
   {key:'eps',    label:'EPS YoY',    defaultOn:true},
   {key:'rev',    label:'הכנסות YoY', defaultOn:true},
   {key:'range',  label:'טווח 52שʹ', defaultOn:false},
@@ -762,6 +770,8 @@ const RESULTS_CACHE_KEY  = 'sepa_scan_results_v1';
    STATE
 ════════════════════════════════════ */
 let allResults = [], results = [], ttUniverse = {};
+let _rawUniverse = null, _rawTime = 0, _rsMapMem = null;
+const UNIVERSE_TTL = 15*60*1000;
 let _currentUser = null;
 let watchlist  = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
 const _savedSort = JSON.parse(localStorage.getItem('sepa_sort')||'null');
@@ -892,7 +902,7 @@ function loadUniverseCache(){
 
 function saveResultsCache(){
   try {
-    localStorage.setItem(RESULTS_CACHE_KEY, JSON.stringify({allResults, time:Date.now()}));
+    localStorage.setItem(RESULTS_CACHE_KEY, JSON.stringify({allResults, time:Date.now(), nt:[...newToday]}));
   } catch(e){}
 }
 
@@ -900,9 +910,10 @@ function loadResultsCache(){
   try {
     const raw = localStorage.getItem(RESULTS_CACHE_KEY);
     if(!raw) return;
-    const {allResults:ar, time} = JSON.parse(raw);
+    const {allResults:ar, time, nt} = JSON.parse(raw);
     if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(RESULTS_CACHE_KEY); return; }
     allResults = ar;
+    if(Array.isArray(nt) && new Date(time).toDateString()===new Date().toDateString()) newToday = new Set(nt);
     applySectorFilter(); sortResults();
     $('resultsPanel').style.display='block';
     $('colPickerWrap').style.display='';
@@ -959,7 +970,14 @@ window.addEventListener('resize', ()=>{ $('colPickerPanel')?.classList.remove('o
 /* ════════════════════════════════════
    SEPA SCORE  (0-100)
 ════════════════════════════════════ */
-function calcScore(r){
+function calcScore(r, scr='sepa'){
+  if(scr==='momentum'||scr==='power'){
+    const rsS   = clamp(r.rs,0,99)/99*50;
+    const hiS   = clamp((1-Math.abs(r.fromHighPct)/25),0,1)*25;
+    const pf    = Math.max(r.perf3??0,(r.perf6??0)/2);
+    const perfS = Math.min(clamp(pf,0,150)/150,1)*25;
+    return Math.round(clamp(rsS+hiS+perfS,0,100));
+  }
   const rsS  = clamp(r.rs,0,99)/99*40;
   const epsS = Math.min(clamp(r.eps??0,0,300)/300,1)*25;
   const revS = Math.min(clamp(r.rev??0,0,200)/200,1)*20;
@@ -1065,38 +1083,41 @@ async function checkAndSaveHistory(tickers){
   const today = new Date().toISOString().slice(0,10);
   const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
   const currentSet = new Set(tickers);
-  if(watchlist.size > 0){
-    const {data:prev} = await _sb.from('screener_history')
-      .select('ticker,last_seen').eq('user_id',_currentUser.id).in('ticker',[...watchlist]);
-    if(prev){
-      const exits = prev.filter(h=>!currentSet.has(h.ticker) && h.last_seen >= yesterday).map(h=>h.ticker);
-      if(exits.length) toast('יצאו מהסינון: '+exits.join(', '), 6000);
-    }
+  const {data:prev} = await _sb.from('screener_history')
+    .select('ticker,first_seen,last_seen').eq('user_id',_currentUser.id);
+  const known = new Map((prev||[]).map(h=>[h.ticker,h]));
+  if(watchlist.size > 0 && prev){
+    const exits = prev.filter(h=>watchlist.has(h.ticker) && !currentSet.has(h.ticker) && h.last_seen >= yesterday).map(h=>h.ticker);
+    if(exits.length) toast('יצאו מהסינון: '+exits.join(', '), 6000);
   }
-  await _sb.from('screener_history').upsert(
-    tickers.map(t=>({user_id:_currentUser.id, ticker:t, first_seen:today, last_seen:today})),
-    {onConflict:'user_id,ticker'}
+  const fresh = tickers.filter(t=>!known.has(t));
+  fresh.forEach(t=>newToday.add(t));
+  tickers.forEach(t=>{ if(known.get(t)?.first_seen===today) newToday.add(t); });
+  if(fresh.length) await _sb.from('screener_history').insert(
+    fresh.map(t=>({user_id:_currentUser.id, ticker:t, first_seen:today, last_seen:today}))
   );
-  const {data:todayIn} = await _sb.from('screener_history')
-    .select('ticker').eq('user_id',_currentUser.id).eq('first_seen',today).in('ticker',tickers);
-  if(todayIn) todayIn.forEach(h=>newToday.add(h.ticker));
+  const seen = tickers.filter(t=>known.has(t));
+  if(seen.length) await _sb.from('screener_history').update({last_seen:today})
+    .eq('user_id',_currentUser.id).in('ticker',seen);
   if(watchlist.size > 0){
-    const wlNew = todayIn?.filter(h=>watchlist.has(h.ticker));
-    if(wlNew && wlNew.length) toast('נכנסו לסינון היום: '+wlNew.map(h=>h.ticker).join(', '), 6000);
+    const wlNew = [...newToday].filter(t=>watchlist.has(t));
+    if(wlNew.length) toast('נכנסו לסינון היום: '+wlNew.join(', '), 6000);
   }
 }
 
-async function scan(){
+async function scan(force=false){
   if(!validateInputs()) return;
   _setScanLoading(true);
   newToday = new Set();
   try{ localStorage.removeItem('sepa_sector'); }catch(e){}
   showSkeleton();
-  $('statBar').innerHTML='<span class="spinner"></span> מושך נתונים מ-TradingView...';
+  const useMem = !force && _rawUniverse && (Date.now()-_rawTime) < UNIVERSE_TTL;
+  $('statBar').innerHTML='<span class="spinner"></span> '+(useMem?'מסנן מחדש...':'מושך נתונים מ-TradingView...');
   try{
-    const universe = await fetchUniverse();
+    const universe = useMem ? _rawUniverse : await fetchUniverse();
+    if(!useMem){ _rawUniverse=universe; _rawTime=Date.now(); _rsMapMem=null; }
     $('statBar').innerHTML='<span class="spinner"></span> מחשב RS Rating ומסנן...';
-    const rsMap = computeRS(universe);
+    const rsMap = _rsMapMem ?? (_rsMapMem = computeRS(universe));
 
     const up = universe.filter(r=>{
       const d=r.d,c=d[C.close],s50=d[C.SMA50],s150=d[C.SMA150],s200=d[C.SMA200];
@@ -1110,12 +1131,12 @@ async function scan(){
     $('breadthChip').classList.add('show');
 
     allResults = applyFilters(universe, rsMap);
-    allResults.forEach(r=>r.score=calcScore(r));
+    allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
     ttUniverse = {};
-    applyFilters(universe, rsMap, {skipFund:true}).forEach(r=>{ r.score=calcScore(r); ttUniverse[r.ticker]=r; });
+    applyFilters(universe, rsMap, {skipFund:true}).forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
     saveUniverseCache();
     saveResultsCache();
-    checkAndSaveHistory(allResults.map(r=>r.ticker));
+    checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(newToday.size){ saveResultsCache(); render(); } });
     $('filterPanel')?.classList.remove('open');
 
     applySectorFilter(); sortResults(); render();
@@ -1123,7 +1144,7 @@ async function scan(){
     $('colPickerWrap').style.display='';
     buildSectorFilter();
 
-    const now=new Date();
+    const now=new Date(_rawTime);
     $('scanTime').textContent='עודכן '+now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
 
     const sparseMsg = bPct<35 && allResults.length<20
@@ -1250,6 +1271,7 @@ function applyFilters(universe, rsMap, opts={}){
       vol, avgVol, dollarVol, earnIn, vcp,
       fromHighPct, fromLowPct:(close/lo-1)*100,
       rangePos:(close-lo)/(hi-lo), perfY, perf3, perf6,
+      extPct:(close/s50-1)*100,
       eps, eps1, eps2, rev, roe, nm, score:0, checks
     });
   }
@@ -1308,7 +1330,7 @@ function renderSectorStrength(){
 const SORTS={
   ticker:r=>r.ticker, close:r=>r.close, rs:r=>r.rs, score:r=>r.score,
   mc:r=>r.mc, vol:r=>r.vol??0, liq:r=>r.dollarVol??0, fromHigh:r=>r.fromHighPct,
-  perfY:r=>r.perfY??-1e9, eps:r=>r.eps??-1e9,
+  perfY:r=>r.perfY??-1e9, perf3:r=>r.perf3??-1e9, eps:r=>r.eps??-1e9,
   rev:r=>r.rev??-1e9, roe:r=>r.roe??-1e9, nm:r=>r.nm??-1e9, range:r=>r.rangePos
 };
 function sortResults(){ const f=SORTS[sortKey]||SORTS.score; results.sort((a,b)=>(f(a)>f(b)?1:f(a)<f(b)?-1:0)*sortDir); }
@@ -1360,13 +1382,19 @@ function renderTable(rows){
     return;
   }
 
+  const scKind = rows[0]?.scoreKind || 'sepa';
+  const scHeadLbl = scKind==='sepa' ? 'ציון SEPA' : 'ציון';
+  const scHeadTip = scKind==='sepa'
+    ? 'ציון מורכב 0–100: RS (40%) + EPS (25%) + הכנסות (20%) + קרבה לשיא (15%)'
+    : 'ציון מומנטום 0–100: RS (50%) + קרבה לשיא (25%) + ביצוע 3-6ח׳ (25%)';
   const head='<tr>'
     +'<th style="width:30px"></th>'
     +th('מניה','ticker')
     +(colVis.price ? th('מחיר','close','מחיר סגירה אחרון') : '')
-    +(colVis.score ? th('ציון SEPA','score','ציון מורכב 0–100: RS (40%) + EPS (25%) + הכנסות (20%) + קרבה לשיא (15%)') : '')
+    +(colVis.score ? th(scHeadLbl,'score',scHeadTip) : '')
     +(colVis.rs    ? th('RS','rs','דירוג יחסי 1–99') : '')
     +(colVis.perfY ? th('ביצֹ 1Y','perfY','שינוי מחיר ב-12 חודשים האחרונים') : '')
+    +(colVis.perf3 ? th('ביצֹ 3M','perf3','שינוי מחיר ב-3 חודשים האחרונים') : '')
     +(colVis.eps   ? th('EPS YoY','eps','צמיחת רווח למניה שנה/שנה') : '')
     +(colVis.rev   ? th('הכנסות YoY','rev','צמיחת הכנסות שנה/שנה') : '')
     +(colVis.range ? th('טווח 52שֹ','range','מיקום המחיר בין השפל לשיא') : '')
@@ -1381,11 +1409,19 @@ function renderTable(rows){
   const bodyRows=rows.map(r=>{
     const wl=watchlist.has(r.ticker), sc=r.score;
 
-    const rsS=Math.round(clamp(r.rs,0,99)/99*40);
-    const epsS=Math.round(Math.min(clamp(r.eps??0,0,300)/300,1)*25);
-    const revS=Math.round(Math.min(clamp(r.rev??0,0,200)/200,1)*20);
-    const hiS=Math.round(clamp((1-Math.abs(r.fromHighPct)/25),0,1)*15);
-    const scTip='ציון SEPA: '+sc+'/100\nRS: '+rsS+'/40\nEPS: '+epsS+'/25\nהכנסות: '+revS+'/20\nקרבה לשיא: '+hiS+'/15';
+    let scTip;
+    if(r.scoreKind==='momentum'||r.scoreKind==='power'){
+      const rsS=Math.round(clamp(r.rs,0,99)/99*50);
+      const hiS=Math.round(clamp((1-Math.abs(r.fromHighPct)/25),0,1)*25);
+      const perfS=sc-rsS-hiS;
+      scTip='ציון מומנטום: '+sc+'/100\nRS: '+rsS+'/50\nקרבה לשיא: '+hiS+'/25\nביצוע 3-6ח׳: '+perfS+'/25';
+    } else {
+      const rsS=Math.round(clamp(r.rs,0,99)/99*40);
+      const epsS=Math.round(Math.min(clamp(r.eps??0,0,300)/300,1)*25);
+      const revS=Math.round(Math.min(clamp(r.rev??0,0,200)/200,1)*20);
+      const hiS=Math.round(clamp((1-Math.abs(r.fromHighPct)/25),0,1)*15);
+      scTip='ציון SEPA: '+sc+'/100\nRS: '+rsS+'/40\nEPS: '+epsS+'/25\nהכנסות: '+revS+'/20\nקרבה לשיא: '+hiS+'/15';
+    }
     const arc=((sc/100)*113.097).toFixed(1);
     const scEl='<div class="score-ring" title="'+scTip+'"><svg viewBox="0 0 44 44" width="44" height="44" style="transform:rotate(-90deg);display:block"><circle cx="22" cy="22" r="18" fill="none" stroke="'+scoreBorder(sc)+'" stroke-width="2.5"/><circle cx="22" cy="22" r="18" fill="none" stroke="'+scoreColor(sc)+'" stroke-width="3.5" stroke-dasharray="'+arc+' 113.097" stroke-linecap="round" style="filter:drop-shadow(0 0 3px '+scoreColor(sc)+')"/></svg><span class="ring-num" style="color:'+scoreColor(sc)+'">'+sc+'</span></div>';
 
@@ -1404,13 +1440,15 @@ function renderTable(rows){
     const isNew = newToday.has(r.ticker);
     const vcpB = r.vcp ? '<span class="vcp-badge" title="התכווצות תנודתיות קרוב לשיא — נקודת קנייה אפשרית">VCP</span>' : '';
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
+    const extB = (r.extPct!=null && r.extPct>=25) ? '<span class="ext-badge" title="המחיר '+r.extPct.toFixed(0)+'% מעל ממוצע 50 יום — מתוח, עדיף לחכות לבסיס">מתוח</span>' : '';
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button></td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+vcpB+earnB+'</div><div class="cname">'+esc(r.name)+'</div></td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+vcpB+earnB+extB+'</div><div class="cname">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
       +col('perfY',  '<td><span class="mn '+((r.perfY??0)>=0?'pos':'neg')+'">'+pct(r.perfY)+'</span></td>')
+      +col('perf3',  '<td><span class="mn '+((r.perf3??0)>=0?'pos':'neg')+'">'+pct(r.perf3)+'</span></td>')
       +col('eps',    (()=>{const accel=r.eps!=null&&r.eps1!=null?r.eps-r.eps1:null;const arr=accel==null?'':accel>5?'<span style="color:var(--green);font-size:10px;margin-right:2px">↑</span>':accel<-5?'<span style="color:var(--red);font-size:10px;margin-right:2px">↓</span>':'<span style="color:var(--text3);font-size:10px;margin-right:2px">→</span>';const tip=r.eps1!=null?'Q0: '+pct(r.eps)+' · Q1: '+pct(r.eps1)+(r.eps2!=null?' · Q2: '+pct(r.eps2):''):'';return '<td title="'+tip+'">'+arr+'<span class="mn '+((r.eps??0)>=0?'pos':'neg')+'">'+pct(r.eps)+'</span></td>';})())
       +col('rev',    '<td><span class="mn '+((r.rev??0)>=0?'pos':'neg')+'">'+pct(r.rev)+'</span></td>')
       +col('range',  '<td>'+rngEl+'</td>')
@@ -1445,6 +1483,11 @@ function renderGallery(){
     const wl=watchlist.has(r.ticker);
     const vcpB = r.vcp ? '<span class="vcp-badge" title="התכווצות תנודתיות קרוב לשיא — נקודת קנייה אפשרית">VCP</span>' : '';
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
+    const extB = (r.extPct!=null && r.extPct>=25) ? '<span class="ext-badge" title="המחיר '+r.extPct.toFixed(0)+'% מעל ממוצע 50 יום — מתוח, עדיף לחכות לבסיס">מתוח</span>' : '';
+    const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : 'SEPA';
+    const scTitle = (r.scoreKind==='momentum'||r.scoreKind==='power')
+      ? 'ציון מומנטום '+r.score+'/100 — RS 50% + קרבה לשיא 25% + ביצוע 25%'
+      : 'ציון SEPA '+r.score+'/100 — RS 40% + EPS 25% + הכנסות 20% + קרבה לשיא 15%';
     const priceStr = r.close>=100 ? Math.round(r.close).toLocaleString('en-US') : r.close.toFixed(2);
     const stat=(lbl,v,tip)=>{
       const up=(v??0)>=0, cls=up?'pos':'neg';
@@ -1458,8 +1501,8 @@ function renderGallery(){
     return '<div class="gcard" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button>'
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name">'+esc(r.name)+'</div></div></div>'
-      +'<div class="gcard-badges">'+vcpB+earnB
-      +'<span class="gbadge" style="color:'+scoreColor(r.score)+';background:'+scoreBg(r.score)+'" title="ציון SEPA '+r.score+'/100 — RS 40% + EPS 25% + הכנסות 20% + קרבה לשיא 15%"><span class="gb-lbl">SEPA</span> <b>'+r.score+'</b></span>'
+      +'<div class="gcard-badges">'+vcpB+earnB+extB
+      +'<span class="gbadge" style="color:'+scoreColor(r.score)+';background:'+scoreBg(r.score)+'" title="'+scTitle+'"><span class="gb-lbl">'+scLbl+'</span> <b>'+r.score+'</b></span>'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — ביצוע יחסי מול השוק"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span></div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
@@ -1526,13 +1569,15 @@ function closeModal(){ $('modal').classList.remove('open'); $('modalChart').inne
 ════════════════════════════════════ */
 function exportCSV(){
   if(!results.length){ toast('אין תוצאות לייצוא'); return; }
-  const head=['Ticker','Name','Exchange','Price','Score','RS','Perf.Y%','From High%','Range%','EPS%','Rev%','ROE%','Net Margin%','Volume','Avg Vol','Market Cap','Sector'];
+  const head=['Ticker','Name','Exchange','Price','Score','RS','Perf.Y%','Perf.3M%','Perf.6M%','From High%','Range%','EPS%','EPS Q1%','EPS Q2%','Rev%','ROE%','Net Margin%','Volume','Avg Vol','Market Cap','Sector'];
   const lines=[head.join(',')];
   results.forEach(r=>lines.push([
     r.ticker,'"'+(r.name||'').replace(/"/g,'')+'"',r.exch,
     r.close.toFixed(2),r.score,r.rs,
-    (r.perfY??'').toString(),r.fromHighPct.toFixed(1),(r.rangePos*100).toFixed(1),
-    (r.eps??'').toString(),(r.rev??'').toString(),(r.roe??'').toString(),(r.nm??'').toString(),
+    (r.perfY??'').toString(),(r.perf3??'').toString(),(r.perf6??'').toString(),
+    r.fromHighPct.toFixed(1),(r.rangePos*100).toFixed(1),
+    (r.eps??'').toString(),(r.eps1??'').toString(),(r.eps2??'').toString(),
+    (r.rev??'').toString(),(r.roe??'').toString(),(r.nm??'').toString(),
     r.vol??'',r.avgVol??'',Math.round(r.mc||0),'"'+r.sector+'"'
   ].join(',')));
   const blob=new Blob(['﻿'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
@@ -1542,9 +1587,11 @@ function exportCSV(){
 }
 
 function exportTickers(){
-  const src = view==='watchlist' ? [...watchlist] : results.map(r=>r.ticker);
+  const src = view==='watchlist'
+    ? [...watchlist].map(t=>ttUniverse[t]?.sym||t)
+    : results.map(r=>r.sym);
   if(!src.length){ toast('אין מניות להעתקה'); return; }
-  navigator.clipboard?.writeText(src.join(',')).then(()=>toast(src.length+' טיקרים הועתקו ✓'));
+  navigator.clipboard?.writeText(src.join(',')).then(()=>toast(src.length+' טיקרים הועתקו ✓ מוכן להדבקה ב-TradingView'));
 }
 
 /* ════════════════════════════════════
