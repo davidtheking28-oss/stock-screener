@@ -38,7 +38,7 @@ body {
   font-family: var(--sans);
   font-size: 14px;
   color: var(--text);
-  background: var(--bg);
+  background: radial-gradient(1100px 480px at 50% -120px, rgba(79,131,255,0.07), transparent 70%), var(--bg);
   min-height: 100vh;
   line-height: 1.5;
 }
@@ -325,8 +325,8 @@ tbody tr:last-child td { border-bottom: none; }
 /* table cells */
 .sym { font: 700 15px var(--mono); color: var(--text); cursor: copy; letter-spacing: 0.3px; }
 .sym:hover { color: var(--accent2); }
-.cname { font-size: 11px; color: var(--text3); margin-top: 2px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
-.mn { font: 500 13px var(--mono-data); color: var(--text2); }
+.cname { font-size: 11px; color: var(--text3); margin-top: 2px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; direction: ltr; text-align: right; white-space: nowrap; }
+.mn { font: 500 13px var(--mono-data); color: var(--text2); direction: ltr; unicode-bidi: isolate; }
 .mn.hi { color: var(--text); font-weight: 600; }
 .pos { color: var(--green); } .neg { color: var(--red); }
 
@@ -367,8 +367,8 @@ tbody tr:last-child td { border-bottom: none; }
 .gcard-id { min-width: 0; }
 .gcard-symline { display: flex; align-items: baseline; gap: 7px; }
 .gcard-sym { font: 700 15.5px var(--mono); letter-spacing: 0.3px; color: var(--text); }
-.gcard-price { font: 600 12px var(--mono-data); color: var(--text2); font-variant-numeric: tabular-nums; }
-.gcard-name { font: 500 10.5px var(--sans); color: var(--text3); margin-top: 2px; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.gcard-price { font: 600 12px var(--mono-data); color: var(--text2); font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+.gcard-name { font: 500 10.5px var(--sans); color: var(--text3); margin-top: 2px; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; direction: ltr; text-align: right; }
 .gcard-badges { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .gbadge { direction: ltr; display: inline-flex; align-items: baseline; gap: 4px; height: 22px; padding: 0 9px; border-radius: 6px; font: 700 9px var(--sans); letter-spacing: 0.7px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }
 .gbadge .gb-lbl { opacity: 0.7; }
@@ -379,7 +379,7 @@ tbody tr:last-child td { border-bottom: none; }
 .gstat { padding: 10px 8px 11px; text-align: center; border-left: 1px solid var(--border2); }
 .gstat:last-child { border-left: none; }
 .gstat-lbl { font: 600 8.5px var(--sans); color: var(--text3); text-transform: uppercase; letter-spacing: 1.1px; }
-.gstat-val { font: 700 14px var(--mono-data); margin-top: 5px; letter-spacing: -0.2px; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 3px; justify-content: center; }
+.gstat-val { font: 700 14px var(--mono-data); margin-top: 5px; letter-spacing: -0.2px; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 3px; justify-content: center; direction: ltr; unicode-bidi: isolate; }
 .gstat-arrow { font-size: 8px; line-height: 1; opacity: 0.9; }
 
 /* ── Modal ── */
@@ -602,7 +602,7 @@ tbody tr:last-child td { border-bottom: none; }
           <div class="fields" id="fundFields">
             <div class="field"><label for="epsMin">EPS YoY מינ&#8217; (%)</label><input type="number" id="epsMin" value="25"><span class="hint">רבעון מול שנה קודמת</span></div>
             <div class="field"><label for="revMin">הכנסות YoY מינ&#8217; (%)</label><input type="number" id="revMin" value="20"></div>
-            <div class="field"><label for="roeMin">ROE מינ&#8217; (%)</label><input type="number" id="roeMin" value="15"></div>
+            <div class="field"><label for="roeMin">ROE מינ&#8217; (%)</label><input type="number" id="roeMin" value="17"><span class="hint">מינרוויני: 17%+</span></div>
           </div>
           <div class="filter-toggles">
             <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
@@ -620,7 +620,7 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
       <div class="filter-actions">
         <button class="btn-scan" id="scanBtnPanel" onclick="scan()">סרוק את השוק</button>
-        <div class="note-text">MA200 במגמה מוערך דרך מבנה MA50&gt;MA150&gt;MA200 · נתונים מ-TradingView בזמן אמת</div>
+        <div class="note-text">MA200 עולה מוערך דרך מבנה MA50&gt;MA150&gt;MA200 + מומנטום 6ח&#8217; חיובי · RS משוקלל בסגנון IBD (40% לרבעון האחרון) · נתונים מ-TradingView בזמן אמת</div>
       </div>
     </div>
   </div>
@@ -729,7 +729,7 @@ const COLUMNS = [
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
 const PRESETS = {
-  classic:      {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:2,  liqMin:20,earnDays:5,epsMin:25,revMin:20,roeMin:15},
+  classic:      {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:2,  liqMin:20,earnDays:5,epsMin:25,revMin:20,roeMin:17},
   aggressive:   {rsMin:80,fromHigh:15,fromLow:30,priceMin:15,mcMin:10, liqMin:30,earnDays:7,epsMin:40,revMin:30,roeMin:20},
   conservative: {rsMin:60,fromHigh:35,fromLow:15,priceMin:5, mcMin:0.3,liqMin:10,earnDays:0,epsMin:10,revMin:10,roeMin:8},
 };
@@ -1172,7 +1172,7 @@ async function fetchUniverse(){
       {left:"type",operation:"equal",right:"stock"},
       {left:"is_primary",operation:"equal",right:true},
       {left:"close",operation:"egreater",right:2},
-      {left:"market_cap_basic",operation:"egreater",right:200000000}
+      {left:"market_cap_basic",operation:"egreater",right:50000000}
     ],
     markets:["america"],
     sort:{sortBy:"market_cap_basic",sortOrder:"desc"},
@@ -1191,7 +1191,12 @@ async function fetchUniverse(){
 }
 
 function computeRS(universe){
-  const valid=universe.filter(r=>r.d[C['Perf.Y']]!=null).map(r=>({s:r.s,p:r.d[C['Perf.Y']]})).sort((a,b)=>a.p-b.p);
+  const rsRaw = d => {
+    const p3=d[C['Perf.3M']], p6=d[C['Perf.6M']], py=d[C['Perf.Y']];
+    if(p3==null && p6==null && py==null) return null;
+    return 0.4*(p3??0) + 0.3*(p6??0) + 0.3*(py??0);
+  };
+  const valid=universe.map(r=>({s:r.s,p:rsRaw(r.d)})).filter(r=>r.p!=null).sort((a,b)=>a.p-b.p);
   const n=valid.length; const map={};
   valid.forEach((row,i)=>{ map[row.s]=Math.max(1,Math.min(99,Math.round((i/(n-1))*98)+1)); });
   return map;
@@ -1255,9 +1260,10 @@ function applyFilters(universe, rsMap, opts={}){
       pass=run&&near&&tight&&up&&strong;
     } else {
       const t1=close>s150&&close>s200, t2=s150>s200, t3=s50>s150&&s50>s200;
+      const t4=perf6!=null&&perf6>0;
       const t5=close>s50, t6=close>=lo*(1+flPct), t7=close>=hi*(1-fhPct), t8=rs>=rsMin;
-      checks={t1,t2,t3,t5,t6,t7,t8};
-      pass=[t1,t2,t3,t5,t6,t7,t8].every(Boolean);
+      checks={t1,t2,t3,t4,t5,t6,t7,t8};
+      pass=[t1,t2,t3,t4,t5,t6,t7,t8].every(Boolean);
       if(pass && useFund && (eps==null||eps<epsMin||rev==null||rev<revMin||roe==null||roe<roeMin)) pass=false;
       if(pass && reqEpsAccel && !(eps!=null && eps1!=null && eps>=eps1)) pass=false;
       if(pass && reqProfit && (nm==null||nm<=0)) pass=false;
