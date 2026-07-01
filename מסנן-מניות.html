@@ -601,6 +601,7 @@ tbody tr:last-child td { border-bottom: none; }
           <div class="filter-toggles">
             <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
             <label class="toggle"><input type="checkbox" id="requireProfit" checked> שולי רווח חיוביים</label>
+            <label class="toggle"><input type="checkbox" id="requireEpsAccel"> האצה ב-EPS (רבעון אחרון &ge; קודם)</label>
             <label class="toggle"><input type="checkbox" id="vcpOnly"> רק קרוב לנקודת קנייה (VCP)</label>
           </div>
           <div class="fund-note">
@@ -710,6 +711,8 @@ const COLUMNS = [
   "name","description","close","SMA50","SMA150","SMA200",
   "price_52_week_high","price_52_week_low","Perf.Y",
   "earnings_per_share_diluted_yoy_growth_fq",
+  "earnings_per_share_diluted_yoy_growth_fq[1]",
+  "earnings_per_share_diluted_yoy_growth_fq[2]",
   "total_revenue_yoy_growth_fq","return_on_equity_fq",
   "net_margin","sector","market_cap_basic","volume",
   "exchange","average_volume_10d_calc",
@@ -1184,6 +1187,7 @@ function applyFilters(universe, rsMap, opts={}){
   const runMin=num('runMin');
   const vcpOnly=opts.skipFund?false:!!$('vcpOnly')?.checked;
   const useFund=opts.skipFund?false:$('useFund').checked, reqProfit=opts.skipFund?false:$('requireProfit').checked;
+  const reqEpsAccel=opts.skipFund?false:!!$('requireEpsAccel')?.checked;
   const epsMin=num('epsMin'), revMin=num('revMin'), roeMin=num('roeMin');
   const nowSec=Date.now()/1000;
   const out=[];
@@ -1207,6 +1211,8 @@ function applyFilters(universe, rsMap, opts={}){
     const vcp = fromHighPct>=-12 && volD!=null && volM!=null && volD<volM && vr!=null && vr<1.0;
     const perfY=d[C['Perf.Y']], perf3=d[C['Perf.3M']], perf6=d[C['Perf.6M']];
     const eps=d[C.earnings_per_share_diluted_yoy_growth_fq],
+          eps1=d[C['earnings_per_share_diluted_yoy_growth_fq[1]']],
+          eps2=d[C['earnings_per_share_diluted_yoy_growth_fq[2]']],
           rev=d[C.total_revenue_yoy_growth_fq],
           roe=d[C.return_on_equity_fq], nm=d[C.net_margin];
 
@@ -1232,6 +1238,7 @@ function applyFilters(universe, rsMap, opts={}){
       checks={t1,t2,t3,t5,t6,t7,t8};
       pass=[t1,t2,t3,t5,t6,t7,t8].every(Boolean);
       if(pass && useFund && (eps==null||eps<epsMin||rev==null||rev<revMin||roe==null||roe<roeMin)) pass=false;
+      if(pass && reqEpsAccel && !(eps!=null && eps1!=null && eps>=eps1)) pass=false;
       if(pass && reqProfit && (nm==null||nm<=0)) pass=false;
       if(pass && vcpOnly && !vcp) pass=false;
     }
@@ -1243,7 +1250,7 @@ function applyFilters(universe, rsMap, opts={}){
       vol, avgVol, dollarVol, earnIn, vcp,
       fromHighPct, fromLowPct:(close/lo-1)*100,
       rangePos:(close-lo)/(hi-lo), perfY, perf3, perf6,
-      eps, rev, roe, nm, score:0, checks
+      eps, eps1, eps2, rev, roe, nm, score:0, checks
     });
   }
   return out;
@@ -1404,7 +1411,7 @@ function renderTable(rows){
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
       +col('perfY',  '<td><span class="mn '+((r.perfY??0)>=0?'pos':'neg')+'">'+pct(r.perfY)+'</span></td>')
-      +col('eps',    '<td><span class="mn '+((r.eps??0)>=0?'pos':'neg')+'">'+pct(r.eps)+'</span></td>')
+      +col('eps',    (()=>{const accel=r.eps!=null&&r.eps1!=null?r.eps-r.eps1:null;const arr=accel==null?'':accel>5?'<span style="color:var(--green);font-size:10px;margin-right:2px">↑</span>':accel<-5?'<span style="color:var(--red);font-size:10px;margin-right:2px">↓</span>':'<span style="color:var(--text3);font-size:10px;margin-right:2px">→</span>';const tip=r.eps1!=null?'Q0: '+pct(r.eps)+' · Q1: '+pct(r.eps1)+(r.eps2!=null?' · Q2: '+pct(r.eps2):''):'';return '<td title="'+tip+'">'+arr+'<span class="mn '+((r.eps??0)>=0?'pos':'neg')+'">'+pct(r.eps)+'</span></td>';})())
       +col('rev',    '<td><span class="mn '+((r.rev??0)>=0?'pos':'neg')+'">'+pct(r.rev)+'</span></td>')
       +col('range',  '<td>'+rngEl+'</td>')
       +col('roe',    '<td><span class="mn">'+pct(r.roe)+'</span></td>')
@@ -1457,7 +1464,7 @@ function renderGallery(){
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
-      +stat('EPS שנה', r.eps, 'צמיחת רווח למניה שנה/שנה')
+      +stat('EPS שנה', r.eps, r.eps1!=null?'Q0: '+pct(r.eps)+' · Q1: '+pct(r.eps1)+(r.eps2!=null?' · Q2: '+pct(r.eps2):''):'צמיחת רווח למניה שנה/שנה')
       +'<div class="gstat" title="מרחק מהשיא של 52 שבועות"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(fhUp?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>'
       +'</div></div>';
   }).join('');
@@ -1645,7 +1652,7 @@ function saveFilterPrefs(){
       priceMin:num('priceMin'),mcMin:num('mcMin'),
       liqMin:num('liqMin'),earnDays:num('earnDays'),runMin:num('runMin'),
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
-      useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,vcpOnly:$('vcpOnly')?.checked
+      useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,requireEpsAccel:$('requireEpsAccel')?.checked,vcpOnly:$('vcpOnly')?.checked
     }));
   } catch(e){}
 }
@@ -1665,6 +1672,7 @@ function loadFilterPrefs(){
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
     if($('requireProfit')&&p.requireProfit!=null) $('requireProfit').checked=p.requireProfit;
+    if($('requireEpsAccel')&&p.requireEpsAccel!=null) $('requireEpsAccel').checked=p.requireEpsAccel;
     if($('vcpOnly')&&p.vcpOnly!=null) $('vcpOnly').checked=p.vcpOnly;
     toggleFundFields();
     syncMcTierUI();
