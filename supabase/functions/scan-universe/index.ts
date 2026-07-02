@@ -5,8 +5,13 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const CACHE_KEY = 'scan:america';
-let mem: { data: unknown; time: number } | null = null;
+function cacheKey(body: unknown): string {
+  const s = JSON.stringify(body);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return 'scan:america:' + (h >>> 0).toString(36);
+}
+const mem = new Map<string, { data: unknown; time: number }>();
 const MEM_TTL = 5 * 60 * 1000;   // 5 min in-instance
 const DB_TTL = 5 * 60 * 1000;    // 5 min persistent freshness
 
@@ -16,11 +21,11 @@ const RATE_LIMIT = 12;
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-async function dbGet(): Promise<{ data: unknown; age: number } | null> {
+async function dbGet(key: string): Promise<{ data: unknown; age: number } | null> {
   if (!SB_URL || !SB_KEY) return null;
   try {
     const r = await fetch(
-      `${SB_URL}/rest/v1/market_cache?cache_key=eq.${encodeURIComponent(CACHE_KEY)}&select=payload,refreshed_at`,
+      `${SB_URL}/rest/v1/market_cache?cache_key=eq.${encodeURIComponent(key)}&select=payload,refreshed_at`,
       { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } },
     );
     if (!r.ok) return null;
@@ -30,7 +35,7 @@ async function dbGet(): Promise<{ data: unknown; age: number } | null> {
   } catch { return null; }
 }
 
-async function dbPut(data: unknown): Promise<void> {
+async function dbPut(key: string, data: unknown): Promise<void> {
   if (!SB_URL || !SB_KEY) return;
   try {
     await fetch(`${SB_URL}/rest/v1/market_cache`, {
@@ -39,7 +44,7 @@ async function dbPut(data: unknown): Promise<void> {
         apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY,
         'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates',
       },
-      body: JSON.stringify({ cache_key: CACHE_KEY, payload: data, refreshed_at: new Date().toISOString() }),
+      body: JSON.stringify({ cache_key: key, payload: data, refreshed_at: new Date().toISOString() }),
     });
   } catch { /* best-effort */ }
 }
@@ -65,27 +70,31 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  let body: unknown = {};
+  try { body = await req.json(); } catch { /* empty body */ }
+  const key = cacheKey(body);
+
   // 1. warm in-instance cache
-  if (mem && Date.now() - mem.time < MEM_TTL) return ok(mem.data, 'MEM');
+  const m = mem.get(key);
+  if (m && Date.now() - m.time < MEM_TTL) return ok(m.data, 'MEM');
 
   // 2. persistent DB cache (fresh)
-  const cached = await dbGet();
+  const cached = await dbGet(key);
   if (cached && cached.age < DB_TTL) {
-    mem = { data: cached.data, time: Date.now() };
+    mem.set(key, { data: cached.data, time: Date.now() });
     return ok(cached.data, 'DB');
   }
 
   // 3. fetch fresh; on failure serve stale cached data if available
   try {
-    const body = await req.json();
     const res = await fetch(
       'https://scanner.tradingview.com/america/scan?label-product=screener-stock',
       { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(body) },
     );
     if (!res.ok) throw new Error('TradingView ' + res.status);
     const data = await res.json();
-    mem = { data, time: Date.now() };
-    dbPut(data);
+    mem.set(key, { data, time: Date.now() });
+    dbPut(key, data);
     return ok(data, 'LIVE');
   } catch (e) {
     if (cached) return ok(cached.data, 'STALE');

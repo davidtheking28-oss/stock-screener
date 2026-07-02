@@ -155,12 +155,37 @@ Deno.serve(async (req: Request) => {
     const breadth = Math.round(up / universe.length * 100);
 
     const scanDate = new Date().toISOString().slice(0, 10);
-    const prevRes = await sb(`/rest/v1/screener_daily?scan_date=lt.${scanDate}&order=scan_date.desc&limit=1&select=scan_date,tickers`);
-    const prevRows = prevRes.ok ? await prevRes.json() : [];
-    const prevSet = new Set<string>((prevRows[0]?.tickers || []).map((r: { t: string }) => r.t));
+    const prevRes = await sb(`/rest/v1/screener_daily?scan_date=lt.${scanDate}&order=scan_date.desc&limit=21&select=scan_date,tickers,summary`);
+    const prevRows: { scan_date: string; tickers: { t: string; c: number }[]; summary: { entries?: string[] } | null }[] =
+      prevRes.ok ? await prevRes.json() : [];
+    const prevSet = new Set<string>((prevRows[0]?.tickers || []).map(r => r.t));
     const todaySet = new Set(results.map(r => r.t));
     const entries = prevRows.length ? results.map(r => r.t).filter(t => !prevSet.has(t)) : [];
     const exits = prevRows.length ? [...prevSet].filter(t => !todaySet.has(t)) : [];
+
+    const priceNow = new Map<string, number>();
+    for (const r of universe) {
+      const t = r.d[C.name] as string, c = r.d[C.close] as number;
+      if (t && c) priceNow.set(t, c);
+    }
+    const fwd = (idx: number) => {
+      const row = prevRows[idx];
+      if (!row) return null;
+      const entryTickers = row.summary?.entries || [];
+      const priceThen = new Map((row.tickers || []).map(x => [x.t, x.c]));
+      const rets: number[] = [];
+      for (const t of entryTickers) {
+        const p0 = priceThen.get(t), p1 = priceNow.get(t);
+        if (p0 && p1) rets.push((p1 / p0 - 1) * 100);
+      }
+      if (!rets.length) return null;
+      return { n: rets.length, avg: +(rets.reduce((a, b) => a + b, 0) / rets.length).toFixed(1) };
+    };
+    const perf: Record<string, { n: number; avg: number }> = {};
+    const p5 = fwd(4), p10 = fwd(9), p20 = fwd(19);
+    if (p5) perf.d5 = p5;
+    if (p10) perf.d10 = p10;
+    if (p20) perf.d20 = p20;
 
     const put = await sb('/rest/v1/screener_daily', {
       method: 'POST',
@@ -168,7 +193,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         scan_date: scanDate,
         tickers: results,
-        summary: { entries, exits, count: results.length, universe: universe.length, breadth },
+        summary: { entries, exits, count: results.length, universe: universe.length, breadth, ...(Object.keys(perf).length ? { perf } : {}) },
       }),
     });
     if (!put.ok) throw new Error('save failed ' + put.status + ' ' + await put.text());

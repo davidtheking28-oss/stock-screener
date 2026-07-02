@@ -75,6 +75,8 @@ body {
 }
 .breadth-chip.show { display: flex; }
 .breadth-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.breadth-spark { display: none; align-items: center; cursor: help; flex-shrink: 0; }
+.breadth-spark.show { display: flex; }
 #statBar { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text2); flex-wrap: wrap; }
 #statBar b { color: var(--text); font-weight: 700; }
 .topbar-end { margin-right: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -371,19 +373,11 @@ tbody tr:last-child td { border-bottom: none; }
 .gcard-name { font: 500 10.5px var(--sans); color: var(--text3); margin-top: 2px; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; direction: ltr; text-align: right; }
 .gcard-badges { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .gcard-tags { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
-.gcard-tags .vcp-badge, .gcard-tags .earn-badge, .gcard-tags .ext-badge { margin: 0; }
+.gcard-tags .earn-badge { margin: 0; }
 .gbadge { direction: ltr; display: inline-flex; align-items: baseline; gap: 4px; height: 22px; padding: 0 9px; border-radius: 6px; font: 700 9px var(--sans); letter-spacing: 0.7px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }
 .gbadge .gb-lbl { opacity: 0.7; }
 .gbadge b { font: 700 13px var(--mono-data); letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .gcard-chart { height: 200px; background: #0a1120; position: relative; overflow: hidden; }
-.vcp-overlay {
-  position: absolute; top: 8px; left: 8px; z-index: 5; pointer-events: auto; cursor: help;
-  display: flex; align-items: center; gap: 6px; direction: rtl;
-  background: rgba(9,17,32,0.88); border: 1px solid rgba(79,131,255,0.35);
-  border-radius: 6px; padding: 3px 8px;
-}
-.vcp-overlay .vo-lbl { font: 700 9.5px var(--sans); color: var(--accent2); letter-spacing: 0.3px; white-space: nowrap; }
-.vcp-overlay .vo-seq { direction: ltr; font: 700 9.5px var(--mono-data); color: var(--text2); letter-spacing: 0.3px; white-space: nowrap; }
 .gcard-chart > .tv-lite { width: 100%; height: 200px; }
 .gcard-stats { display: grid; grid-template-columns: repeat(3,1fr); border-top: 1px solid var(--border2); background: linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0)); }
 .gstat { padding: 10px 8px 11px; text-align: center; border-left: 1px solid var(--border2); }
@@ -500,12 +494,6 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 1px 5px; border-radius: 4px; letter-spacing: 0.5px;
   text-transform: uppercase; margin-right: 4px; vertical-align: middle;
 }
-.vcp-badge {
-  display: inline-block; font: 700 9px var(--sans); color: var(--accent2);
-  background: rgba(79,131,255,0.14); border: 1px solid rgba(79,131,255,0.32);
-  padding: 1px 5px; border-radius: 4px; letter-spacing: 0.5px;
-  margin-right: 5px; vertical-align: middle;
-}
 .earn-badge {
   display: inline-block; font: 700 9px var(--sans); color: var(--text3);
   background: rgba(255,255,255,0.05); border: 1px solid var(--border);
@@ -513,12 +501,6 @@ tbody tr:last-child td { border-bottom: none; }
   margin-right: 5px; vertical-align: middle;
 }
 .earn-badge.soon { color: var(--amber); background: rgba(245,185,74,0.12); border-color: rgba(245,185,74,0.3); }
-.ext-badge {
-  display: inline-block; font: 700 9px var(--sans); color: var(--amber);
-  background: rgba(245,185,74,0.12); border: 1px solid rgba(245,185,74,0.3);
-  padding: 1px 5px; border-radius: 4px; letter-spacing: 0.3px;
-  margin-right: 5px; vertical-align: middle;
-}
 
 .sector-strength {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -548,7 +530,7 @@ tbody tr:last-child td { border-bottom: none; }
 .lg-mid { background: var(--amber); color: var(--amber); }
 .lg-lo { background: var(--text3); color: var(--text3); }
 .lg-sep { width: 1px; height: 13px; background: var(--border); }
-.results-legend .vcp-badge, .results-legend .earn-badge { margin: 0; }
+.results-legend .earn-badge { margin: 0; }
 @media (max-width: 640px) {
   .ss-chip { min-height: 40px; padding: 8px 12px; }
   .results-controls .btn-ghost, .view-tab { min-height: 40px; }
@@ -570,6 +552,7 @@ tbody tr:last-child td { border-bottom: none; }
     <span class="breadth-dot" id="breadthDot"></span>
     <span id="breadthLabel"></span>
   </div>
+  <span class="breadth-spark" id="breadthSpark"></span>
   <div id="statBar"><span style="color:var(--text3)">8 תנאי Trend Template · RS Rating · EPS · הכנסות · ROE</span></div>
   <div class="topbar-end">
     <span id="scanTime"></span>
@@ -637,7 +620,6 @@ tbody tr:last-child td { border-bottom: none; }
             <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
             <label class="toggle"><input type="checkbox" id="requireProfit" checked> שולי רווח חיוביים</label>
             <label class="toggle"><input type="checkbox" id="requireEpsAccel"> האצה ב-EPS (רבעון אחרון &ge; קודם)</label>
-            <label class="toggle"><input type="checkbox" id="vcpOnly"> רק קרוב לנקודת קנייה (VCP)</label>
           </div>
           <div class="fund-note">
             <div class="fund-note-inner">
@@ -683,9 +665,7 @@ tbody tr:last-child td { border-bottom: none; }
       <span class="lg-grp"><i class="lg-dot lg-mid"></i>בינוני 60–79</span>
       <span class="lg-grp"><i class="lg-dot lg-lo"></i>חלש מתחת 60</span>
       <span class="lg-sep"></span>
-      <span class="lg-grp"><span class="vcp-badge">VCP</span> קרוב לנקודת קנייה</span>
       <span class="lg-grp"><span class="earn-badge soon">דוח 5י</span> דוח כספי קרוב</span>
-      <span class="lg-grp"><span class="ext-badge">מתוח</span> 25%+ מעל MA50 — לא לרדוף</span>
     </div>
     <div id="tableView" class="table-wrap"></div>
     <div id="galleryView" class="gallery" style="display:none"></div>
@@ -753,8 +733,7 @@ const COLUMNS = [
   "net_margin","sector","market_cap_basic","volume",
   "exchange","average_volume_10d_calc",
   "earnings_release_next_date","Volatility.D","Volatility.M",
-  "Perf.3M","Perf.6M",
-  "Volatility.W","relative_volume_10d_calc"
+  "Perf.3M","Perf.6M"
 ];
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
@@ -811,30 +790,6 @@ let _galleryKey = '';
 const _ohlcCache = new Map();
 let _ohlcLd = 0; const _ohlcQ = [];
 function _ohlcMsg(el,t){ el.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px">'+t+'</div>'; }
-function analyzeVCP(bars){
-  if(!Array.isArray(bars)||bars.length<40) return null;
-  const adr=bars.slice(-20).reduce((s,b)=>s+(b.h-b.l)/b.c,0)/20*100;
-  const thr=Math.max(3, adr*1.2);
-  const contractions=[];
-  let hi=bars[0].h, lo=null, mode='up';
-  for(let i=1;i<bars.length;i++){
-    const b=bars[i];
-    if(mode==='up'){
-      if(b.h>=hi){ hi=b.h; }
-      else if((hi-b.l)/hi*100>=thr){ mode='down'; lo=b.l; }
-    } else {
-      if(b.l<=lo){ lo=b.l; }
-      else if((b.h-lo)/lo*100>=thr){ contractions.push((hi-lo)/hi*100); mode='up'; hi=b.h; }
-    }
-  }
-  if(mode==='down' && lo!=null) contractions.push((hi-lo)/hi*100);
-  if(contractions.length<2) return null;
-  const seq=contractions.slice(-4);
-  for(let i=1;i<seq.length;i++) if(seq[i]>seq[i-1]*1.15) return null;
-  const last=seq[seq.length-1];
-  if(last>15 || last>seq[0]*0.75) return null;
-  return seq.map(x=>Math.round(x));
-}
 async function _ohlcDraw(el){
   if(!HAS_SUPABASE){
     const to=Math.floor(Date.now()/1000), from=to-90*86400;
@@ -884,15 +839,6 @@ async function _ohlcDraw(el){
     vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:'rgba(255,255,255,0.25)'})));
     chart.timeScale().fitContent();
     new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth})).observe(box);
-    const vseq=analyzeVCP(bars);
-    if(vseq){
-      const ov=document.createElement('div'); ov.className='vcp-overlay';
-      const readable=vseq.map(v=>v+'%').join(' ואז ');
-      ov.title='תבנית VCP (מינרוויני): הגלים היורדים בבסיס הולכים ומתכווצים — ירידה של '+readable
-        +' מהשיא המקומי. מחיר נסחר הדוק יותר ויותר = מוכנות לפריצה. הרצף משמאל לימין כמו ציר הזמן בגרף.';
-      ov.innerHTML='<span class="vo-lbl">בסיס מתהדק</span><span class="vo-seq">'+vseq.join('% → ')+'%</span>';
-      el.appendChild(ov);
-    }
   }catch(e){ _ohlcMsg(el,'<span>שגיאה</span> <button onclick="event.stopPropagation();_ohlcRetry(this)" style="margin-right:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text2);border-radius:5px;padding:2px 8px;font:600 11px var(--sans);cursor:pointer">↻</button>'); }
 }
 function _ohlcRetry(btn){
@@ -1289,7 +1235,6 @@ function applyFilters(universe, rsMap, opts={}){
   const mcMin=opts.skipFund?0:num('mcMin')*1e9, priceMin=num('priceMin');
   const liqMin=opts.skipFund?0:num('liqMin')*1e6, earnGap=opts.skipFund?0:num('earnDays');
   const runMin=num('runMin');
-  const vcpOnly=opts.skipFund?false:!!$('vcpOnly')?.checked;
   const useFund=opts.skipFund?false:$('useFund').checked, reqProfit=opts.skipFund?false:$('requireProfit').checked;
   const reqEpsAccel=opts.skipFund?false:!!$('requireEpsAccel')?.checked;
   const epsMin=num('epsMin'), revMin=num('revMin'), roeMin=num('roeMin');
@@ -1310,11 +1255,8 @@ function applyFilters(universe, rsMap, opts={}){
     const earnIn=(earnTs!=null && earnTs>0)?Math.round((earnTs-nowSec)/86400):null;
     if(earnGap>0 && earnIn!=null && earnIn>=0 && earnIn<=earnGap) continue;
     const fromHighPct=(close/hi-1)*100;
-    const volD=d[C['Volatility.D']], volM=d[C['Volatility.M']], volW=d[C['Volatility.W']];
-    const relVol=d[C['relative_volume_10d_calc']];
+    const volD=d[C['Volatility.D']], volM=d[C['Volatility.M']];
     const vr=(vol!=null&&avgVol)?vol/avgVol:null;
-    const vcp = fromHighPct>=-12 && volD!=null && volW!=null && volM!=null
-      && volD<volW && volD<volM && relVol!=null && relVol<1.0;
     const perfY=d[C['Perf.Y']], perf3=d[C['Perf.3M']], perf6=d[C['Perf.6M']];
     const eps=d[C.earnings_per_share_diluted_yoy_growth_fq],
           eps1=d[C['earnings_per_share_diluted_yoy_growth_fq[1]']],
@@ -1347,17 +1289,15 @@ function applyFilters(universe, rsMap, opts={}){
       if(pass && useFund && (eps==null||eps<epsMin||rev==null||rev<revMin||roe==null||roe<roeMin)) pass=false;
       if(pass && reqEpsAccel && !(eps!=null && eps1!=null && eps>=eps1)) pass=false;
       if(pass && reqProfit && (nm==null||nm<=0)) pass=false;
-      if(pass && vcpOnly && !vcp) pass=false;
     }
     if(!pass) continue;
 
     out.push({
       sym:r.s, ticker:d[C.name], name:d[C.description]||'', exch:d[C.exchange],
       close, rs, sector:d[C.sector]||'—', mc,
-      vol, avgVol, dollarVol, earnIn, vcp,
+      vol, avgVol, dollarVol, earnIn,
       fromHighPct, fromLowPct:(close/lo-1)*100,
       rangePos:(close-lo)/(hi-lo), perfY, perf3, perf6,
-      extPct:(close/s50-1)*100,
       eps, eps1, eps2, rev, roe, nm, score:0, checks
     });
   }
@@ -1524,12 +1464,10 @@ function renderTable(rows){
 
     const priceStr=r.close>=100?r.close.toFixed(0):r.close.toFixed(2);
     const isNew = newToday.has(r.ticker);
-    const vcpB = r.vcp ? '<span class="vcp-badge" title="תנודתיות מתכווצת (יום<שבוע<חודש) + נפח מתייבש קרוב לשיא — נקודת קנייה אפשרית">VCP</span>' : '';
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
-    const extB = (r.extPct!=null && r.extPct>=25) ? '<span class="ext-badge" title="המחיר '+r.extPct.toFixed(0)+'% מעל ממוצע 50 יום — מתוח, עדיף לחכות לבסיס">מתוח</span>' : '';
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button></td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+vcpB+earnB+extB+'</div><div class="cname">'+esc(r.name)+'</div></td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+earnB+'</div><div class="cname">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
@@ -1567,9 +1505,7 @@ function renderGallery(){
   _galleryKey=_key;
   g.innerHTML=results.map(r=>{
     const wl=watchlist.has(r.ticker);
-    const vcpB = r.vcp ? '<span class="vcp-badge" title="תנודתיות מתכווצת (יום<שבוע<חודש) + נפח מתייבש קרוב לשיא — נקודת קנייה אפשרית">VCP</span>' : '';
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
-    const extB = (r.extPct!=null && r.extPct>=25) ? '<span class="ext-badge" title="המחיר '+r.extPct.toFixed(0)+'% מעל ממוצע 50 יום — מתוח, עדיף לחכות לבסיס">מתוח</span>' : '';
     const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : 'SEPA';
     const scTitle = (r.scoreKind==='momentum'||r.scoreKind==='power')
       ? 'ציון מומנטום '+r.score+'/100 — RS 50% + קרבה לשיא 25% + ביצוע 25%'
@@ -1587,7 +1523,7 @@ function renderGallery(){
     return '<div class="gcard" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button>'
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name">'+esc(r.name)+'</div>'
-      +((vcpB||earnB||extB)?'<div class="gcard-tags">'+vcpB+earnB+extB+'</div>':'')+'</div></div>'
+      +(earnB?'<div class="gcard-tags">'+earnB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+scoreColor(r.score)+';background:'+scoreBg(r.score)+'" title="'+scTitle+'"><span class="gb-lbl">'+scLbl+'</span> <b>'+r.score+'</b></span>'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — ביצוע יחסי מול השוק"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span></div></div>'
@@ -1782,14 +1718,20 @@ function closeAuthModal(){ $('authModal').classList.remove('open'); }
 async function loadDailyStatus(){
   if(!HAS_SUPABASE) return;
   try{
-    const r=await fetch(SUPABASE_URL+'/rest/v1/screener_daily?select=scan_date,summary&order=scan_date.desc&limit=1',
+    const r=await fetch(SUPABASE_URL+'/rest/v1/screener_daily?select=scan_date,summary&order=scan_date.desc&limit=30',
       {headers:{apikey:SUPABASE_ANON,Authorization:'Bearer '+SUPABASE_ANON}});
     if(!r.ok) return;
     const rows=await r.json(); if(!rows.length) return;
+    drawBreadthSpark(rows);
     const {scan_date, summary}=rows[0];
     if(localStorage.getItem('sepa_daily_dismissed')===scan_date) return;
-    const ent=summary?.entries||[], ex=summary?.exits||[];
-    if(!ent.length && !ex.length) return;
+    const ent=summary?.entries||[], ex=summary?.exits||[], perf=summary?.perf;
+    const perfBits=[];
+    if(perf) ['d5','d10','d20'].forEach(k=>{
+      const p=perf[k]; if(!p||!p.n) return;
+      perfBits.push(k.slice(1)+' ימים: <b class="'+(p.avg>=0?'pos':'neg')+'">'+(p.avg>=0?'+':'')+p.avg.toFixed(1)+'%</b> ('+p.n+' מניות)');
+    });
+    if(!ent.length && !ex.length && !perfBits.length) return;
     const mark=t=>watchlist.has(t)?'<b style="color:var(--amber)">★'+t+'</b>':t;
     const fmt=a=>a.slice(0,12).map(mark).join(', ')+(a.length>12?' +'+(a.length-12):'');
     const dateHe=scan_date.slice(5).split('-').reverse().join('/');
@@ -1797,9 +1739,22 @@ async function loadDailyStatus(){
     el.innerHTML='<span class="db-title">סריקת לילה '+dateHe+'</span>'
       +(ent.length?'<span><b style="color:var(--green)">נכנסו ('+ent.length+'):</b> <span class="db-list">'+fmt(ent)+'</span></span>':'')
       +(ex.length?'<span><b style="color:var(--red)">יצאו ('+ex.length+'):</b> <span class="db-list">'+fmt(ex)+'</span></span>':'')
+      +(perfBits.length?'<span title="תשואה ממוצעת עד היום של המניות שנכנסו לסינון לפני X ימי מסחר"><b style="color:var(--accent2)">ביצועי כניסות עבר:</b> '+perfBits.join(' · ')+'</span>':'')
       +'<button class="db-close" onclick="dismissDaily(\''+scan_date+'\')" aria-label="סגור">✕</button>';
     el.style.display='flex';
   }catch(e){}
+}
+function drawBreadthSpark(rows){
+  const el=$('breadthSpark'); if(!el) return;
+  const pts=rows.map(r=>r.summary?.breadth).filter(b=>b!=null).reverse();
+  if(pts.length<2) return;
+  const w=72,h=20,n=pts.length;
+  const poly=pts.map((b,i)=>(1+(i/(n-1))*(w-2)).toFixed(1)+','+(h-1-clamp(b,0,100)/100*(h-2)).toFixed(1)).join(' ');
+  const last=pts[n-1];
+  const col=last>=50?'var(--green)':last>=35?'var(--amber)':'var(--red)';
+  el.innerHTML='<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><polyline points="'+poly+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  el.title='בריאות שוק — אחוז המניות במגמת עלייה, '+n+' סריקות לילה אחרונות (עדכני: '+last+'%)';
+  el.classList.add('show');
 }
 function dismissDaily(d){
   try{ localStorage.setItem('sepa_daily_dismissed', d); }catch(e){}
@@ -1813,7 +1768,7 @@ function saveFilterPrefs(){
       priceMin:num('priceMin'),mcMin:num('mcMin'),
       liqMin:num('liqMin'),earnDays:num('earnDays'),runMin:num('runMin'),
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
-      useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,requireEpsAccel:$('requireEpsAccel')?.checked,vcpOnly:$('vcpOnly')?.checked
+      useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,requireEpsAccel:$('requireEpsAccel')?.checked
     }));
   } catch(e){}
 }
@@ -1834,7 +1789,6 @@ function loadFilterPrefs(){
     if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
     if($('requireProfit')&&p.requireProfit!=null) $('requireProfit').checked=p.requireProfit;
     if($('requireEpsAccel')&&p.requireEpsAccel!=null) $('requireEpsAccel').checked=p.requireEpsAccel;
-    if($('vcpOnly')&&p.vcpOnly!=null) $('vcpOnly').checked=p.vcpOnly;
     toggleFundFields();
     syncMcTierUI();
   } catch(e){}
