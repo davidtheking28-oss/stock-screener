@@ -377,11 +377,13 @@ tbody tr:last-child td { border-bottom: none; }
 .gbadge b { font: 700 13px var(--mono-data); letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .gcard-chart { height: 200px; background: #0a1120; position: relative; overflow: hidden; }
 .vcp-overlay {
-  position: absolute; top: 8px; left: 8px; z-index: 5; pointer-events: none;
-  direction: ltr; font: 700 9.5px var(--mono-data); letter-spacing: 0.3px;
-  color: var(--accent2); background: rgba(9,17,32,0.85);
-  border: 1px solid rgba(79,131,255,0.35); border-radius: 6px; padding: 3px 7px;
+  position: absolute; top: 8px; left: 8px; z-index: 5; pointer-events: auto; cursor: help;
+  display: flex; align-items: center; gap: 6px; direction: rtl;
+  background: rgba(9,17,32,0.88); border: 1px solid rgba(79,131,255,0.35);
+  border-radius: 6px; padding: 3px 8px;
 }
+.vcp-overlay .vo-lbl { font: 700 9.5px var(--sans); color: var(--accent2); letter-spacing: 0.3px; white-space: nowrap; }
+.vcp-overlay .vo-seq { direction: ltr; font: 700 9.5px var(--mono-data); color: var(--text2); letter-spacing: 0.3px; white-space: nowrap; }
 .gcard-chart > .tv-lite { width: 100%; height: 200px; }
 .gcard-stats { display: grid; grid-template-columns: repeat(3,1fr); border-top: 1px solid var(--border2); background: linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0)); }
 .gstat { padding: 10px 8px 11px; text-align: center; border-left: 1px solid var(--border2); }
@@ -885,8 +887,10 @@ async function _ohlcDraw(el){
     const vseq=analyzeVCP(bars);
     if(vseq){
       const ov=document.createElement('div'); ov.className='vcp-overlay';
-      ov.title='התכווצויות עומק בבסיס — כל אחת הדוקה מהקודמת (VCP)';
-      ov.textContent='VCP '+vseq.join('% → ')+'%';
+      const readable=vseq.map(v=>v+'%').join(' ואז ');
+      ov.title='תבנית VCP (מינרוויני): הגלים היורדים בבסיס הולכים ומתכווצים — ירידה של '+readable
+        +' מהשיא המקומי. מחיר נסחר הדוק יותר ויותר = מוכנות לפריצה. הרצף משמאל לימין כמו ציר הזמן בגרף.';
+      ov.innerHTML='<span class="vo-lbl">בסיס מתהדק</span><span class="vo-seq">'+vseq.join('% → ')+'%</span>';
       el.appendChild(ov);
     }
   }catch(e){ _ohlcMsg(el,'<span>שגיאה</span> <button onclick="event.stopPropagation();_ohlcRetry(this)" style="margin-right:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text2);border-radius:5px;padding:2px 8px;font:600 11px var(--sans);cursor:pointer">↻</button>'); }
