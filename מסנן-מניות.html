@@ -92,7 +92,7 @@ body {
 }
 
 /* ── Main ── */
-.main { padding: 22px 28px; max-width: 1640px; margin: 0 auto; }
+.main { padding: 22px 28px; }
 
 /* ── Filter panel ── */
 .filter-panel {
@@ -842,18 +842,24 @@ async function _ohlcDraw(el){
     return;
   }
   const sym=el.dataset.sym;
+  const OHLC_TTL=30*60*1000;
   try{
-    let bars=_ohlcCache.get(sym);
+    let bars=null;
+    const mc=_ohlcCache.get(sym);
+    if(mc && Date.now()-mc.t<OHLC_TTL) bars=mc.bars;
     if(!bars){
-      try{ const sc=sessionStorage.getItem('ohlc_'+sym); if(sc) bars=JSON.parse(sc); }catch(e){}
+      try{
+        const sc=JSON.parse(sessionStorage.getItem('ohlc_'+sym));
+        if(sc && sc.t && Date.now()-sc.t<OHLC_TTL) bars=sc.bars;
+      }catch(e){}
     }
     if(!bars){
       const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON}});
       const j=await r.json();
       bars=Array.isArray(j.bars)?j.bars:[];
-      try{ sessionStorage.setItem('ohlc_'+sym, JSON.stringify(bars)); }catch(e){}
+      try{ sessionStorage.setItem('ohlc_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
     }
-    _ohlcCache.set(sym,bars);
+    _ohlcCache.set(sym,{bars,t:Date.now()});
     if(!bars.length){ _ohlcMsg(el,'אין נתונים'); return; }
     el.innerHTML='';
     const box=document.createElement('div'); box.className='tv-lite'; el.appendChild(box);
@@ -990,7 +996,10 @@ function loadResultsCache(){
     const isToday = d.toDateString() === new Date().toDateString();
     $('scanTime').textContent = isToday ? hh+':'+mm+' (מאוחסן)' : 'אמש '+hh+':'+mm;
     const rb=$('scanBtn'); if(rb) rb.style.display='';
-    $('statBar').innerHTML='<b>'+results.length+'</b> מניות מסריקה '+(isToday?'ב-'+hh+':'+mm:'מאתמול')+' <span style="color:var(--text3);font-size:11px">· לחץ "סרוק שנית" לעדכון</span>';
+    const stale = Date.now()-time > 30*60*1000;
+    $('statBar').innerHTML='<b>'+results.length+'</b> מניות מסריקה '+(isToday?'ב-'+hh+':'+mm:'מאתמול')
+      +' <span style="color:var(--text3);font-size:11px">'+(stale?'· מרענן נתונים...':'· לחץ "סרוק שנית" לעדכון')+'</span>';
+    if(stale) setTimeout(()=>scan(true), 600);
   } catch(e){}
 }
 

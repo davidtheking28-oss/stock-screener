@@ -6,8 +6,8 @@ const CORS = {
 };
 
 const mem = new Map<string, { bars: unknown; time: number }>();
-const MEM_TTL = 60 * 60 * 1000;      // 1h in-instance
-const DB_TTL = 6 * 60 * 60 * 1000;   // 6h persistent freshness
+const MEM_TTL = 15 * 60 * 1000;      // 15min in-instance
+const DB_TTL = 45 * 60 * 1000;       // 45min persistent freshness
 
 const _rate = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 120;
