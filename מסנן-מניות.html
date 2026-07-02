@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -374,6 +374,12 @@ tbody tr:last-child td { border-bottom: none; }
 .gbadge .gb-lbl { opacity: 0.7; }
 .gbadge b { font: 700 13px var(--mono-data); letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .gcard-chart { height: 200px; background: #0a1120; position: relative; overflow: hidden; }
+.vcp-overlay {
+  position: absolute; top: 8px; left: 8px; z-index: 5; pointer-events: none;
+  direction: ltr; font: 700 9.5px var(--mono-data); letter-spacing: 0.3px;
+  color: var(--accent2); background: rgba(9,17,32,0.85);
+  border: 1px solid rgba(79,131,255,0.35); border-radius: 6px; padding: 3px 7px;
+}
 .gcard-chart > .tv-lite { width: 100%; height: 200px; }
 .gcard-stats { display: grid; grid-template-columns: repeat(3,1fr); border-top: 1px solid var(--border2); background: linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0)); }
 .gstat { padding: 10px 8px 11px; text-align: center; border-left: 1px solid var(--border2); }
@@ -405,6 +411,23 @@ tbody tr:last-child td { border-bottom: none; }
 /* ── Toast ── */
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(14px); background: var(--surface); border: 1px solid rgba(255,255,255,0.1); color: var(--text); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity 0.2s ease-out, transform 0.2s cubic-bezier(0.16,1,0.3,1); z-index: 200; pointer-events: none; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Daily banner ── */
+.daily-banner {
+  display: flex; align-items: center; gap: 8px 18px; flex-wrap: wrap;
+  background: linear-gradient(135deg, rgba(79,131,255,0.09), rgba(79,131,255,0.02));
+  border: 1px solid rgba(79,131,255,0.22); border-radius: 14px;
+  padding: 10px 16px; margin-bottom: 14px;
+  font-size: 12.5px; color: var(--text2); line-height: 1.7;
+}
+.db-title { font-weight: 700; color: var(--accent2); white-space: nowrap; }
+.db-list { direction: ltr; unicode-bidi: isolate; font-family: var(--mono-data); font-size: 12px; }
+.db-close {
+  margin-right: auto; background: transparent; border: 1px solid var(--border);
+  color: var(--text3); border-radius: 7px; width: 26px; height: 26px;
+  font-size: 12px; display: grid; place-items: center; flex-shrink: 0;
+}
+.db-close:hover { color: var(--text); background: var(--bg3); }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -552,6 +575,8 @@ tbody tr:last-child td { border-bottom: none; }
 </div>
 
 <div class="main">
+
+  <div id="dailyBanner" class="daily-banner" style="display:none"></div>
 
   <!-- Filter -->
   <div class="filter-panel open" id="filterPanel">
@@ -724,7 +749,8 @@ const COLUMNS = [
   "net_margin","sector","market_cap_basic","volume",
   "exchange","average_volume_10d_calc",
   "earnings_release_next_date","Volatility.D","Volatility.M",
-  "Perf.3M","Perf.6M"
+  "Perf.3M","Perf.6M",
+  "Volatility.W","relative_volume_10d_calc"
 ];
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
@@ -781,8 +807,38 @@ let _galleryKey = '';
 const _ohlcCache = new Map();
 let _ohlcLd = 0; const _ohlcQ = [];
 function _ohlcMsg(el,t){ el.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px">'+t+'</div>'; }
+function analyzeVCP(bars){
+  if(!Array.isArray(bars)||bars.length<40) return null;
+  const adr=bars.slice(-20).reduce((s,b)=>s+(b.h-b.l)/b.c,0)/20*100;
+  const thr=Math.max(3, adr*1.2);
+  const contractions=[];
+  let hi=bars[0].h, lo=null, mode='up';
+  for(let i=1;i<bars.length;i++){
+    const b=bars[i];
+    if(mode==='up'){
+      if(b.h>=hi){ hi=b.h; }
+      else if((hi-b.l)/hi*100>=thr){ mode='down'; lo=b.l; }
+    } else {
+      if(b.l<=lo){ lo=b.l; }
+      else if((b.h-lo)/lo*100>=thr){ contractions.push((hi-lo)/hi*100); mode='up'; hi=b.h; }
+    }
+  }
+  if(mode==='down' && lo!=null) contractions.push((hi-lo)/hi*100);
+  if(contractions.length<2) return null;
+  const seq=contractions.slice(-4);
+  for(let i=1;i<seq.length;i++) if(seq[i]>seq[i-1]*1.15) return null;
+  const last=seq[seq.length-1];
+  if(last>15 || last>seq[0]*0.75) return null;
+  return seq.map(x=>Math.round(x));
+}
 async function _ohlcDraw(el){
-  if(!HAS_SUPABASE){ _ohlcMsg(el,'זמין לאחר חיבור'); return; }
+  if(!HAS_SUPABASE){
+    const to=Math.floor(Date.now()/1000), from=to-90*86400;
+    const ov=encodeURIComponent('{"mainSeriesProperties.barStyle.upColor":"#ffffff","mainSeriesProperties.barStyle.downColor":"#ffffff"}');
+    const st=encodeURIComponent('{"volume.volume.color.0":"#ffffff","volume.volume.color.1":"#ffffff"}');
+    el.innerHTML='<iframe style="width:calc(100% + 52px);margin-left:-52px;height:200px;border:none" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(el.dataset.sym)+'&interval=D&from='+from+'&to='+to+'&hide_top_toolbar=1&hide_legend=1&saveimage=0&theme=dark&style=0&timezone=Etc%2FUTC&locale=he_IL&overrides='+ov+'&studies_overrides='+st+'"></iframe>';
+    return;
+  }
   const sym=el.dataset.sym;
   try{
     let bars=_ohlcCache.get(sym);
@@ -818,6 +874,13 @@ async function _ohlcDraw(el){
     vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:'rgba(255,255,255,0.25)'})));
     chart.timeScale().fitContent();
     new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth})).observe(box);
+    const vseq=analyzeVCP(bars);
+    if(vseq){
+      const ov=document.createElement('div'); ov.className='vcp-overlay';
+      ov.title='התכווצויות עומק בבסיס — כל אחת הדוקה מהקודמת (VCP)';
+      ov.textContent='VCP '+vseq.join('% → ')+'%';
+      el.appendChild(ov);
+    }
   }catch(e){ _ohlcMsg(el,'<span>שגיאה</span> <button onclick="event.stopPropagation();_ohlcRetry(this)" style="margin-right:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text2);border-radius:5px;padding:2px 8px;font:600 11px var(--sans);cursor:pointer">↻</button>'); }
 }
 function _ohlcRetry(btn){
@@ -1232,9 +1295,11 @@ function applyFilters(universe, rsMap, opts={}){
     const earnIn=(earnTs!=null && earnTs>0)?Math.round((earnTs-nowSec)/86400):null;
     if(earnGap>0 && earnIn!=null && earnIn>=0 && earnIn<=earnGap) continue;
     const fromHighPct=(close/hi-1)*100;
-    const volD=d[C['Volatility.D']], volM=d[C['Volatility.M']];
+    const volD=d[C['Volatility.D']], volM=d[C['Volatility.M']], volW=d[C['Volatility.W']];
+    const relVol=d[C['relative_volume_10d_calc']];
     const vr=(vol!=null&&avgVol)?vol/avgVol:null;
-    const vcp = fromHighPct>=-12 && volD!=null && volM!=null && volD<volM && vr!=null && vr<1.0;
+    const vcp = fromHighPct>=-12 && volD!=null && volW!=null && volM!=null
+      && volD<volW && volD<volM && relVol!=null && relVol<1.0;
     const perfY=d[C['Perf.Y']], perf3=d[C['Perf.3M']], perf6=d[C['Perf.6M']];
     const eps=d[C.earnings_per_share_diluted_yoy_growth_fq],
           eps1=d[C['earnings_per_share_diluted_yoy_growth_fq[1]']],
@@ -1444,7 +1509,7 @@ function renderTable(rows){
 
     const priceStr=r.close>=100?r.close.toFixed(0):r.close.toFixed(2);
     const isNew = newToday.has(r.ticker);
-    const vcpB = r.vcp ? '<span class="vcp-badge" title="התכווצות תנודתיות קרוב לשיא — נקודת קנייה אפשרית">VCP</span>' : '';
+    const vcpB = r.vcp ? '<span class="vcp-badge" title="תנודתיות מתכווצת (יום<שבוע<חודש) + נפח מתייבש קרוב לשיא — נקודת קנייה אפשרית">VCP</span>' : '';
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     const extB = (r.extPct!=null && r.extPct>=25) ? '<span class="ext-badge" title="המחיר '+r.extPct.toFixed(0)+'% מעל ממוצע 50 יום — מתוח, עדיף לחכות לבסיס">מתוח</span>' : '';
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
@@ -1487,7 +1552,7 @@ function renderGallery(){
   _galleryKey=_key;
   g.innerHTML=results.map(r=>{
     const wl=watchlist.has(r.ticker);
-    const vcpB = r.vcp ? '<span class="vcp-badge" title="התכווצות תנודתיות קרוב לשיא — נקודת קנייה אפשרית">VCP</span>' : '';
+    const vcpB = r.vcp ? '<span class="vcp-badge" title="תנודתיות מתכווצת (יום<שבוע<חודש) + נפח מתייבש קרוב לשיא — נקודת קנייה אפשרית">VCP</span>' : '';
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     const extB = (r.extPct!=null && r.extPct>=25) ? '<span class="ext-badge" title="המחיר '+r.extPct.toFixed(0)+'% מעל ממוצע 50 יום — מתוח, עדיף לחכות לבסיס">מתוח</span>' : '';
     const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : 'SEPA';
@@ -1698,6 +1763,33 @@ function toggleAuthModal(){
 }
 function closeAuthModal(){ $('authModal').classList.remove('open'); }
 
+async function loadDailyStatus(){
+  if(!HAS_SUPABASE) return;
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/screener_daily?select=scan_date,summary&order=scan_date.desc&limit=1',
+      {headers:{apikey:SUPABASE_ANON,Authorization:'Bearer '+SUPABASE_ANON}});
+    if(!r.ok) return;
+    const rows=await r.json(); if(!rows.length) return;
+    const {scan_date, summary}=rows[0];
+    if(localStorage.getItem('sepa_daily_dismissed')===scan_date) return;
+    const ent=summary?.entries||[], ex=summary?.exits||[];
+    if(!ent.length && !ex.length) return;
+    const mark=t=>watchlist.has(t)?'<b style="color:var(--amber)">★'+t+'</b>':t;
+    const fmt=a=>a.slice(0,12).map(mark).join(', ')+(a.length>12?' +'+(a.length-12):'');
+    const dateHe=scan_date.slice(5).split('-').reverse().join('/');
+    const el=$('dailyBanner');
+    el.innerHTML='<span class="db-title">סריקת לילה '+dateHe+'</span>'
+      +(ent.length?'<span><b style="color:var(--green)">נכנסו ('+ent.length+'):</b> <span class="db-list">'+fmt(ent)+'</span></span>':'')
+      +(ex.length?'<span><b style="color:var(--red)">יצאו ('+ex.length+'):</b> <span class="db-list">'+fmt(ex)+'</span></span>':'')
+      +'<button class="db-close" onclick="dismissDaily(\''+scan_date+'\')" aria-label="סגור">✕</button>';
+    el.style.display='flex';
+  }catch(e){}
+}
+function dismissDaily(d){
+  try{ localStorage.setItem('sepa_daily_dismissed', d); }catch(e){}
+  $('dailyBanner').style.display='none';
+}
+
 function saveFilterPrefs(){
   try {
     localStorage.setItem('sepa_filters', JSON.stringify({
@@ -1737,7 +1829,7 @@ setScreener(activeScreener, false);
 updUnitHints();
 loadUniverseCache();
 loadResultsCache();
-initAuth();
+initAuth().then(loadDailyStatus);
 </script>
 </body>
 </html>

@@ -26,3 +26,4 @@ jobs:
         run: |
           supabase functions deploy scan-universe --project-ref "$PROJECT_REF"
           supabase functions deploy ohlc --project-ref "$PROJECT_REF"
+          supabase functions deploy daily-scan --project-ref "$PROJECT_REF"

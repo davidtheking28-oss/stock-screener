@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.ohlc]
 verify_jwt = false
+
+[functions.daily-scan]
+verify_jwt = false
