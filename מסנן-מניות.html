@@ -501,6 +501,14 @@ tbody tr:last-child td { border-bottom: none; }
   margin-right: 5px; vertical-align: middle;
 }
 .earn-badge.soon { color: var(--amber); background: rgba(245,185,74,0.12); border-color: rgba(245,185,74,0.3); }
+.streak-badge {
+  display: inline-block; font: 700 9px var(--sans); color: var(--accent2);
+  background: rgba(79,131,255,0.12); border: 1px solid rgba(79,131,255,0.28);
+  padding: 1px 5px; border-radius: 4px; letter-spacing: 0.3px;
+  margin-right: 5px; vertical-align: middle;
+}
+.gcard-tags .streak-badge { margin: 0; }
+.results-legend .streak-badge { margin: 0; }
 
 .sector-strength {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -666,6 +674,7 @@ tbody tr:last-child td { border-bottom: none; }
       <span class="lg-grp"><i class="lg-dot lg-lo"></i>חלש מתחת 60</span>
       <span class="lg-sep"></span>
       <span class="lg-grp"><span class="earn-badge soon">דוח 5י</span> דוח כספי קרוב</span>
+      <span class="lg-grp"><span class="streak-badge">5 לילות</span> רצף לילות בסריקה — התמדה = חוזק</span>
     </div>
     <div id="tableView" class="table-wrap"></div>
     <div id="galleryView" class="gallery" style="display:none"></div>
@@ -727,8 +736,7 @@ const COLUMNS = [
   "name","description","close","SMA50","SMA150","SMA200",
   "price_52_week_high","price_52_week_low","Perf.Y",
   "earnings_per_share_diluted_yoy_growth_fq",
-  "earnings_per_share_diluted_yoy_growth_fq[1]",
-  "earnings_per_share_diluted_yoy_growth_fq[2]",
+  "earnings_per_share_diluted_qoq_growth_fq",
   "total_revenue_yoy_growth_fq","return_on_equity_fq",
   "net_margin","sector","market_cap_basic","volume",
   "exchange","average_volume_10d_calc",
@@ -853,6 +861,11 @@ function _ohlcNext(){
 let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
 let searchQuery = '';
 let newToday = new Set();
+let _streaks = {};
+function streakBadge(t){
+  const n=_streaks[t];
+  return n>=2 ? '<span class="streak-badge" title="מופיעה בסריקת הלילה '+n+' לילות ברצף — התמדה בסינון היא סימן חוזק">'+n+' לילות</span>' : '';
+}
 
 /* ════════════════════════════════════
    UTILS
@@ -1259,8 +1272,7 @@ function applyFilters(universe, rsMap, opts={}){
     const vr=(vol!=null&&avgVol)?vol/avgVol:null;
     const perfY=d[C['Perf.Y']], perf3=d[C['Perf.3M']], perf6=d[C['Perf.6M']];
     const eps=d[C.earnings_per_share_diluted_yoy_growth_fq],
-          eps1=d[C['earnings_per_share_diluted_yoy_growth_fq[1]']],
-          eps2=d[C['earnings_per_share_diluted_yoy_growth_fq[2]']],
+          epsQoq=d[C['earnings_per_share_diluted_qoq_growth_fq']],
           rev=d[C.total_revenue_yoy_growth_fq],
           roe=d[C.return_on_equity_fq], nm=d[C.net_margin];
 
@@ -1287,7 +1299,7 @@ function applyFilters(universe, rsMap, opts={}){
       checks={t1,t2,t3,t4,t5,t6,t7,t8};
       pass=[t1,t2,t3,t4,t5,t6,t7,t8].every(Boolean);
       if(pass && useFund && (eps==null||eps<epsMin||rev==null||rev<revMin||roe==null||roe<roeMin)) pass=false;
-      if(pass && reqEpsAccel && !(eps!=null && eps1!=null && eps>=eps1)) pass=false;
+      if(pass && reqEpsAccel && !(epsQoq!=null && epsQoq>=0)) pass=false;
       if(pass && reqProfit && (nm==null||nm<=0)) pass=false;
     }
     if(!pass) continue;
@@ -1298,7 +1310,7 @@ function applyFilters(universe, rsMap, opts={}){
       vol, avgVol, dollarVol, earnIn,
       fromHighPct, fromLowPct:(close/lo-1)*100,
       rangePos:(close-lo)/(hi-lo), perfY, perf3, perf6,
-      eps, eps1, eps2, rev, roe, nm, score:0, checks
+      eps, epsQoq, rev, roe, nm, score:0, checks
     });
   }
   return out;
@@ -1467,13 +1479,13 @@ function renderTable(rows){
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button></td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+earnB+'</div><div class="cname">'+esc(r.name)+'</div></td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+earnB+streakBadge(r.ticker)+'</div><div class="cname">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
       +col('perfY',  '<td><span class="mn '+((r.perfY??0)>=0?'pos':'neg')+'">'+pct(r.perfY)+'</span></td>')
       +col('perf3',  '<td><span class="mn '+((r.perf3??0)>=0?'pos':'neg')+'">'+pct(r.perf3)+'</span></td>')
-      +col('eps',    (()=>{const accel=r.eps!=null&&r.eps1!=null?r.eps-r.eps1:null;const arr=accel==null?'':accel>5?'<span style="color:var(--green);font-size:10px;margin-right:2px">↑</span>':accel<-5?'<span style="color:var(--red);font-size:10px;margin-right:2px">↓</span>':'<span style="color:var(--text3);font-size:10px;margin-right:2px">→</span>';const tip=r.eps1!=null?'Q0: '+pct(r.eps)+' · Q1: '+pct(r.eps1)+(r.eps2!=null?' · Q2: '+pct(r.eps2):''):'';return '<td title="'+tip+'">'+arr+'<span class="mn '+((r.eps??0)>=0?'pos':'neg')+'">'+pct(r.eps)+'</span></td>';})())
+      +col('eps',    (()=>{const q=r.epsQoq;const arr=q==null?'':q>5?'<span style="color:var(--green);font-size:10px;margin-right:2px">↑</span>':q<-5?'<span style="color:var(--red);font-size:10px;margin-right:2px">↓</span>':'<span style="color:var(--text3);font-size:10px;margin-right:2px">→</span>';const tip=q!=null?'שנה/שנה: '+pct(r.eps)+' · רבעון מול קודם: '+pct(q):'צמיחת רווח למניה שנה/שנה';return '<td title="'+tip+'">'+arr+'<span class="mn '+((r.eps??0)>=0?'pos':'neg')+'">'+pct(r.eps)+'</span></td>';})())
       +col('rev',    '<td><span class="mn '+((r.rev??0)>=0?'pos':'neg')+'">'+pct(r.rev)+'</span></td>')
       +col('range',  '<td>'+rngEl+'</td>')
       +col('roe',    '<td><span class="mn">'+pct(r.roe)+'</span></td>')
@@ -1523,14 +1535,14 @@ function renderGallery(){
     return '<div class="gcard" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button>'
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name">'+esc(r.name)+'</div>'
-      +(earnB?'<div class="gcard-tags">'+earnB+'</div>':'')+'</div></div>'
+      +((earnB||streakBadge(r.ticker))?'<div class="gcard-tags">'+earnB+streakBadge(r.ticker)+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+scoreColor(r.score)+';background:'+scoreBg(r.score)+'" title="'+scTitle+'"><span class="gb-lbl">'+scLbl+'</span> <b>'+r.score+'</b></span>'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — ביצוע יחסי מול השוק"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span></div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
-      +stat('EPS שנה', r.eps, r.eps1!=null?'Q0: '+pct(r.eps)+' · Q1: '+pct(r.eps1)+(r.eps2!=null?' · Q2: '+pct(r.eps2):''):'צמיחת רווח למניה שנה/שנה')
+      +stat('EPS שנה', r.eps, r.epsQoq!=null?'שנה/שנה: '+pct(r.eps)+' · רבעון מול קודם: '+pct(r.epsQoq):'צמיחת רווח למניה שנה/שנה')
       +'<div class="gstat" title="מרחק מהשיא של 52 שבועות"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(fhUp?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>'
       +'</div></div>';
   }).join('');
@@ -1592,14 +1604,14 @@ function closeModal(){ $('modal').classList.remove('open'); $('modalChart').inne
 ════════════════════════════════════ */
 function exportCSV(){
   if(!results.length){ toast('אין תוצאות לייצוא'); return; }
-  const head=['Ticker','Name','Exchange','Price','Score','RS','Perf.Y%','Perf.3M%','Perf.6M%','From High%','Range%','EPS%','EPS Q1%','EPS Q2%','Rev%','ROE%','Net Margin%','Volume','Avg Vol','Market Cap','Sector'];
+  const head=['Ticker','Name','Exchange','Price','Score','RS','Perf.Y%','Perf.3M%','Perf.6M%','From High%','Range%','EPS%','EPS QoQ%','Rev%','ROE%','Net Margin%','Volume','Avg Vol','Market Cap','Sector'];
   const lines=[head.join(',')];
   results.forEach(r=>lines.push([
     r.ticker,'"'+(r.name||'').replace(/"/g,'')+'"',r.exch,
     r.close.toFixed(2),r.score,r.rs,
     (r.perfY??'').toString(),(r.perf3??'').toString(),(r.perf6??'').toString(),
     r.fromHighPct.toFixed(1),(r.rangePos*100).toFixed(1),
-    (r.eps??'').toString(),(r.eps1??'').toString(),(r.eps2??'').toString(),
+    (r.eps??'').toString(),(r.epsQoq??'').toString(),
     (r.rev??'').toString(),(r.roe??'').toString(),(r.nm??'').toString(),
     r.vol??'',r.avgVol??'',Math.round(r.mc||0),'"'+r.sector+'"'
   ].join(',')));
@@ -1718,11 +1730,15 @@ function closeAuthModal(){ $('authModal').classList.remove('open'); }
 async function loadDailyStatus(){
   if(!HAS_SUPABASE) return;
   try{
-    const r=await fetch(SUPABASE_URL+'/rest/v1/screener_daily?select=scan_date,summary&order=scan_date.desc&limit=30',
+    const r=await fetch(SUPABASE_URL+'/rest/v1/screener_daily?select=scan_date,summary,tickers&order=scan_date.desc&limit=30',
       {headers:{apikey:SUPABASE_ANON,Authorization:'Bearer '+SUPABASE_ANON}});
     if(!r.ok) return;
     const rows=await r.json(); if(!rows.length) return;
     drawBreadthSpark(rows);
+    _streaks={};
+    const sets=rows.map(x=>new Set((x.tickers||[]).map(o=>o.t)));
+    sets[0].forEach(t=>{ let n=1; for(let i=1;i<sets.length;i++){ if(sets[i].has(t)) n++; else break; } _streaks[t]=n; });
+    if(allResults.length){ _galleryKey=''; render(); }
     const {scan_date, summary}=rows[0];
     if(localStorage.getItem('sepa_daily_dismissed')===scan_date) return;
     const ent=summary?.entries||[], ex=summary?.exits||[], perf=summary?.perf;
