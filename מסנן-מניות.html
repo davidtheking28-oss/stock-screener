@@ -1654,7 +1654,7 @@ function renderGallery(){
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
-      +stat('EPS שנה', r.eps, r.epsQoq!=null?'שנה/שנה: '+pct(r.eps)+' · רבעון מול קודם: '+pct(r.epsQoq):'צמיחת רווח למניה שנה/שנה')
+      +stat('EPS YoY', r.eps, r.epsQoq!=null?'שנה מול שנה: '+pct(r.eps)+' · רבעון מול הקודם: '+pct(r.epsQoq):'צמיחת רווח למניה, שנה מול שנה')
       +'<div class="gstat" title="מרחק מהשיא של 52 שבועות"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(fhUp?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>'
       +'</div></div>';
   }).join('');
