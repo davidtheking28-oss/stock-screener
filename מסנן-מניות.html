@@ -163,10 +163,12 @@ body {
   background: rgba(79,131,255,0.16); border-color: var(--accent);
   color: #c4d4ff; box-shadow: inset 0 0 0 1px rgba(79,131,255,0.25);
 }
-#filterPanel.panel-momentum .f-sepa, #filterPanel.panel-power .f-sepa, #filterPanel.panel-growth .f-sepa { display: none; }
-#filterPanel.panel-sepa .f-power, #filterPanel.panel-momentum .f-power, #filterPanel.panel-growth .f-power { display: none; }
-#filterPanel.panel-growth .f-tech { display: none; }
-#filterPanel.panel-sepa .f-growth, #filterPanel.panel-momentum .f-growth, #filterPanel.panel-power .f-growth { display: none; }
+#filterPanel.panel-momentum .f-sepa, #filterPanel.panel-power .f-sepa, #filterPanel.panel-growth .f-sepa, #filterPanel.panel-commodities .f-sepa { display: none; }
+#filterPanel.panel-sepa .f-power, #filterPanel.panel-momentum .f-power, #filterPanel.panel-growth .f-power, #filterPanel.panel-commodities .f-power { display: none; }
+#filterPanel.panel-growth .f-tech, #filterPanel.panel-commodities .f-tech { display: none; }
+#filterPanel.panel-sepa .f-growth, #filterPanel.panel-momentum .f-growth, #filterPanel.panel-power .f-growth, #filterPanel.panel-commodities .f-growth { display: none; }
+#filterPanel.panel-commodities .f-base { display: none; }
+#filterPanel.panel-sepa .f-commodities, #filterPanel.panel-momentum .f-commodities, #filterPanel.panel-power .f-commodities, #filterPanel.panel-growth .f-commodities { display: none; }
 .filter-sections.single { grid-template-columns: 1fr; }
 .preset-btn {
   padding: 5px 14px; border-radius: 7px;
@@ -632,6 +634,7 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="screener-btn" data-screener="momentum" onclick="setScreener('momentum')">פריצת שיא</button>
         <button class="screener-btn" data-screener="power" onclick="setScreener('power')">Power Play</button>
         <button class="screener-btn" data-screener="growth" onclick="setScreener('growth')">מסנן פונדמנטלי</button>
+        <button class="screener-btn" data-screener="commodities" onclick="setScreener('commodities')">סחורות</button>
       </div>
       <div class="presets f-sepa">
         <span class="preset-label">פריסט:</span>
@@ -659,10 +662,22 @@ tbody tr:last-child td { border-bottom: none; }
             </div>
             <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="number" id="fromLow" value="25" min="0" max="500" onfocus="openFieldPicker(this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="runMin" value="100" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">עליית מחיר נפיצה ב-3-6ח&#8217;</span></div>
-            <div class="field"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" onfocus="openFieldPicker(this)"></div></div>
-            <div class="field"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="number" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
-            <div class="field"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
-            <div class="field"><label for="earnDays">חסום דוח בעוד (ימים)</label><div class="field-combo"><input type="number" id="earnDays" value="5" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
+            <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" onfocus="openFieldPicker(this)"></div></div>
+            <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="number" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
+            <div class="field f-base"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
+            <div class="field f-base"><label for="earnDays">חסום דוח בעוד (ימים)</label><div class="field-combo"><input type="number" id="earnDays" value="5" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
+            <div class="field f-commodities" style="grid-column:1 / -1">
+              <label>סחורות (קבוע)</label>
+              <div class="sector-lock-tags">
+                <span class="sector-tag locked">GLD</span><span class="sector-tag locked">SLV</span>
+                <span class="sector-tag locked">COPX</span><span class="sector-tag locked">WEAT</span>
+                <span class="sector-tag locked">CORN</span><span class="sector-tag locked">UNG</span>
+                <span class="sector-tag locked">PALL</span><span class="sector-tag locked">PPLT</span>
+                <span class="sector-tag locked">UGA</span><span class="sector-tag locked">USO</span>
+                <span class="sector-tag locked">CANE</span><span class="sector-tag locked">URA</span>
+              </div>
+              <span class="hint">רשימה סגורה — 12 הסחורות האלה בלבד, ללא יוצא מהכלל</span>
+            </div>
           </div>
         </div>
         <div class="filter-section f-sepa">
@@ -804,13 +819,16 @@ const SCREENERS = {
   momentum: {name:'פריצת שיא',           sub:'פריצת שיא 52ש׳ · מומנטום', fund:false, presets:false},
   power:    {name:'Power Play',           sub:'ריצה נפיצה + דשדוש הדוק', fund:false, presets:false},
   growth:   {name:'מסנן פונדמנטלי',      sub:'סקטורים נבחרים + צמיחה רבעונית', fund:false, presets:false},
+  commodities: {name:'סחורות',           sub:'רשימת סחורות קבועה',       fund:false, presets:false},
 };
 const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
+  commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
 };
+const COMMODITY_TICKERS = ['GLD','SLV','COPX','WEAT','CORN','UNG','PALL','PPLT','UGA','USO','CANE','URA'];
 const GROWTH_SECTORS = ['Technology Services','Electronic Technology','Consumer Durables','Consumer Non-Durables','Consumer Services','Retail Trade','Communications','Energy Minerals'];
 let activeScreener = localStorage.getItem('sepa_screener') || 'sepa';
 
@@ -839,6 +857,7 @@ const RESULTS_CACHE_KEY  = 'sepa_scan_results_v1';
 ════════════════════════════════════ */
 let allResults = [], results = [], ttUniverse = {};
 let _rawUniverse = null, _rawTime = 0, _rsMapMem = null;
+let _commUniverse = null, _commTime = 0;
 const UNIVERSE_TTL = 15*60*1000;
 let _currentUser = null;
 let watchlist  = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
@@ -1059,7 +1078,7 @@ function calcScore(r, scr='sepa'){
     const revS=Math.min(Math.max(r.revQoq??0,0),150)/150*50;
     return Math.round(clamp(epsS+revS,0,100));
   }
-  if(scr==='momentum'||scr==='power'){
+  if(scr==='momentum'||scr==='power'||scr==='commodities'){
     const rsS   = clamp(r.rs,0,99)/99*50;
     const hiS   = clamp((1-Math.abs(r.fromHighPct)/25),0,1)*25;
     const pf    = Math.max(r.perf3??0,(r.perf6??0)/2);
@@ -1166,7 +1185,7 @@ function applyPreset(key, btn){
   const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+PRESET_NAMES[key];
 }
 
-const SCREENER_HEADS = {sepa:'טכני — Trend Template', momentum:'טכני — מומנטום', power:'טכני — Power Play', growth:'פונדמנטלי — צמיחה רבעונית'};
+const SCREENER_HEADS = {sepa:'טכני — Trend Template', momentum:'טכני — מומנטום', power:'טכני — Power Play', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
 function setScreener(key, applyDef=true){
   if(!SCREENERS[key]) return;
   activeScreener=key;
@@ -1242,30 +1261,38 @@ async function scan(force=false){
   newToday = new Set();
   try{ localStorage.removeItem('sepa_sector'); }catch(e){}
   showSkeleton();
-  const useMem = !force && _rawUniverse && (Date.now()-_rawTime) < UNIVERSE_TTL;
+  const isCommodities = activeScreener==='commodities';
+  const useMem = !force && (isCommodities?_commUniverse:_rawUniverse) && (Date.now()-(isCommodities?_commTime:_rawTime)) < UNIVERSE_TTL;
   $('statBar').innerHTML='<span class="spinner"></span> '+(useMem?'מסנן מחדש...':'מושך נתונים מ-TradingView...');
   try{
-    const universe = useMem ? _rawUniverse : await fetchUniverse();
-    if(!useMem){ _rawUniverse=universe; _rawTime=Date.now(); _rsMapMem=null; }
+    const universe = useMem ? (isCommodities?_commUniverse:_rawUniverse) : await (isCommodities?fetchCommodities():fetchUniverse());
+    if(!useMem){
+      if(isCommodities){ _commUniverse=universe; _commTime=Date.now(); }
+      else { _rawUniverse=universe; _rawTime=Date.now(); _rsMapMem=null; }
+    }
     $('statBar').innerHTML='<span class="spinner"></span> מחשב RS Rating ומסנן...';
-    const rsMap = _rsMapMem ?? (_rsMapMem = computeRS(universe));
+    const rsMap = isCommodities ? computeRS(universe) : (_rsMapMem ?? (_rsMapMem = computeRS(universe)));
 
-    const up = universe.filter(r=>{
+    const up = isCommodities ? 0 : universe.filter(r=>{
       const d=r.d,c=d[C.close],s50=d[C.SMA50],s150=d[C.SMA150],s200=d[C.SMA200];
       return c&&s50&&s150&&s200&&c>s150&&c>s200&&s150>s200&&s50>s150&&c>s50;
     }).length;
     const bPct = Math.round(up/universe.length*100);
     const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--amber)':'var(--red)';
-    $('breadthDot').style.background = bCol;
-    $('breadthLabel').style.color    = bCol;
-    $('breadthLabel').textContent    = bPct+'% במגמת עלייה';
-    $('breadthChip').classList.add('show');
+    if(!isCommodities){
+      $('breadthDot').style.background = bCol;
+      $('breadthLabel').style.color    = bCol;
+      $('breadthLabel').textContent    = bPct+'% במגמת עלייה';
+      $('breadthChip').classList.add('show');
+    }
 
     allResults = applyFilters(universe, rsMap);
     allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
-    ttUniverse = {};
-    applyFilters(universe, rsMap, {skipFund:true}).forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
-    saveUniverseCache();
+    if(!isCommodities){
+      ttUniverse = {};
+      applyFilters(universe, rsMap, {skipFund:true}).forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
+      saveUniverseCache();
+    }
     saveResultsCache();
     checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(newToday.size){ saveResultsCache(); render(); } });
     if(!wasResultsVisible) $('filterPanel')?.classList.remove('open');
@@ -1275,10 +1302,10 @@ async function scan(force=false){
     $('colPickerWrap').style.display='';
     buildSectorFilter();
 
-    const now=new Date(_rawTime);
+    const now=new Date(isCommodities?_commTime:_rawTime);
     $('scanTime').textContent='עודכן '+now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
 
-    const sparseMsg = bPct<35 && allResults.length<20
+    const sparseMsg = !isCommodities && bPct<35 && allResults.length<20
       ? ' \xb7 <span style="color:var(--amber);font-weight:500">שוק חלש — מעט הזדמנויות SEPA</span>'
       : '';
     $('statBar').innerHTML='<b>'+results.length+'</b> מניות עברו \xb7 מתוך <b>'+universe.length.toLocaleString()+'</b> שנסרקו'+sparseMsg;
@@ -1308,6 +1335,25 @@ async function fetchUniverse(){
     markets:["america"],
     sort:{sortBy:"market_cap_basic",sortOrder:"desc"},
     range:[0,8000]
+  };
+  if(HAS_SUPABASE){
+    const res=await fetch(SUPABASE_URL+'/functions/v1/scan-universe',
+      {method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},body:JSON.stringify(body)});
+    if(!res.ok) throw new Error('Scan service '+res.status);
+    return (await res.json()).data||[];
+  }
+  const res=await fetch('https://scanner.tradingview.com/america/scan?label-product=screener-stock',
+    {method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body)});
+  if(!res.ok) throw new Error('TradingView '+res.status);
+  return (await res.json()).data||[];
+}
+
+async function fetchCommodities(){
+  const body={
+    columns:COLUMNS,
+    filter:[{left:"name",operation:"in_range",right:COMMODITY_TICKERS}],
+    markets:["america"],
+    range:[0,20]
   };
   if(HAS_SUPABASE){
     const res=await fetch(SUPABASE_URL+'/functions/v1/scan-universe',
@@ -1372,7 +1418,10 @@ function applyFilters(universe, rsMap, opts={}){
           roe=d[C.return_on_equity_fq], nm=d[C.net_margin];
 
     let pass=false, checks={};
-    if(scr==='growth'){
+    if(scr==='commodities'){
+      pass=COMMODITY_TICKERS.includes(d[C.name]);
+      checks={pass};
+    } else if(scr==='growth'){
       const epsQoqMin=num('epsQoqMin'), revQoqMin=num('revQoqMin');
       const sectorOk=GROWTH_SECTORS.includes(d[C.sector]);
       const epsOk=epsQoq!=null && epsQoq>=epsQoqMin;
@@ -1559,7 +1608,7 @@ function renderTable(rows){
       const epsS=Math.round(Math.min(Math.max(r.epsQoq??0,0),100)/100*50);
       const revS=sc-epsS;
       scTip='ציון צמיחה: '+sc+'/100\nEPS QoQ: '+epsS+'/50\nמכירות QoQ: '+revS+'/50';
-    } else if(r.scoreKind==='momentum'||r.scoreKind==='power'){
+    } else if(r.scoreKind==='momentum'||r.scoreKind==='power'||r.scoreKind==='commodities'){
       const rsS=Math.round(clamp(r.rs,0,99)/99*50);
       const hiS=Math.round(clamp((1-Math.abs(r.fromHighPct)/25),0,1)*25);
       const perfS=sc-rsS-hiS;
@@ -1629,10 +1678,10 @@ function renderGallery(){
   g.innerHTML=results.map(r=>{
     const wl=watchlist.has(r.ticker);
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
-    const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : r.scoreKind==='growth' ? 'GRW' : 'SEPA';
+    const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : r.scoreKind==='growth' ? 'GRW' : r.scoreKind==='commodities' ? 'COMM' : 'SEPA';
     const scTitle = r.scoreKind==='growth'
       ? 'ציון צמיחה '+r.score+'/100 — EPS QoQ 50% + מכירות QoQ 50%'
-      : (r.scoreKind==='momentum'||r.scoreKind==='power')
+      : (r.scoreKind==='momentum'||r.scoreKind==='power'||r.scoreKind==='commodities')
       ? 'ציון מומנטום '+r.score+'/100 — RS 50% + קרבה לשיא 25% + ביצוע 25%'
       : 'ציון SEPA '+r.score+'/100 — RS 40% + EPS 25% + הכנסות 20% + קרבה לשיא 15%';
     const priceStr = r.close>=100 ? Math.round(r.close).toLocaleString('en-US') : r.close.toFixed(2);
