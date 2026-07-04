@@ -843,7 +843,7 @@ const UNIVERSE_TTL = 15*60*1000;
 let _currentUser = null;
 let watchlist  = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
 const _savedSort = JSON.parse(localStorage.getItem('sepa_sort')||'null');
-let sortKey = _savedSort?.sortKey||'score', sortDir = _savedSort?.sortDir??-1;
+let sortKey = _savedSort?.sortKey||'rs', sortDir = _savedSort?.sortDir??-1;
 let view = localStorage.getItem('sepa_view')||'table', activeRow = -1;
 let _galleryKey = '';
 const _ohlcCache = new Map();
@@ -1237,6 +1237,7 @@ async function checkAndSaveHistory(tickers){
 
 async function scan(force=false){
   if(!validateInputs()) return;
+  const wasResultsVisible = $('resultsPanel').style.display==='block';
   _setScanLoading(true);
   newToday = new Set();
   try{ localStorage.removeItem('sepa_sector'); }catch(e){}
@@ -1267,7 +1268,7 @@ async function scan(force=false){
     saveUniverseCache();
     saveResultsCache();
     checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(newToday.size){ saveResultsCache(); render(); } });
-    $('filterPanel')?.classList.remove('open');
+    if(!wasResultsVisible) $('filterPanel')?.classList.remove('open');
 
     applySectorFilter(); sortResults(); render();
     $('resultsPanel').style.display='block';
