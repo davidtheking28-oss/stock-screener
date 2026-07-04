@@ -132,9 +132,9 @@ body {
   user-select: none;
 }
 .filter-header:hover { background: rgba(255,255,255,0.02); }
-.filter-title { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--text2); letter-spacing: 1.4px; text-transform: uppercase; }
+.filter-title { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 700; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; }
 .filter-title::before { content: ''; width: 3px; height: 11px; border-radius: 1px; background: var(--accent2); flex-shrink: 0; }
-.filter-sub { font-size: 12px; color: var(--text3); }
+.filter-sub { font-size: 11px; color: var(--text3); }
 .filter-arrow { margin-right: auto; color: var(--text3); font-size: 11px; transition: transform 0.2s; }
 .filter-panel.open .filter-arrow { transform: rotate(180deg); }
 .filter-body {
@@ -151,27 +151,29 @@ body {
 .filter-panel.open .filter-actions { animation: termReveal .32s ease-out .2s both; }
 
 .presets { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
-.preset-label { font-size: 11px; color: var(--text3); font-weight: 600; margin-left: 2px; }
+.preset-label { font-size: 11px; color: var(--text3); font-weight: 600; letter-spacing: 0.2px; margin-left: 2px; }
 .screeners { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
 .screener-btn {
   padding: 7px 16px; border-radius: 7px;
   border: 1px solid var(--border); background: rgba(255,255,255,0.02); color: var(--text2);
-  font: 700 12px var(--sans); cursor: pointer; transition: all 0.15s; letter-spacing: 0.2px;
+  font: 700 12px var(--sans); cursor: pointer; transition: all 0.15s; letter-spacing: 0.3px;
 }
 .screener-btn:hover { border-color: rgba(79,131,255,0.5); color: var(--text); background: rgba(79,131,255,0.06); }
 .screener-btn.active {
   background: rgba(79,131,255,0.16); border-color: var(--accent);
   color: #c4d4ff; box-shadow: inset 0 0 0 1px rgba(79,131,255,0.25);
 }
-#filterPanel.panel-momentum .f-sepa, #filterPanel.panel-power .f-sepa { display: none; }
-#filterPanel.panel-sepa .f-power, #filterPanel.panel-momentum .f-power { display: none; }
+#filterPanel.panel-momentum .f-sepa, #filterPanel.panel-power .f-sepa, #filterPanel.panel-growth .f-sepa { display: none; }
+#filterPanel.panel-sepa .f-power, #filterPanel.panel-momentum .f-power, #filterPanel.panel-growth .f-power { display: none; }
+#filterPanel.panel-growth .f-tech { display: none; }
+#filterPanel.panel-sepa .f-growth, #filterPanel.panel-momentum .f-growth, #filterPanel.panel-power .f-growth { display: none; }
 .filter-sections.single { grid-template-columns: 1fr; }
 .preset-btn {
   padding: 5px 14px; border-radius: 7px;
   border: 1px solid var(--border);
   background: transparent; color: var(--text3);
-  font: 600 11px var(--sans); cursor: pointer; transition: all 0.15s;
-  letter-spacing: 0.2px;
+  font: 600 12px var(--sans); cursor: pointer; transition: all 0.15s;
+  letter-spacing: 0.3px;
 }
 .preset-btn:hover { border-color: rgba(79,131,255,0.5); color: var(--text); background: rgba(79,131,255,0.06); }
 .preset-btn.active {
@@ -200,7 +202,7 @@ body {
 .field-picker-item {
   background: transparent; border: none; color: var(--text2);
   text-align: right; padding: 6px 10px; border-radius: 6px;
-  font: 600 12px var(--sans); cursor: pointer; white-space: nowrap;
+  font: 600 12px var(--sans); letter-spacing: 0.2px; cursor: pointer; white-space: nowrap;
 }
 .field-picker-item:hover { background: rgba(79,131,255,0.1); color: var(--text); }
 .field-picker-item.active { color: #a8c0ff; background: rgba(79,131,255,0.16); }
@@ -221,11 +223,11 @@ body {
   border-top: 1px dashed var(--border2); padding-top: 12px;
   display: flex; flex-direction: column; gap: 5px;
 }
-.fund-note-title { font: 700 9.5px var(--sans); letter-spacing: 1px; text-transform: uppercase; color: var(--text2); }
+.fund-note-title { font: 700 10px var(--sans); letter-spacing: 1px; text-transform: uppercase; color: var(--text2); }
 .fund-note p { font-size: 11px; line-height: 1.65; color: var(--text3); }
 .fund-note b { color: var(--text2); font-weight: 700; }
 .filter-section h3 {
-  font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; margin-bottom: 14px;
   display: flex; align-items: center; gap: 8px;
 }
@@ -242,7 +244,7 @@ body {
 .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .field { display: flex; flex-direction: column; gap: 3px; }
 .field label { font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.2px; }
-.field .hint { font-size: 10px; color: var(--text3); margin-top: 1px; }
+.field .hint { font-size: 11px; color: var(--text3); margin-top: 1px; line-height: 1.4; }
 
 input[type=number], select {
   background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
@@ -627,6 +629,7 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="screener-btn active" data-screener="sepa" onclick="setScreener('sepa')">Minervini SEPA</button>
         <button class="screener-btn" data-screener="momentum" onclick="setScreener('momentum')">פריצת שיא</button>
         <button class="screener-btn" data-screener="power" onclick="setScreener('power')">Power Play</button>
+        <button class="screener-btn" data-screener="growth" onclick="setScreener('growth')">מסנן פונדמנטלי</button>
       </div>
       <div class="presets f-sepa">
         <span class="preset-label">פריסט:</span>
@@ -638,8 +641,10 @@ tbody tr:last-child td { border-bottom: none; }
         <div class="filter-section">
           <h3 class="tech-head" id="techHead">טכני — Trend Template</h3>
           <div class="fields">
-            <div class="field"><label for="rsMin">RS Rating מינ&#8217;</label><div class="field-combo"><input type="number" id="rsMin" value="70" min="1" max="99" onfocus="openFieldPicker(this)"></div><span class="hint">ביצוע יחסי (0-99)</span></div>
-            <div class="field"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><div class="field-combo"><input type="number" id="fromHigh" value="25" min="0" max="100" onfocus="openFieldPicker(this)"></div><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
+            <div class="field f-tech"><label for="rsMin">RS Rating מינ&#8217;</label><div class="field-combo"><input type="number" id="rsMin" value="70" min="1" max="99" onfocus="openFieldPicker(this)"></div><span class="hint">ביצוע יחסי (0-99)</span></div>
+            <div class="field f-tech"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><div class="field-combo"><input type="number" id="fromHigh" value="25" min="0" max="100" onfocus="openFieldPicker(this)"></div><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
+            <div class="field f-growth"><label for="epsQoqMin">EPS QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="epsQoqMin" value="15" onfocus="openFieldPicker(this)"></div><span class="hint">רבעון מול הרבעון הקודם</span></div>
+            <div class="field f-growth"><label for="revQoqMin">מכירות QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="revQoqMin" value="25" onfocus="openFieldPicker(this)"></div><span class="hint">סקטורים: טכנולוגיה · צריכה · תקשורת · אנרגיה</span></div>
             <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="number" id="fromLow" value="25" min="0" max="500" onfocus="openFieldPicker(this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="runMin" value="100" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">עליית מחיר נפיצה ב-3-6ח&#8217;</span></div>
             <div class="field"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" onfocus="openFieldPicker(this)"></div></div>
@@ -767,6 +772,7 @@ const COLUMNS = [
   "price_52_week_high","price_52_week_low","Perf.Y",
   "earnings_per_share_diluted_yoy_growth_fq",
   "earnings_per_share_diluted_qoq_growth_fq",
+  "total_revenue_qoq_growth_fq",
   "total_revenue_yoy_growth_fq","return_on_equity_fq",
   "net_margin","sector","market_cap_basic","volume",
   "exchange","average_volume_10d_calc",
@@ -785,12 +791,15 @@ const SCREENERS = {
   sepa:     {name:'Minervini SEPA',      sub:'Trend Template + SEPA',  fund:true,  presets:true},
   momentum: {name:'פריצת שיא',           sub:'פריצת שיא 52ש׳ · מומנטום', fund:false, presets:false},
   power:    {name:'Power Play',           sub:'ריצה נפיצה + דשדוש הדוק', fund:false, presets:false},
+  growth:   {name:'מסנן פונדמנטלי',      sub:'סקטורים נבחרים + צמיחה רבעונית', fund:false, presets:false},
 };
 const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100},
+  growth:   {priceMin:10,mcMin:2,liqMin:5,earnDays:0,epsQoqMin:15,revQoqMin:25},
 };
+const GROWTH_SECTORS = ['Technology Services','Electronic Technology','Consumer Durables','Consumer Non-Durables','Consumer Services','Retail Trade','Communications','Energy Minerals'];
 let activeScreener = localStorage.getItem('sepa_screener') || 'sepa';
 
 const COL_DEFS = [
@@ -1033,6 +1042,11 @@ window.addEventListener('resize', ()=>{ $('colPickerPanel')?.classList.remove('o
    SEPA SCORE  (0-100)
 ════════════════════════════════════ */
 function calcScore(r, scr='sepa'){
+  if(scr==='growth'){
+    const epsS=Math.min(Math.max(r.epsQoq??0,0),100)/100*50;
+    const revS=Math.min(Math.max(r.revQoq??0,0),150)/150*50;
+    return Math.round(clamp(epsS+revS,0,100));
+  }
   if(scr==='momentum'||scr==='power'){
     const rsS   = clamp(r.rs,0,99)/99*50;
     const hiS   = clamp((1-Math.abs(r.fromHighPct)/25),0,1)*25;
@@ -1071,6 +1085,8 @@ const FIELD_PRESETS = {
   epsMin:   [[0,'0%'],[10,'10%'],[25,'25% — קלאסי'],[40,'40%'],[60,'60%'],[100,'100%']],
   revMin:   [[0,'0%'],[10,'10%'],[20,'20% — קלאסי'],[30,'30%'],[50,'50%']],
   roeMin:   [[0,'0%'],[10,'10%'],[15,'15%'],[17,'17% — מינרוויני'],[20,'20%'],[30,'30%']],
+  epsQoqMin: [[0,'0%'],[10,'10%'],[15,'15% — קלאסי'],[25,'25%'],[40,'40%'],[60,'60%']],
+  revQoqMin: [[0,'0%'],[10,'10%'],[15,'15%'],[25,'25% — קלאסי'],[40,'40%'],[60,'60%']],
 };
 let _fieldPanel=null, _fieldPanelInput=null;
 function closeFieldPicker(){
@@ -1138,7 +1154,7 @@ function applyPreset(key, btn){
   const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+PRESET_NAMES[key];
 }
 
-const SCREENER_HEADS = {sepa:'טכני — Trend Template', momentum:'טכני — מומנטום', power:'טכני — Power Play'};
+const SCREENER_HEADS = {sepa:'טכני — Trend Template', momentum:'טכני — מומנטום', power:'טכני — Power Play', growth:'פונדמנטלי — צמיחה רבעונית'};
 function setScreener(key, applyDef=true){
   if(!SCREENERS[key]) return;
   activeScreener=key;
@@ -1339,10 +1355,18 @@ function applyFilters(universe, rsMap, opts={}){
     const eps=d[C.earnings_per_share_diluted_yoy_growth_fq],
           epsQoq=d[C['earnings_per_share_diluted_qoq_growth_fq']],
           rev=d[C.total_revenue_yoy_growth_fq],
+          revQoq=d[C['total_revenue_qoq_growth_fq']],
           roe=d[C.return_on_equity_fq], nm=d[C.net_margin];
 
     let pass=false, checks={};
-    if(scr==='momentum'){
+    if(scr==='growth'){
+      const epsQoqMin=num('epsQoqMin'), revQoqMin=num('revQoqMin');
+      const sectorOk=GROWTH_SECTORS.includes(d[C.sector]);
+      const epsOk=epsQoq!=null && epsQoq>=epsQoqMin;
+      const revOk=revQoq!=null && revQoq>=revQoqMin;
+      checks={sectorOk,epsOk,revOk};
+      pass=sectorOk&&epsOk&&revOk;
+    } else if(scr==='momentum'){
       const up=close>s50 && s50>s200 && close>s200;
       const near=close>=hi*(1-fhPct);
       const strong=rs>=rsMin;
@@ -1375,7 +1399,7 @@ function applyFilters(universe, rsMap, opts={}){
       vol, avgVol, dollarVol, earnIn,
       fromHighPct, fromLowPct:(close/lo-1)*100,
       rangePos:(close-lo)/(hi-lo), perfY, perf3, perf6,
-      eps, epsQoq, rev, roe, nm, score:0, checks
+      eps, epsQoq, rev, revQoq, roe, nm, score:0, checks
     });
   }
   return out;
@@ -1407,23 +1431,26 @@ function selectSector(s){
 
 function renderSectorStrength(){
   const wrap=$('sectorStrength'); if(!wrap) return;
-  if(!allResults.length){ wrap.innerHTML=''; return; }
-  const counts={};
-  allResults.forEach(r=>{ counts[r.sector]=(counts[r.sector]||0)+1; });
-  const ranked=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
-  const max=ranked[0][1];
+  if(!allResults.length || !_rawUniverse){ wrap.innerHTML=''; return; }
+  const passCounts={}, totalCounts={};
+  allResults.forEach(r=>{ passCounts[r.sector]=(passCounts[r.sector]||0)+1; });
+  _rawUniverse.forEach(r=>{ const s=r.d[C.sector]; if(s) totalCounts[s]=(totalCounts[s]||0)+1; });
+  const ranked=Object.entries(passCounts)
+    .map(([s,n])=>{ const total=totalCounts[s]||n; return [s,n,total,n/total*100]; })
+    .sort((a,b)=>b[3]-a[3]);
+  const maxPct=ranked[0][3];
   const active=$('sectorFilter')?.value||'';
   wrap.innerHTML='<span class="ss-title">עוצמת סקטורים</span>'
-    +ranked.slice(0,8).map(([s,n],i)=>{
-      const pct=Math.round(n/max*100);
+    +ranked.slice(0,8).map(([s,n,total,pct])=>{
+      const barW=Math.round(pct/maxPct*100);
       const on=active===s;
-      const strong=n>=max*0.66;
+      const strong=pct>=maxPct*0.66;
       const barCol=strong?'rgba(46,204,113,0.20)':'rgba(79,131,255,0.16)';
       const numCol=strong?'var(--green)':'var(--accent2)';
-      return '<button class="ss-chip'+(on?' on':'')+(strong?' strong':'')+'" onclick="selectSector(\''+(on?'':esc(s))+'\')" title="'+esc(s)+' — '+n+' מניות עוברות את הסינון">'
-        +'<span class="ss-bar" style="width:'+pct+'%;background:'+barCol+'"></span>'
+      return '<button class="ss-chip'+(on?' on':'')+(strong?' strong':'')+'" onclick="selectSector(\''+(on?'':esc(s))+'\')" title="'+esc(s)+' — '+n+' מתוך '+total+' מניות בסקטור עוברות את הסינון ('+pct.toFixed(1)+'%)">'
+        +'<span class="ss-bar" style="width:'+barW+'%;background:'+barCol+'"></span>'
         +'<span class="ss-name">'+esc(s.split(' ').slice(0,2).join(' '))+'</span>'
-        +'<span class="ss-num" style="color:'+numCol+'">'+n+'</span></button>';
+        +'<span class="ss-num" style="color:'+numCol+'">'+pct.toFixed(1)+'%</span></button>';
     }).join('');
 }
 
@@ -1489,6 +1516,8 @@ function renderTable(rows){
   const scHeadLbl = scKind==='sepa' ? 'ציון SEPA' : 'ציון';
   const scHeadTip = scKind==='sepa'
     ? 'ציון מורכב 0–100: RS (40%) + EPS (25%) + הכנסות (20%) + קרבה לשיא (15%)'
+    : scKind==='growth'
+    ? 'ציון צמיחה 0–100: EPS QoQ (50%) + מכירות QoQ (50%)'
     : 'ציון מומנטום 0–100: RS (50%) + קרבה לשיא (25%) + ביצוע 3-6ח׳ (25%)';
   const head='<tr>'
     +'<th style="width:30px"></th>'
@@ -1513,7 +1542,11 @@ function renderTable(rows){
     const wl=watchlist.has(r.ticker), sc=r.score;
 
     let scTip;
-    if(r.scoreKind==='momentum'||r.scoreKind==='power'){
+    if(r.scoreKind==='growth'){
+      const epsS=Math.round(Math.min(Math.max(r.epsQoq??0,0),100)/100*50);
+      const revS=sc-epsS;
+      scTip='ציון צמיחה: '+sc+'/100\nEPS QoQ: '+epsS+'/50\nמכירות QoQ: '+revS+'/50';
+    } else if(r.scoreKind==='momentum'||r.scoreKind==='power'){
       const rsS=Math.round(clamp(r.rs,0,99)/99*50);
       const hiS=Math.round(clamp((1-Math.abs(r.fromHighPct)/25),0,1)*25);
       const perfS=sc-rsS-hiS;
@@ -1583,8 +1616,10 @@ function renderGallery(){
   g.innerHTML=results.map(r=>{
     const wl=watchlist.has(r.ticker);
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
-    const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : 'SEPA';
-    const scTitle = (r.scoreKind==='momentum'||r.scoreKind==='power')
+    const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : r.scoreKind==='growth' ? 'GRW' : 'SEPA';
+    const scTitle = r.scoreKind==='growth'
+      ? 'ציון צמיחה '+r.score+'/100 — EPS QoQ 50% + מכירות QoQ 50%'
+      : (r.scoreKind==='momentum'||r.scoreKind==='power')
       ? 'ציון מומנטום '+r.score+'/100 — RS 50% + קרבה לשיא 25% + ביצוע 25%'
       : 'ציון SEPA '+r.score+'/100 — RS 40% + EPS 25% + הכנסות 20% + קרבה לשיא 15%';
     const priceStr = r.close>=100 ? Math.round(r.close).toLocaleString('en-US') : r.close.toFixed(2);
@@ -1845,6 +1880,7 @@ function saveFilterPrefs(){
       priceMin:num('priceMin'),mcMin:num('mcMin'),
       liqMin:num('liqMin'),earnDays:num('earnDays'),runMin:num('runMin'),
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
+      epsQoqMin:num('epsQoqMin'),revQoqMin:num('revQoqMin'),
       useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,requireEpsAccel:$('requireEpsAccel')?.checked
     }));
   } catch(e){}
@@ -1859,6 +1895,7 @@ function loadFilterPrefs(){
     if(p.mcMin!=null){ let v=p.mcMin; if(v>=50) v=v/1000; $('mcMin').value=v; }
     set('liqMin',p.liqMin); set('earnDays',p.earnDays); set('runMin',p.runMin);
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
+    set('epsQoqMin',p.epsQoqMin); set('revQoqMin',p.revQoqMin);
     if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
     if($('requireProfit')&&p.requireProfit!=null) $('requireProfit').checked=p.requireProfit;
     if($('requireEpsAccel')&&p.requireEpsAccel!=null) $('requireEpsAccel').checked=p.requireEpsAccel;
