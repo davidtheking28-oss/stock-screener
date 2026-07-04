@@ -402,6 +402,8 @@ tbody tr:last-child td { border-bottom: none; }
 .range-dot { position: absolute; top: -3px; width: 10px; height: 10px; border-radius: 50%; transform: translateX(-50%); border: 2px solid var(--bg2); }
 
 .sector-tag { font-size: 11px; color: var(--text3); background: rgba(255,255,255,0.04); border: 1px solid var(--border); padding: 2px 7px; border-radius: 4px; }
+.sector-lock-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.sector-tag.locked { color: var(--accent2); background: rgba(79,131,255,0.1); border-color: rgba(79,131,255,0.28); font-weight: 600; }
 
 .star-btn { background: none; border: none; cursor: pointer; font-size: 15px; padding: 2px 4px; border-radius: 4px; transition: transform 0.1s; }
 .star-btn:hover { opacity: 0.7; }
@@ -644,7 +646,17 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field f-tech"><label for="rsMin">RS Rating מינ&#8217;</label><div class="field-combo"><input type="number" id="rsMin" value="70" min="1" max="99" onfocus="openFieldPicker(this)"></div><span class="hint">ביצוע יחסי (0-99)</span></div>
             <div class="field f-tech"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><div class="field-combo"><input type="number" id="fromHigh" value="25" min="0" max="100" onfocus="openFieldPicker(this)"></div><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
             <div class="field f-growth"><label for="epsQoqMin">EPS QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="epsQoqMin" value="15" onfocus="openFieldPicker(this)"></div><span class="hint">רבעון מול הרבעון הקודם</span></div>
-            <div class="field f-growth"><label for="revQoqMin">מכירות QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="revQoqMin" value="25" onfocus="openFieldPicker(this)"></div><span class="hint">סקטורים: טכנולוגיה · צריכה · תקשורת · אנרגיה</span></div>
+            <div class="field f-growth"><label for="revQoqMin">מכירות QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="revQoqMin" value="25" onfocus="openFieldPicker(this)"></div></div>
+            <div class="field f-growth" style="grid-column:1 / -1">
+              <label>סקטורים (קבוע)</label>
+              <div class="sector-lock-tags">
+                <span class="sector-tag locked">טכנולוגיה</span>
+                <span class="sector-tag locked">צריכה</span>
+                <span class="sector-tag locked">תקשורת</span>
+                <span class="sector-tag locked">אנרגיה</span>
+              </div>
+              <span class="hint">רק מניות מהסקטורים האלה יעברו את הסינון, ללא יוצא מהכלל</span>
+            </div>
             <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="number" id="fromLow" value="25" min="0" max="500" onfocus="openFieldPicker(this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="runMin" value="100" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">עליית מחיר נפיצה ב-3-6ח&#8217;</span></div>
             <div class="field"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" onfocus="openFieldPicker(this)"></div></div>
