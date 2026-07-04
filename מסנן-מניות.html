@@ -660,8 +660,8 @@ tbody tr:last-child td { border-bottom: none; }
               </div>
               <span class="hint">רק מניות מהסקטורים האלה יעברו את הסינון, ללא יוצא מהכלל</span>
             </div>
-            <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="number" id="fromLow" value="25" min="0" max="500" onfocus="openFieldPicker(this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
-            <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="runMin" value="100" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">עליית מחיר נפיצה ב-3-6ח&#8217;</span></div>
+            <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="number" id="fromLow" value="30" min="0" max="500" onfocus="openFieldPicker(this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
+            <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="runMin" value="100" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">ריצה נפיצה תוך ~8 שבועות (OHLC)</span></div>
             <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" onfocus="openFieldPicker(this)"></div></div>
             <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="number" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
             <div class="field f-base"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
@@ -822,7 +822,7 @@ const SCREENERS = {
   commodities: {name:'סחורות',           sub:'רשימת סחורות קבועה',       fund:false, presets:false},
 };
 const SCREENER_DEFAULTS = {
-  sepa:     {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
+  sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
@@ -927,6 +927,70 @@ function _ohlcRetry(btn){
 }
 function _ohlcNext(){
   while(_ohlcLd<6 && _ohlcQ.length){ const el=_ohlcQ.shift(); _ohlcLd++; _ohlcDraw(el).finally(()=>{ _ohlcLd--; _ohlcNext(); }); }
+}
+
+/* ── exact OHLC validation (1y bars) ── */
+const _valBars = new Map();
+async function _fetchBars1y(sym){
+  if(!HAS_SUPABASE) return null;
+  const TTL=30*60*1000;
+  const c=_valBars.get(sym);
+  if(c && Date.now()-c.t<TTL) return c.bars;
+  try{ const sc=JSON.parse(sessionStorage.getItem('ohlc1y_'+sym)); if(sc && sc.t && Date.now()-sc.t<TTL){ _valBars.set(sym,{bars:sc.bars,t:sc.t}); return sc.bars; } }catch(e){}
+  try{
+    const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?range=1y&symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON}});
+    if(!r.ok) return null;
+    const j=await r.json(); const bars=Array.isArray(j.bars)?j.bars:[];
+    _valBars.set(sym,{bars,t:Date.now()});
+    try{ sessionStorage.setItem('ohlc1y_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
+    return bars;
+  }catch(e){ return null; }
+}
+function _sma(c, end, period){ if(end-period+1<0) return null; let s=0; for(let i=end-period+1;i<=end;i++) s+=c[i]; return s/period; }
+function _ma200Rising(bars){
+  if(!bars || bars.length<222) return null;   // unknown → keep
+  const c=bars.map(b=>b.c), n=c.length;
+  const today=_sma(c,n-1,200), monthAgo=_sma(c,n-23,200);
+  if(today==null||monthAgo==null) return null;
+  return today>monthAgo;
+}
+function _powerPlayOK(bars, runPct){
+  if(!bars || bars.length<45) return null;
+  const w=bars.slice(-55), need=1+runPct/100;
+  let best=null;   // strongest ≤40-bar (≈8wk) 100%+ run culminating at bar j
+  for(let j=0;j<w.length;j++){
+    let minL=Infinity; for(let i=Math.max(0,j-40);i<j;i++){ if(w[i].l<minL) minL=w[i].l; }
+    if(minL>0 && w[j].h/minL>=need && (!best || w[j].h>best.high)) best={iHigh:j, high:w[j].h};
+  }
+  if(!best) return false;
+  let postLow=best.high; for(let i=best.iHigh;i<w.length;i++){ if(w[i].l<postLow) postLow=w[i].l; }
+  return (best.high-postLow)/best.high*100<=25;   // tight consolidation ≤25%
+}
+async function validateExact(list, scr){
+  if((scr!=='sepa'&&scr!=='power')||!HAS_SUPABASE||!list.length) return list;
+  const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
+  async function worker(){
+    while(idx<list.length){
+      const r=list[idx++];
+      try{
+        const bars=await _fetchBars1y(r.ticker);
+        if(scr==='sepa'){
+          if(bars && _ma200Rising(bars)===false) r._exactFail=true;
+        } else {
+          if(bars){ if(_powerPlayOK(bars,runMin)===false) r._exactFail=true; }
+          else {
+            const runOld=(r.perf3!=null&&r.perf3>=runMin)||(r.perf6!=null&&r.perf6>=runMin);
+            const tight=r.volD!=null&&r.volM!=null&&r.volD<r.volM;
+            if(!(runOld&&tight)) r._exactFail=true;
+          }
+        }
+      }catch(e){}
+      done++;
+      if(done%4===0||done===total) $('statBar').innerHTML='<span class="spinner"></span> אימות מדויק מול OHLC... '+done+'/'+total;
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(6,total)}, worker));
+  return list.filter(r=>!r._exactFail);
 }
 let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
 let searchQuery = '';
@@ -1288,6 +1352,10 @@ async function scan(force=false){
 
     allResults = applyFilters(universe, rsMap);
     allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
+    if(activeScreener==='sepa' || activeScreener==='power'){
+      $('statBar').innerHTML='<span class="spinner"></span> אימות מדויק מול OHLC...';
+      allResults = await validateExact(allResults, activeScreener);
+    }
     if(!isCommodities){
       ttUniverse = {};
       applyFilters(universe, rsMap, {skipFund:true}).forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
@@ -1436,13 +1504,12 @@ function applyFilters(universe, rsMap, opts={}){
       checks={up,near,strong,perfPos};
       pass=up&&near&&strong&&perfPos;
     } else if(scr==='power'){
-      const run=(perf3!=null && perf3>=runMin) || (perf6!=null && perf6>=runMin);
+      const run=(perf3!=null && perf3>=runMin*0.4) || (perf6!=null && perf6>=runMin*0.4);
       const near=fromHighPct>=-num('fromHigh');
-      const tight=volD!=null && volM!=null && volD<volM;
       const up=close>s50;
       const strong=rs>=rsMin;
-      checks={run,near,tight,up,strong};
-      pass=run&&near&&tight&&up&&strong;
+      checks={run,near,up,strong};
+      pass=run&&near&&up&&strong;
     } else {
       const t1=close>s150&&close>s200, t2=s150>s200, t3=s50>s150&&s50>s200;
       const t4=perf6!=null&&perf6>0;
@@ -1460,7 +1527,7 @@ function applyFilters(universe, rsMap, opts={}){
       close, rs, sector:d[C.sector]||'—', mc,
       vol, avgVol, dollarVol, earnIn,
       fromHighPct, fromLowPct:(close/lo-1)*100,
-      rangePos:(close-lo)/(hi-lo), perfY, perf3, perf6,
+      rangePos:(close-lo)/(hi-lo), perfY, perf3, perf6, volD, volM,
       eps, epsQoq, rev, revQoq, roe, nm, score:0, checks
     });
   }
