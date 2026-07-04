@@ -501,14 +501,6 @@ tbody tr:last-child td { border-bottom: none; }
   margin-right: 5px; vertical-align: middle;
 }
 .earn-badge.soon { color: var(--amber); background: rgba(245,185,74,0.12); border-color: rgba(245,185,74,0.3); }
-.streak-badge {
-  display: inline-block; font: 700 9px var(--sans); color: var(--accent2);
-  background: rgba(79,131,255,0.12); border: 1px solid rgba(79,131,255,0.28);
-  padding: 1px 5px; border-radius: 4px; letter-spacing: 0.3px;
-  margin-right: 5px; vertical-align: middle;
-}
-.gcard-tags .streak-badge { margin: 0; }
-.results-legend .streak-badge { margin: 0; }
 
 .sector-strength {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -674,7 +666,6 @@ tbody tr:last-child td { border-bottom: none; }
       <span class="lg-grp"><i class="lg-dot lg-lo"></i>חלש מתחת 60</span>
       <span class="lg-sep"></span>
       <span class="lg-grp"><span class="earn-badge soon">דוח 5י</span> דוח כספי קרוב</span>
-      <span class="lg-grp"><span class="streak-badge">5 לילות</span> רצף לילות בסריקה — התמדה = חוזק</span>
     </div>
     <div id="tableView" class="table-wrap"></div>
     <div id="galleryView" class="gallery" style="display:none"></div>
@@ -861,11 +852,6 @@ function _ohlcNext(){
 let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
 let searchQuery = '';
 let newToday = new Set();
-let _streaks = {};
-function streakBadge(t){
-  const n=_streaks[t];
-  return n>=2 ? '<span class="streak-badge" title="מופיעה בסריקת הלילה '+n+' לילות ברצף — התמדה בסינון היא סימן חוזק">'+n+' לילות</span>' : '';
-}
 
 /* ════════════════════════════════════
    UTILS
@@ -1479,7 +1465,7 @@ function renderTable(rows){
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button></td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+earnB+streakBadge(r.ticker)+'</div><div class="cname">'+esc(r.name)+'</div></td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+earnB+'</div><div class="cname">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
@@ -1535,7 +1521,7 @@ function renderGallery(){
     return '<div class="gcard" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button>'
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name">'+esc(r.name)+'</div>'
-      +((earnB||streakBadge(r.ticker))?'<div class="gcard-tags">'+earnB+streakBadge(r.ticker)+'</div>':'')+'</div></div>'
+      +(earnB?'<div class="gcard-tags">'+earnB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+scoreColor(r.score)+';background:'+scoreBg(r.score)+'" title="'+scTitle+'"><span class="gb-lbl">'+scLbl+'</span> <b>'+r.score+'</b></span>'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — ביצוע יחסי מול השוק"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span></div></div>'
@@ -1730,15 +1716,11 @@ function closeAuthModal(){ $('authModal').classList.remove('open'); }
 async function loadDailyStatus(){
   if(!HAS_SUPABASE) return;
   try{
-    const r=await fetch(SUPABASE_URL+'/rest/v1/screener_daily?select=scan_date,summary,tickers&order=scan_date.desc&limit=30',
+    const r=await fetch(SUPABASE_URL+'/rest/v1/screener_daily?select=scan_date,summary&order=scan_date.desc&limit=30',
       {headers:{apikey:SUPABASE_ANON,Authorization:'Bearer '+SUPABASE_ANON}});
     if(!r.ok) return;
     const rows=await r.json(); if(!rows.length) return;
     drawBreadthSpark(rows);
-    _streaks={};
-    const sets=rows.map(x=>new Set((x.tickers||[]).map(o=>o.t)));
-    sets[0].forEach(t=>{ let n=1; for(let i=1;i<sets.length;i++){ if(sets[i].has(t)) n++; else break; } _streaks[t]=n; });
-    if(allResults.length){ _galleryKey=''; render(); }
     const {scan_date, summary}=rows[0];
     if(localStorage.getItem('sepa_daily_dismissed')===scan_date) return;
     const ent=summary?.entries||[], ex=summary?.exits||[], perf=summary?.perf;
