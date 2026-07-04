@@ -989,7 +989,7 @@ async function validateExact(list, scr){
       if(done%4===0||done===total) $('statBar').innerHTML='<span class="spinner"></span> אימות מדויק מול OHLC... '+done+'/'+total;
     }
   }
-  await Promise.all(Array.from({length:Math.min(6,total)}, worker));
+  await Promise.all(Array.from({length:Math.min(10,total)}, worker));
   return list.filter(r=>!r._exactFail);
 }
 let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));

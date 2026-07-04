@@ -7,10 +7,11 @@ const CORS = {
 
 const mem = new Map<string, { bars: unknown; time: number }>();
 const MEM_TTL = 15 * 60 * 1000;      // 15min in-instance
-const DB_TTL = 45 * 60 * 1000;       // 45min persistent freshness
+const DB_TTL = 45 * 60 * 1000;       // 45min persistent freshness (3mo bars)
+const DB_TTL_1Y = 6 * 60 * 60 * 1000; // 6h persistent freshness (1y bars — daily, finalize once/day)
 
 const _rate = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 120;
+const RATE_LIMIT = 400;   // one screener scan validates ~150 survivors from a single IP
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -96,7 +97,7 @@ Deno.serve(async (req: Request) => {
 
   // 2. persistent DB cache (fresh)
   const cached = await dbGet(ckey);
-  if (cached && cached.age < DB_TTL) {
+  if (cached && cached.age < (range === '1y' ? DB_TTL_1Y : DB_TTL)) {
     mem.set(ckey, { bars: cached.bars, time: Date.now() });
     return ok(sym, cached.bars, 'DB');
   }
