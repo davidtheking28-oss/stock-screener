@@ -64,19 +64,21 @@ body {
 .breadth-chip {
   display: none;
   align-items: center;
-  gap: 6px;
-  padding: 4px 11px;
+  gap: 8px;
+  padding: 5px 12px;
   border-radius: 20px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.3px;
   border: 1px solid var(--border);
   background: var(--bg3);
+  transition: border-color 0.15s;
 }
 .breadth-chip.show { display: flex; }
-.breadth-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.breadth-chip:has(.breadth-spark.show) { padding-left: 9px; }
+.breadth-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px -1px currentColor; }
 .breadth-spark { display: none; align-items: center; cursor: help; flex-shrink: 0; }
-.breadth-spark.show { display: flex; }
+.breadth-spark.show { display: flex; padding-right: 8px; border-right: 1px solid var(--border); }
 #statBar { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text2); flex-wrap: wrap; }
 #statBar b { color: var(--text); font-weight: 700; }
 .topbar-end { margin-right: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -152,11 +154,15 @@ body {
   color: #a8c0ff; box-shadow: 0 0 0 1px rgba(79,131,255,0.2);
 }
 .field-combo { position: relative; }
-.field-combo input[type=number] { cursor: pointer; padding-left: 26px; }
+.field-combo input[type=number] { cursor: pointer; padding-left: 28px; }
 .field-combo::after {
-  content: '▾'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-  font-size: 9px; color: var(--text3); pointer-events: none;
+  content: ''; position: absolute; left: 12px; top: 50%;
+  width: 0; height: 0; margin-top: -2px;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 5px solid var(--text3);
+  pointer-events: none; transition: border-top-color 0.12s;
 }
+.field-combo:focus-within::after { border-top-color: var(--accent2); }
 .field-picker-panel {
   position: fixed; z-index: 70;
   background: var(--bg2); border: 1px solid var(--border);
@@ -543,6 +549,7 @@ tbody tr:last-child td { border-bottom: none; }
 @media (max-width: 640px) {
   .ss-chip { min-height: 40px; padding: 8px 12px; }
   .results-controls .btn-ghost, .view-tab { min-height: 40px; }
+  .screener-btn, .preset-btn, .field-picker-item { min-height: 40px; }
 }
 
 /* ── Reduced motion ── */
@@ -560,8 +567,8 @@ tbody tr:last-child td { border-bottom: none; }
   <div class="breadth-chip" id="breadthChip">
     <span class="breadth-dot" id="breadthDot"></span>
     <span id="breadthLabel"></span>
+    <span class="breadth-spark" id="breadthSpark"></span>
   </div>
-  <span class="breadth-spark" id="breadthSpark"></span>
   <div id="statBar"><span style="color:var(--text3)">8 תנאי Trend Template · RS Rating · EPS · הכנסות · ROE</span></div>
   <div class="topbar-end">
     <span id="scanTime"></span>
