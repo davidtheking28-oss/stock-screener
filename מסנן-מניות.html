@@ -2005,6 +2005,7 @@ function dismissDaily(d){
 function saveFilterPrefs(){
   try {
     localStorage.setItem('sepa_filters', JSON.stringify({
+      v:2,
       rsMin:num('rsMin'),fromHigh:num('fromHigh'),fromLow:num('fromLow'),
       priceMin:num('priceMin'),mcMin:num('mcMin'),
       liqMin:num('liqMin'),earnDays:num('earnDays'),runMin:num('runMin'),
@@ -2018,6 +2019,7 @@ function saveFilterPrefs(){
 function loadFilterPrefs(){
   try {
     const p=JSON.parse(localStorage.getItem('sepa_filters')||'null'); if(!p) return;
+    if((p.v||0)<2){ if(p.fromLow==25) p.fromLow=30; p.v=2; try{ localStorage.setItem('sepa_filters', JSON.stringify(p)); }catch(e){} }
     const set=(id,v)=>{ const el=$(id); if(el&&v!=null) el.value=v; };
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
     set('priceMin',p.priceMin);
