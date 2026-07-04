@@ -151,19 +151,28 @@ body {
   background: rgba(79,131,255,0.18); border-color: var(--accent);
   color: #a8c0ff; box-shadow: 0 0 0 1px rgba(79,131,255,0.2);
 }
-.mc-tier-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
-.mc-tier-btn {
-  padding: 4px 9px; border-radius: 16px;
-  border: 1px solid var(--border);
-  background: transparent; color: var(--text3);
-  font: 600 10px var(--sans); cursor: pointer; transition: all 0.12s;
-  white-space: nowrap;
+.field-combo { position: relative; }
+.field-combo input[type=number] { cursor: pointer; padding-left: 26px; }
+.field-combo::after {
+  content: '▾'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 9px; color: var(--text3); pointer-events: none;
 }
-.mc-tier-btn:hover { border-color: rgba(79,131,255,0.5); color: var(--text); background: rgba(79,131,255,0.06); }
-.mc-tier-btn.active {
-  background: rgba(79,131,255,0.18); border-color: var(--accent);
-  color: #a8c0ff; box-shadow: 0 0 0 1px rgba(79,131,255,0.2);
+.field-picker-panel {
+  position: fixed; z-index: 70;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 5px; box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  display: flex; flex-direction: column; gap: 1px;
+  opacity: 0; transform: translateY(-4px); pointer-events: none;
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
 }
+.field-picker-panel.open { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.field-picker-item {
+  background: transparent; border: none; color: var(--text2);
+  text-align: right; padding: 6px 10px; border-radius: 6px;
+  font: 600 12px var(--sans); cursor: pointer; white-space: nowrap;
+}
+.field-picker-item:hover { background: rgba(79,131,255,0.1); color: var(--text); }
+.field-picker-item.active { color: #a8c0ff; background: rgba(79,131,255,0.16); }
 
 .filter-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 680px) { .filter-sections { grid-template-columns: 1fr; } }
@@ -589,32 +598,22 @@ tbody tr:last-child td { border-bottom: none; }
         <div class="filter-section">
           <h3 class="tech-head" id="techHead">טכני — Trend Template</h3>
           <div class="fields">
-            <div class="field"><label for="rsMin">RS Rating מינ&#8217;</label><input type="number" id="rsMin" value="70" min="1" max="99"><span class="hint">ביצוע יחסי (0-99)</span></div>
-            <div class="field"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><input type="number" id="fromHigh" value="25" min="0" max="100"><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
-            <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><input type="number" id="fromLow" value="25" min="0" max="500"><span class="hint">% מעל שפל 52ש&#8217;</span></div>
-            <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><input type="number" id="runMin" value="100" min="0"><span class="hint">עליית מחיר נפיצה ב-3-6ח&#8217;</span></div>
-            <div class="field"><label for="priceMin">מחיר מינ&#8217; ($)</label><input type="number" id="priceMin" value="10" min="0"></div>
-            <div class="field"><label>שווי שוק מינ&#8217;</label>
-              <input type="hidden" id="mcMin" value="2">
-              <div class="mc-tier-picker">
-                <button type="button" class="mc-tier-btn" data-val="0" onclick="setMcTier(this)">הכל</button>
-                <button type="button" class="mc-tier-btn" data-val="0.05" onclick="setMcTier(this)">$50M+</button>
-                <button type="button" class="mc-tier-btn" data-val="0.3" onclick="setMcTier(this)">$300M+</button>
-                <button type="button" class="mc-tier-btn active" data-val="2" onclick="setMcTier(this)">$2B+</button>
-                <button type="button" class="mc-tier-btn" data-val="10" onclick="setMcTier(this)">$10B+</button>
-                <button type="button" class="mc-tier-btn" data-val="200" onclick="setMcTier(this)">$200B+</button>
-              </div>
-              <span class="hint">סינון לפי קטגוריית גודל</span></div>
-            <div class="field"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()"><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
-            <div class="field"><label for="earnDays">חסום דוח בעוד (ימים)</label><input type="number" id="earnDays" value="5" min="0"><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
+            <div class="field"><label for="rsMin">RS Rating מינ&#8217;</label><div class="field-combo"><input type="number" id="rsMin" value="70" min="1" max="99" onfocus="openFieldPicker(this)"></div><span class="hint">ביצוע יחסי (0-99)</span></div>
+            <div class="field"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><div class="field-combo"><input type="number" id="fromHigh" value="25" min="0" max="100" onfocus="openFieldPicker(this)"></div><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
+            <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="number" id="fromLow" value="25" min="0" max="500" onfocus="openFieldPicker(this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
+            <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="runMin" value="100" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">עליית מחיר נפיצה ב-3-6ח&#8217;</span></div>
+            <div class="field"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" onfocus="openFieldPicker(this)"></div></div>
+            <div class="field"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="number" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
+            <div class="field"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
+            <div class="field"><label for="earnDays">חסום דוח בעוד (ימים)</label><div class="field-combo"><input type="number" id="earnDays" value="5" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
           </div>
         </div>
         <div class="filter-section f-sepa">
           <h3 class="fund-head">פונדמנטלי</h3>
           <div class="fields" id="fundFields">
-            <div class="field"><label for="epsMin">EPS YoY מינ&#8217; (%)</label><input type="number" id="epsMin" value="25"><span class="hint">רבעון מול שנה קודמת</span></div>
-            <div class="field"><label for="revMin">הכנסות YoY מינ&#8217; (%)</label><input type="number" id="revMin" value="20"></div>
-            <div class="field"><label for="roeMin">ROE מינ&#8217; (%)</label><input type="number" id="roeMin" value="17"><span class="hint">מינרוויני: 17%+</span></div>
+            <div class="field"><label for="epsMin">EPS YoY מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="epsMin" value="25" onfocus="openFieldPicker(this)"></div><span class="hint">רבעון מול שנה קודמת</span></div>
+            <div class="field"><label for="revMin">הכנסות YoY מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="revMin" value="20" onfocus="openFieldPicker(this)"></div></div>
+            <div class="field"><label for="roeMin">ROE מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="roeMin" value="17" onfocus="openFieldPicker(this)"></div><span class="hint">מינרוויני: 17%+</span></div>
           </div>
           <div class="filter-toggles">
             <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
@@ -1014,19 +1013,61 @@ function scoreBg(s)      { return s>=80?'rgba(46,204,113,0.13)':s>=60?'rgba(245,
 function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : '$'+m+'M'; }
 function updUnitHints(){
   const lh=$('liqHint'); if(lh) lh.textContent='נפח דולרי ממוצע · ≈ '+fmtMoneyM(num('liqMin'))+' ליום';
+  const mh=$('mcHint'); if(mh) mh.textContent='≈ '+fmtMoneyM(num('mcMin')*1000)+' ומעלה';
 }
 
-function setMcTier(btn){
-  document.querySelectorAll('.mc-tier-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  $('mcMin').value=btn.dataset.val;
+/* ════════════════════════════════════
+   FIELD PRESET PICKER
+════════════════════════════════════ */
+const FIELD_PRESETS = {
+  rsMin:    [[50,'50 — סביר'],[60,'60'],[70,'70 — קלאסי'],[80,'80 — חזק'],[90,'90 — מוביל שוק'],[95,'95 — עלית']],
+  fromHigh: [[5,'5% — צמוד לשיא'],[10,'10%'],[15,'15%'],[25,'25% — קלאסי'],[35,'35%'],[50,'50%']],
+  fromLow:  [[10,'10%'],[25,'25% — קלאסי'],[50,'50%'],[100,'100%'],[200,'200%']],
+  runMin:   [[50,'50%'],[75,'75%'],[100,'100% — קלאסי'],[150,'150%'],[200,'200%']],
+  priceMin: [[1,'$1+'],[5,'$5+'],[10,'$10+ — קלאסי'],[20,'$20+'],[50,'$50+'],[100,'$100+']],
+  mcMin:    [[0,'הכל'],[0.05,'$50M+'],[0.3,'$300M+'],[2,'$2B+ — קלאסי'],[10,'$10B+'],[200,'$200B+']],
+  liqMin:   [[1,'$1M+'],[5,'$5M+'],[10,'$10M+'],[20,'$20M+ — קלאסי'],[50,'$50M+'],[100,'$100M+']],
+  earnDays: [[0,'כבוי'],[3,'3 ימים'],[5,'5 ימים — קלאסי'],[7,'7 ימים'],[10,'10 ימים'],[14,'14 ימים']],
+  epsMin:   [[0,'0%'],[10,'10%'],[25,'25% — קלאסי'],[40,'40%'],[60,'60%'],[100,'100%']],
+  revMin:   [[0,'0%'],[10,'10%'],[20,'20% — קלאסי'],[30,'30%'],[50,'50%']],
+  roeMin:   [[0,'0%'],[10,'10%'],[15,'15%'],[17,'17% — מינרוויני'],[20,'20%'],[30,'30%']],
+};
+let _fieldPanel=null, _fieldPanelInput=null;
+function closeFieldPicker(){
+  if(_fieldPanel){ _fieldPanel.remove(); _fieldPanel=null; _fieldPanelInput=null; }
 }
-function syncMcTierUI(){
-  const v=$('mcMin').value;
-  document.querySelectorAll('.mc-tier-btn').forEach(b=>{
-    b.classList.toggle('active', b.dataset.val===String(v));
+function openFieldPicker(input){
+  const presets=FIELD_PRESETS[input.id]; if(!presets) return;
+  if(_fieldPanelInput===input) return;
+  closeFieldPicker();
+  const panel=document.createElement('div');
+  panel.className='field-picker-panel';
+  panel.innerHTML=presets.map(([v,l])=>
+    '<button type="button" class="field-picker-item'+(String(v)===input.value?' active':'')+'" data-v="'+v+'">'+l+'</button>'
+  ).join('');
+  document.body.appendChild(panel);
+  const rect=input.getBoundingClientRect();
+  panel.style.top=(rect.bottom+4)+'px';
+  panel.style.left=rect.left+'px';
+  panel.style.minWidth=rect.width+'px';
+  requestAnimationFrame(()=>panel.classList.add('open'));
+  panel.addEventListener('mousedown', e=>{
+    const btn=e.target.closest('.field-picker-item'); if(!btn) return;
+    e.preventDefault();
+    input.value=btn.dataset.v;
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    closeFieldPicker();
+    input.blur();
   });
+  _fieldPanel=panel; _fieldPanelInput=input;
 }
+document.addEventListener('click', e=>{
+  if(_fieldPanel && e.target!==_fieldPanelInput && !_fieldPanel.contains(e.target)) closeFieldPicker();
+});
+document.addEventListener('scroll', ()=>closeFieldPicker(), {passive:true, capture:true});
+window.addEventListener('resize', closeFieldPicker);
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeFieldPicker(); });
+
 function toggleFundFields(){
   const ff=$('fundFields'); if(!ff) return;
   const on=$('useFund').checked;
@@ -1053,7 +1094,6 @@ function applyPreset(key, btn){
   Object.entries(p).forEach(([k,v])=>{ const el=$(k); if(el) el.value=v; });
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  syncMcTierUI();
   updUnitHints();
   const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+PRESET_NAMES[key];
 }
@@ -1073,7 +1113,6 @@ function setScreener(key, applyDef=true){
   if(applyDef){
     Object.entries(SCREENER_DEFAULTS[key]||{}).forEach(([k,v])=>{ const el=$(k); if(el) el.value=v; });
     if(key==='sepa') document.querySelectorAll('.preset-btn').forEach((b,i)=>b.classList.toggle('active', i===0));
-    syncMcTierUI();
     updUnitHints();
   }
 }
@@ -1777,18 +1816,13 @@ function loadFilterPrefs(){
     const set=(id,v)=>{ const el=$(id); if(el&&v!=null) el.value=v; };
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
     set('priceMin',p.priceMin);
-    if(p.mcMin!=null){
-      let v=p.mcMin; if(v>=50) v=v/1000;  // migrate old $M values to $B
-      const tiers=[0,0.05,0.3,2,10,200];
-      $('mcMin').value=String(tiers.filter(t=>t<=v).pop() ?? 0);
-    }
+    if(p.mcMin!=null){ let v=p.mcMin; if(v>=50) v=v/1000; $('mcMin').value=v; }
     set('liqMin',p.liqMin); set('earnDays',p.earnDays); set('runMin',p.runMin);
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
     if($('requireProfit')&&p.requireProfit!=null) $('requireProfit').checked=p.requireProfit;
     if($('requireEpsAccel')&&p.requireEpsAccel!=null) $('requireEpsAccel').checked=p.requireEpsAccel;
     toggleFundFields();
-    syncMcTierUI();
   } catch(e){}
 }
 
