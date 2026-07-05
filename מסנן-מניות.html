@@ -869,7 +869,7 @@ let sortKey = _savedSort?.sortKey||'rs', sortDir = _savedSort?.sortDir??-1;
 let view = localStorage.getItem('sepa_view')||'table', activeRow = -1;
 let _galleryKey = '';
 const _ohlcCache = new Map();
-let _ohlcLd = 0; const _ohlcQ = [];
+let _ohlcLd = 0, _ohlcIO = null; const _ohlcQ = [];
 function _ohlcMsg(el,t){ el.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px">'+t+'</div>'; }
 async function _ohlcDraw(el){
   if(!HAS_SUPABASE){
@@ -1793,8 +1793,15 @@ function renderGallery(){
   }).join('');
 
   _ohlcQ.length = 0;
-  g.querySelectorAll('.tv-lazy').forEach(el=>_ohlcQ.push(el));
-  _ohlcNext();
+  _ohlcIO?.disconnect();
+  _ohlcIO = new IntersectionObserver(entries=>{
+    for(const en of entries){
+      if(!en.isIntersecting) continue;
+      _ohlcIO.unobserve(en.target);
+      if(!_ohlcQ.includes(en.target)){ _ohlcQ.push(en.target); _ohlcNext(); }
+    }
+  }, {rootMargin:'500px 0px'});
+  g.querySelectorAll('.tv-lazy').forEach(el=>_ohlcIO.observe(el));
 }
 
 /* ════════════════════════════════════
