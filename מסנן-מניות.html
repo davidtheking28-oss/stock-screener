@@ -397,9 +397,10 @@ tbody tr:last-child td { border-bottom: none; }
 .ring-num { position: relative; z-index: 1; line-height: 1; font-weight: 700; letter-spacing: -0.3px; font-size: 13px; }
 
 /* mini bars */
-.mini-bar-wrap { display: flex; align-items: center; gap: 6px; }
+.mini-bar-wrap { display: flex; align-items: center; gap: 10px; }
+.mini-bar-wrap .mn { min-width: 20px; text-align: center; }
 .mini-bar { width: 56px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); box-shadow: inset 0 1px 1px rgba(0,0,0,0.35); overflow: hidden; flex-shrink: 0; }
-.mini-bar-fill { height: 100%; border-radius: 3px; background-image: linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0)); box-shadow: 0 0 6px -1px currentColor; }
+.mini-bar-fill { height: 100%; border-radius: 3px; background-image: linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0)); box-shadow: 0 0 3px -1px currentColor; }
 .range-track { width: 52px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.07); position: relative; flex-shrink: 0; }
 .range-dot { position: absolute; top: -3px; width: 10px; height: 10px; border-radius: 50%; transform: translateX(-50%); border: 2px solid var(--bg2); }
 
@@ -856,6 +857,7 @@ const RESULTS_CACHE_KEY  = 'sepa_scan_results_v1';
    STATE
 ════════════════════════════════════ */
 let allResults = [], results = [], ttUniverse = {};
+let _scanToken = 0;
 let _rawUniverse = null, _rawTime = 0, _rsMapMem = null;
 let _commUniverse = null, _commTime = 0;
 const UNIVERSE_TTL = 15*60*1000;
@@ -966,7 +968,7 @@ function _powerPlayOK(bars, runPct){
   let postLow=best.high; for(let i=best.iHigh;i<w.length;i++){ if(w[i].l<postLow) postLow=w[i].l; }
   return (best.high-postLow)/best.high*100<=25;   // tight consolidation ≤25%
 }
-async function validateExact(list, scr){
+async function validateExact(list, scr, onProgress){
   if((scr!=='sepa'&&scr!=='power')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   async function worker(){
@@ -986,10 +988,10 @@ async function validateExact(list, scr){
         }
       }catch(e){}
       done++;
-      if(done%4===0||done===total) $('statBar').innerHTML='<span class="spinner"></span> אימות מדויק מול OHLC... '+done+'/'+total;
+      if(onProgress && (done%6===0||done===total)) onProgress(done,total);
     }
   }
-  await Promise.all(Array.from({length:Math.min(10,total)}, worker));
+  await Promise.all(Array.from({length:Math.min(20,total)}, worker));
   return list.filter(r=>!r._exactFail);
 }
 let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
@@ -1320,6 +1322,7 @@ async function checkAndSaveHistory(tickers){
 
 async function scan(force=false){
   if(!validateInputs()) return;
+  const myToken = ++_scanToken;
   const wasResultsVisible = $('resultsPanel').style.display==='block';
   _setScanLoading(true);
   newToday = new Set();
@@ -1352,39 +1355,56 @@ async function scan(force=false){
 
     allResults = applyFilters(universe, rsMap);
     allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
-    if(activeScreener==='sepa' || activeScreener==='power'){
+    const needsExact = activeScreener==='sepa' || activeScreener==='power';
+    const bgValidate = activeScreener==='sepa';   // SEPA refines invisibly; Power Play blocks (big candidate→confirmed collapse)
+
+    // Power Play: confirm exact before showing — the loose candidate set is misleading
+    if(needsExact && !bgValidate){
       $('statBar').innerHTML='<span class="spinner"></span> אימות מדויק מול OHLC...';
-      allResults = await validateExact(allResults, activeScreener);
+      allResults = await validateExact(allResults, activeScreener, (d,t)=>{ $('statBar').innerHTML='<span class="spinner"></span> אימות מדויק מול OHLC... '+d+'/'+t; });
+      if(myToken!==_scanToken) return;   // superseded by a newer scan
     }
+
     if(!isCommodities){
       ttUniverse = {};
       applyFilters(universe, rsMap, {skipFund:true}).forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
       saveUniverseCache();
     }
-    saveResultsCache();
-    checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(newToday.size){ saveResultsCache(); render(); } });
     if(!wasResultsVisible) $('filterPanel')?.classList.remove('open');
-
-    applySectorFilter(); sortResults(); render();
     $('resultsPanel').style.display='block';
     $('colPickerWrap').style.display='';
-    buildSectorFilter();
-
     const now=new Date(isCommodities?_commTime:_rawTime);
     $('scanTime').textContent='עודכן '+now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
 
-    const sparseMsg = !isCommodities && bPct<35 && allResults.length<20
-      ? ' \xb7 <span style="color:var(--amber);font-weight:500">שוק חלש — מעט הזדמנויות SEPA</span>'
-      : '';
-    $('statBar').innerHTML='<b>'+results.length+'</b> מניות עברו \xb7 מתוך <b>'+universe.length.toLocaleString()+'</b> שנסרקו'+sparseMsg;
+    const finalize = validating=>{
+      applySectorFilter(); sortResults(); render(); buildSectorFilter();
+      const sparseMsg = !isCommodities && bPct<35 && allResults.length<20
+        ? ' \xb7 <span style="color:var(--amber);font-weight:500">שוק חלש — מעט הזדמנויות SEPA</span>' : '';
+      const valNote = validating ? ' \xb7 <span style="color:var(--text3)">מאמת מדויק מול OHLC…</span>' : '';
+      $('statBar').innerHTML='<b>'+results.length+'</b> מניות עברו \xb7 מתוך <b>'+universe.length.toLocaleString()+'</b> שנסרקו'+sparseMsg+valNote;
+    };
+
+    saveResultsCache();
+    finalize(bgValidate);   // show results immediately; SEPA refines in the background
     saveFilterPrefs();
-    toast('נמצאו '+results.length+' מניות');
     const rb=$('scanBtn'); if(rb) rb.style.display='';
+
+    if(bgValidate){
+      validateExact(allResults, activeScreener).then(v=>{
+        if(myToken!==_scanToken) return;   // superseded
+        allResults = v; saveResultsCache(); finalize(false);
+        checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken && newToday.size){ saveResultsCache(); render(); } });
+        toast('נמצאו '+results.length+' מניות');
+      }).catch(()=>{ if(myToken===_scanToken) finalize(false); });
+    } else {
+      checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken && newToday.size){ saveResultsCache(); render(); } });
+      toast('נמצאו '+results.length+' מניות');
+    }
   }catch(e){
     console.error(e);
     $('statBar').innerHTML='<span style="color:var(--red)">שגיאה: '+e.message+'</span> <button onclick="scan()" style="background:transparent;border:1px solid var(--border);color:var(--text2);padding:3px 10px;border-radius:6px;font:600 11px var(--mono);cursor:pointer;margin-right:8px">↻ נסה שנית</button>';
   }finally{
-    _setScanLoading(false);
+    if(myToken===_scanToken) _setScanLoading(false);
   }
 }
 
