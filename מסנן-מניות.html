@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>מסנן מניות — Minervini SEPA</title>
+<meta name="description" content="מסנן מניות חינמי בעברית בשיטת SEPA של מארק מינרוויני — Trend Template, RS Rating, פריצות שיא, Power Play, סינון פונדמנטלי וסחורות. נתוני שוק מתעדכנים.">
+<meta property="og:title" content="SEPA.screen — מסנן מניות בשיטת מינרוויני">
+<meta property="og:description" content="סריקת שוק לפי Trend Template + RS Rating: מסנני SEPA, פריצת שיא, Power Play, פונדמנטלי וסחורות. חינם, בעברית.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://davidtheking28-oss.github.io/stock-screener/">
+<meta property="og:locale" content="he_IL">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230d1526'/%3E%3Cpath d='M15 70 L38 47 L52 58 L85 25' stroke='%232ecc71' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M63 25 L85 25 L85 47' stroke='%232ecc71' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://www.tradingview.com">
 <link rel="preconnect" href="https://s3.tradingview.com">
 <link rel="dns-prefetch" href="https://www.tradingview.com">
@@ -744,6 +752,10 @@ tbody tr:last-child td { border-bottom: none; }
     <div id="galleryView" class="gallery" style="display:none"></div>
   </div>
 
+  <footer style="margin-top:28px;padding:18px 4px 10px;border-top:1px solid var(--border2);color:var(--text3);font-size:11px;line-height:1.8;text-align:center">
+    המידע באתר זה מוצג למטרות מידע ולימוד בלבד, אינו מהווה ייעוץ השקעות, שיווק השקעות או המלצה לביצוע פעולות בניירות ערך, ואינו תחליף לייעוץ אישי המתחשב בנתונים ובצרכים של כל אדם. המסחר בניירות ערך כרוך בסיכון להפסד. הנתונים מסופקים על ידי צדדים שלישיים וייתכנו אי-דיוקים או עיכובים. השימוש באתר באחריות המשתמש בלבד.
+  </footer>
+
 </div>
 
 <!-- Modal -->
@@ -766,6 +778,13 @@ tbody tr:last-child td { border-bottom: none; }
     </div>
     <div id="authModalBody" style="padding:20px 24px 24px">
       <div id="authForm">
+        <button onclick="signInWithGoogle()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f;border:none;border-radius:9px;padding:11px 16px;font:600 13.5px var(--sans);cursor:pointer;transition:opacity 0.15s" onmouseover="this.style.opacity=0.9" onmouseout="this.style.opacity=1">
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          המשך עם Google
+        </button>
+        <div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--text3);font-size:11px">
+          <span style="flex:1;height:1px;background:var(--border2)"></span>או באימייל<span style="flex:1;height:1px;background:var(--border2)"></span>
+        </div>
         <div class="field" style="margin-bottom:14px">
           <label style="margin-bottom:6px;display:block">אימייל</label>
           <input type="email" id="authEmail" placeholder="you@example.com" style="direction:ltr;width:100%" onkeydown="if(event.key==='Enter')sendMagicLink()">
@@ -1964,6 +1983,11 @@ async function sendMagicLink(){
   $('authSent').style.display='block';
   const {error}=await _sb.auth.signInWithOtp({email, options:{emailRedirectTo:location.href.split('?')[0].split('#')[0]}});
   if(error){ $('authForm').style.display=''; $('authSent').style.display='none'; toast('שגיאה: '+error.message); }
+}
+
+async function signInWithGoogle(){
+  const {error}=await _sb.auth.signInWithOAuth({provider:'google', options:{redirectTo:location.href.split('?')[0].split('#')[0]}});
+  if(error) toast('שגיאה: '+error.message);
 }
 
 async function signOut(){
