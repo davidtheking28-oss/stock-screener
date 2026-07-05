@@ -359,7 +359,7 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: al
 .table-wrap { overflow-x: auto; max-height: 72vh; overflow-y: auto; }
 table { width: 100%; border-collapse: collapse; }
 thead th {
-  position: sticky; top: 0;
+  position: sticky; top: 0; z-index: 2;
   background: var(--bg2); color: var(--text3);
   font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: 0.5px;
   padding: 10px 11px; text-align: right; cursor: pointer; white-space: nowrap;
@@ -367,7 +367,7 @@ thead th {
   transition: color 0.12s, background 0.12s;
 }
 thead th:hover { color: var(--accent2); }
-thead th.sorted { color: var(--accent); background: oklch(64% 0.2 258 / 0.06); }
+thead th.sorted { color: var(--accent); background: linear-gradient(oklch(64% 0.2 258 / 0.06), oklch(64% 0.2 258 / 0.06)) var(--bg2); }
 .sort-arr { font-size: 10px; opacity: 0.5; margin-right: 2px; }
 thead th.sorted .sort-arr { opacity: 1; }
 tbody td { padding: 9px 11px; border-bottom: 1px solid var(--border2); vertical-align: middle; white-space: nowrap; }
@@ -515,6 +515,7 @@ tbody tr:last-child td { border-bottom: none; }
     background: var(--bg2);
     box-shadow: -4px 0 10px rgba(0,0,0,0.35);
   }
+  thead th:nth-child(1), thead th:nth-child(2) { z-index: 4; }
   /* Smaller score ring on mobile */
   .score-ring { width: 34px; height: 34px; font-size: 10px; }
   .score-ring svg { width: 34px; height: 34px; }
