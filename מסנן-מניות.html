@@ -1356,14 +1356,6 @@ async function scan(force=false){
     allResults = applyFilters(universe, rsMap);
     allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
     const needsExact = activeScreener==='sepa' || activeScreener==='power';
-    const bgValidate = activeScreener==='sepa';   // SEPA refines invisibly; Power Play blocks (big candidate→confirmed collapse)
-
-    // Power Play: confirm exact before showing — the loose candidate set is misleading
-    if(needsExact && !bgValidate){
-      $('statBar').innerHTML='<span class="spinner"></span> אימות מדויק מול OHLC...';
-      allResults = await validateExact(allResults, activeScreener, (d,t)=>{ $('statBar').innerHTML='<span class="spinner"></span> אימות מדויק מול OHLC... '+d+'/'+t; });
-      if(myToken!==_scanToken) return;   // superseded by a newer scan
-    }
 
     if(!isCommodities){
       ttUniverse = {};
@@ -1378,20 +1370,23 @@ async function scan(force=false){
 
     const finalize = validating=>{
       applySectorFilter(); sortResults(); render(); buildSectorFilter();
-      const sparseMsg = !isCommodities && bPct<35 && allResults.length<20
-        ? ' \xb7 <span style="color:var(--amber);font-weight:500">שוק חלש — מעט הזדמנויות SEPA</span>' : '';
-      const valNote = validating ? ' \xb7 <span style="color:var(--text3)">מאמת מדויק מול OHLC…</span>' : '';
-      $('statBar').innerHTML='<b>'+results.length+'</b> מניות עברו \xb7 מתוך <b>'+universe.length.toLocaleString()+'</b> שנסרקו'+sparseMsg+valNote;
+      if(validating){
+        $('statBar').innerHTML='<span class="spinner"></span> <b>'+results.length+'</b> מועמדים \xb7 מאמת מדויק מול OHLC…';
+      } else {
+        const sparseMsg = !isCommodities && bPct<35 && allResults.length<20
+          ? ' \xb7 <span style="color:var(--amber);font-weight:500">שוק חלש — מעט הזדמנויות SEPA</span>' : '';
+        $('statBar').innerHTML='<b>'+results.length+'</b> מניות עברו \xb7 מתוך <b>'+universe.length.toLocaleString()+'</b> שנסרקו'+sparseMsg;
+      }
     };
 
     saveResultsCache();
-    finalize(bgValidate);   // show results immediately; SEPA refines in the background
+    finalize(needsExact);   // render candidates instantly; exact validation refines in the background
     saveFilterPrefs();
     const rb=$('scanBtn'); if(rb) rb.style.display='';
 
-    if(bgValidate){
+    if(needsExact){
       validateExact(allResults, activeScreener).then(v=>{
-        if(myToken!==_scanToken) return;   // superseded
+        if(myToken!==_scanToken) return;   // superseded by a newer scan
         allResults = v; saveResultsCache(); finalize(false);
         checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken && newToday.size){ saveResultsCache(); render(); } });
         toast('נמצאו '+results.length+' מניות');
