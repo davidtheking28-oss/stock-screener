@@ -17,7 +17,7 @@
 <link rel="dns-prefetch" href="https://www.tradingview.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script>if(new URLSearchParams(location.search).get('theme')==='tj')document.documentElement.dataset.theme='tj';</script>
+<script>const _thq=new URLSearchParams(location.search).get('theme');if(_thq==='tj'||_thq==='tj-light')document.documentElement.dataset.theme=_thq;</script>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23091525'/%3E%3Ctext x='16' y='23' font-family='monospace' font-weight='900' font-size='20' fill='%234f83ff' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -41,17 +41,31 @@
   --mono-data:'DM Mono', 'JetBrains Mono', monospace;
   --sans:     'Inter', system-ui, sans-serif;
   --chart-bg: #0a1120;
+  --chart-bar: #ffffff;
+  --chart-vol: rgba(255,255,255,0.25);
+  --chart-txt: #5b6b85;
 }
 html[data-theme="tj"] {
-  --bg:#0a0a0a; --bg2:#070708; --bg3:#111111; --surface:#111111;
-  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.05);
+  --bg:#101013; --bg2:#0c0c0f; --bg3:#17171b; --surface:#17171b;
+  --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.05);
   --accent:#818cf8; --accent2:#a5b4fc;
   --green:#2dd4a0; --red:#ff6b8a; --amber:#fbbf24;
   --text:#f1f5f9; --text2:#a8b8cc; --text3:#8896a8;
-  --chart-bg:#0d0d0d;
+  --chart-bg:#101014;
   --sans:'Heebo','Inter',system-ui,sans-serif;
 }
 html[data-theme="tj"] .btn-scan { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
+html[data-theme="tj-light"] {
+  color-scheme: light;
+  --bg:#eef2f8; --bg2:#e4eaf2; --bg3:#ffffff; --surface:#ffffff;
+  --border:rgba(14,14,18,0.10); --border2:rgba(14,14,18,0.07);
+  --accent:#0284c7; --accent2:#0ea5e9;
+  --green:#059669; --red:#e11d48; --amber:#d97706;
+  --text:#0f172a; --text2:#334155; --text3:#64748b;
+  --chart-bg:#ffffff; --chart-bar:#334155; --chart-vol:rgba(51,65,85,0.22); --chart-txt:#64748b;
+  --sans:'Heebo','Inter',system-ui,sans-serif;
+}
+html[data-theme="tj-light"] .btn-scan { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -934,21 +948,26 @@ async function _ohlcDraw(el){
     const box=document.createElement('div'); box.className='tv-lite'; el.appendChild(box);
     box.addEventListener('click', e=>e.stopPropagation());
     box.addEventListener('pointerdown', e=>e.stopPropagation());
+    const _cv=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+    const isLight=document.documentElement.dataset.theme==='tj-light';
+    const gridCol=isLight?'rgba(14,14,18,0.05)':'rgba(255,255,255,0.035)';
+    const axisCol=isLight?'rgba(14,14,18,0.10)':'rgba(255,255,255,0.06)';
     const chart=LightweightCharts.createChart(box,{
       width:box.clientWidth||el.clientWidth, height:200,
-      layout:{background:{color:getComputedStyle(document.documentElement).getPropertyValue('--chart-bg').trim()||'#0a1120'},textColor:'#5b6b85',fontSize:10,fontFamily:'JetBrains Mono, monospace',attributionLogo:false},
-      grid:{vertLines:{color:'rgba(255,255,255,0.035)'},horzLines:{color:'rgba(255,255,255,0.035)'}},
-      rightPriceScale:{borderColor:'rgba(255,255,255,0.06)'},
-      timeScale:{borderColor:'rgba(255,255,255,0.06)',rightOffset:5,fixLeftEdge:false,fixRightEdge:false},
+      layout:{background:{color:_cv('--chart-bg')||'#0a1120'},textColor:_cv('--chart-txt')||'#5b6b85',fontSize:10,fontFamily:'JetBrains Mono, monospace',attributionLogo:false},
+      grid:{vertLines:{color:gridCol},horzLines:{color:gridCol}},
+      rightPriceScale:{borderColor:axisCol},
+      timeScale:{borderColor:axisCol,rightOffset:5,fixLeftEdge:false,fixRightEdge:false},
       handleScroll:{pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false,mouseWheel:false},
       handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:{time:true,price:true}},
     });
     const toTime=t=>new Date(t*1000).toISOString().slice(0,10);
-    const bs=chart.addBarSeries({upColor:'#ffffff',downColor:'#ffffff'});
+    const barCol=_cv('--chart-bar')||'#ffffff';
+    const bs=chart.addBarSeries({upColor:barCol,downColor:barCol});
     bs.setData(bars.map(b=>({time:toTime(b.t),open:b.o,high:b.h,low:b.l,close:b.c})));
     const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:''});
     vs.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
-    vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:'rgba(255,255,255,0.25)'})));
+    vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:_cv('--chart-vol')||'rgba(255,255,255,0.25)'})));
     chart.timeScale().fitContent();
     new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth})).observe(box);
   }catch(e){ _ohlcMsg(el,'<span>שגיאה</span> <button onclick="event.stopPropagation();_ohlcRetry(this)" style="margin-right:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text2);border-radius:5px;padding:2px 8px;font:600 11px var(--sans);cursor:pointer">↻</button>'); }
