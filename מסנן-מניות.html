@@ -1844,11 +1844,14 @@ function renderGallery(){
 
   _ohlcQ.length = 0;
   _ohlcIO?.disconnect();
-  // Result sets here are the filtered SEPA/Trend Template candidates (typically
-  // a few dozen), not the full market universe — small enough to queue every
-  // card's chart immediately instead of waiting for it to scroll into view.
-  g.querySelectorAll('.tv-lazy').forEach(el=>{ _ohlcQ.push(el); });
-  _ohlcNext();
+  _ohlcIO = new IntersectionObserver(entries=>{
+    for(const en of entries){
+      if(!en.isIntersecting) continue;
+      _ohlcIO.unobserve(en.target);
+      if(!_ohlcQ.includes(en.target)){ _ohlcQ.push(en.target); _ohlcNext(); }
+    }
+  }, {rootMargin:'500px 0px'});
+  g.querySelectorAll('.tv-lazy').forEach(el=>_ohlcIO.observe(el));
 }
 
 /* ════════════════════════════════════
