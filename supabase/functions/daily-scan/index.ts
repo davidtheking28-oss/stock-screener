@@ -154,7 +154,10 @@ Deno.serve(async (req: Request) => {
     }).length;
     const breadth = Math.round(up / universe.length * 100);
 
-    const scanDate = new Date().toISOString().slice(0, 10);
+    // Cron fires at 22:10 UTC, which is already past midnight in Israel (UTC+2/+3) —
+    // using the UTC date here would label the scan with yesterday's date from the
+    // Israeli user's perspective. Use the Israel calendar date instead.
+    const scanDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date());
     const prevRes = await sb(`/rest/v1/screener_daily?scan_date=lt.${scanDate}&order=scan_date.desc&limit=21&select=scan_date,tickers,summary`);
     const prevRows: { scan_date: string; tickers: { t: string; c: number }[]; summary: { entries?: string[] } | null }[] =
       prevRes.ok ? await prevRes.json() : [];
