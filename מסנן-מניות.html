@@ -943,6 +943,11 @@ async function _ohlcDraw(el){
       try{ sessionStorage.setItem('ohlc_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
     }
     _ohlcCache.set(sym,{bars,t:Date.now()});
+    // A newer renderGallery() call (e.g. exact-validation refresh right after the
+    // first render) replaces g.innerHTML and detaches this element from the DOM
+    // while this fetch was in flight. Drawing into a detached element gives
+    // LightweightCharts a 0px width -> an invisible/broken chart. Bail instead.
+    if(!el.isConnected) return;
     if(!bars.length){ _ohlcMsg(el,'אין נתונים'); return; }
     el.innerHTML='';
     const box=document.createElement('div'); box.className='tv-lite'; el.appendChild(box);
@@ -1844,14 +1849,13 @@ function renderGallery(){
 
   _ohlcQ.length = 0;
   _ohlcIO?.disconnect();
-  _ohlcIO = new IntersectionObserver(entries=>{
-    for(const en of entries){
-      if(!en.isIntersecting) continue;
-      _ohlcIO.unobserve(en.target);
-      if(!_ohlcQ.includes(en.target)){ _ohlcQ.push(en.target); _ohlcNext(); }
-    }
-  }, {rootMargin:'500px 0px'});
-  g.querySelectorAll('.tv-lazy').forEach(el=>_ohlcIO.observe(el));
+  // Result sets here are the filtered SEPA/Trend Template candidates (typically
+  // a few dozen), not the full market universe — small enough to queue every
+  // card's chart immediately instead of waiting for it to scroll into view.
+  // _ohlcDraw() guards against a superseded render (see isConnected check there),
+  // so this is safe even if this fires again before the first batch finishes.
+  g.querySelectorAll('.tv-lazy').forEach(el=>{ _ohlcQ.push(el); });
+  _ohlcNext();
 }
 
 /* ════════════════════════════════════
