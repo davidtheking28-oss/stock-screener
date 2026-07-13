@@ -1425,7 +1425,7 @@ async function scan(force=false){
     $('scanTime').textContent='עודכן '+now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
 
     const finalize = validating=>{
-      applySectorFilter(); sortResults(); render(); buildSectorFilter();
+      applySectorFilter(); sortResults(); setView(view); buildSectorFilter();
       if(validating){
         $('statBar').innerHTML='<span class="spinner"></span> <b>'+results.length+'</b> מועמדים \xb7 מאמת מדויק מול OHLC…';
       } else {
