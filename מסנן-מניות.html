@@ -197,12 +197,13 @@ body {
   background: rgba(79,131,255,0.16); border-color: var(--accent);
   color: #c4d4ff; box-shadow: inset 0 0 0 1px rgba(79,131,255,0.25);
 }
-#filterPanel.panel-momentum .f-sepa, #filterPanel.panel-power .f-sepa, #filterPanel.panel-growth .f-sepa, #filterPanel.panel-commodities .f-sepa { display: none; }
-#filterPanel.panel-sepa .f-power, #filterPanel.panel-momentum .f-power, #filterPanel.panel-growth .f-power, #filterPanel.panel-commodities .f-power { display: none; }
-#filterPanel.panel-growth .f-tech, #filterPanel.panel-commodities .f-tech { display: none; }
-#filterPanel.panel-sepa .f-growth, #filterPanel.panel-momentum .f-growth, #filterPanel.panel-power .f-growth, #filterPanel.panel-commodities .f-growth { display: none; }
+#filterPanel.panel-momentum .f-sepa, #filterPanel.panel-power .f-sepa, #filterPanel.panel-growth .f-sepa, #filterPanel.panel-commodities .f-sepa, #filterPanel.panel-qulla .f-sepa { display: none; }
+#filterPanel.panel-sepa .f-power, #filterPanel.panel-momentum .f-power, #filterPanel.panel-growth .f-power, #filterPanel.panel-commodities .f-power, #filterPanel.panel-qulla .f-power { display: none; }
+#filterPanel.panel-growth .f-tech, #filterPanel.panel-commodities .f-tech, #filterPanel.panel-qulla .f-tech { display: none; }
+#filterPanel.panel-sepa .f-growth, #filterPanel.panel-momentum .f-growth, #filterPanel.panel-power .f-growth, #filterPanel.panel-commodities .f-growth, #filterPanel.panel-qulla .f-growth { display: none; }
 #filterPanel.panel-commodities .f-base { display: none; }
-#filterPanel.panel-sepa .f-commodities, #filterPanel.panel-momentum .f-commodities, #filterPanel.panel-power .f-commodities, #filterPanel.panel-growth .f-commodities { display: none; }
+#filterPanel.panel-sepa .f-commodities, #filterPanel.panel-momentum .f-commodities, #filterPanel.panel-power .f-commodities, #filterPanel.panel-growth .f-commodities, #filterPanel.panel-qulla .f-commodities { display: none; }
+#filterPanel.panel-sepa .f-qulla, #filterPanel.panel-momentum .f-qulla, #filterPanel.panel-power .f-qulla, #filterPanel.panel-growth .f-qulla, #filterPanel.panel-commodities .f-qulla { display: none; }
 .filter-sections.single { grid-template-columns: 1fr; }
 .preset-btn {
   padding: 5px 14px; border-radius: 7px;
@@ -682,6 +683,7 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="screener-btn active" data-screener="sepa" onclick="setScreener('sepa')">Minervini SEPA</button>
         <button class="screener-btn" data-screener="momentum" onclick="setScreener('momentum')">פריצת שיא</button>
         <button class="screener-btn" data-screener="power" onclick="setScreener('power')">Power Play</button>
+        <button class="screener-btn" data-screener="qulla" onclick="setScreener('qulla')">Qullamaggie</button>
         <button class="screener-btn" data-screener="growth" onclick="setScreener('growth')">מסנן פונדמנטלי</button>
         <button class="screener-btn" data-screener="commodities" onclick="setScreener('commodities')">סחורות</button>
       </div>
@@ -711,6 +713,12 @@ tbody tr:last-child td { border-bottom: none; }
             </div>
             <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="number" id="fromLow" value="30" min="0" max="500" onfocus="openFieldPicker(this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="runMin" value="100" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">ריצה נפיצה תוך ~8 שבועות (OHLC)</span></div>
+            <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="number" id="adrMin" value="4" min="0" step="0.5" onfocus="openFieldPicker(this)"></div><span class="hint">תנודתיות יומית ממוצעת 20 יום</span></div>
+            <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="move6Min" value="30" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">זינוק קודם — עדיף 50%+</span></div>
+            <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="move3Min" value="20" min="0" onfocus="openFieldPicker(this)"></div></div>
+            <div class="field f-qulla"><label for="emaDistMax">מרחק מ-EMA10/20 מקס&#8217; (%)</label><div class="field-combo"><input type="number" id="emaDistMax" value="2.5" min="0" step="0.5" onfocus="openFieldPicker(this)"></div><span class="hint">&#8220;surfing&#8221; הממוצעים 10/20</span></div>
+            <div class="field f-qulla"><label for="weekRangeMax">דשדוש 5 ימים מקס&#8217; (&#177;%)</label><div class="field-combo"><input type="number" id="weekRangeMax" value="5" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">שינוי שבועי בטווח צר</span></div>
+            <div class="field f-qulla"><label for="volSharesMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="number" id="volSharesMin" value="0.5" min="0" step="0.1" onfocus="openFieldPicker(this)"></div><span class="hint">ממוצע 30/90 יום</span></div>
             <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" onfocus="openFieldPicker(this)"></div></div>
             <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="number" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
             <div class="field f-base"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
@@ -867,7 +875,9 @@ const COLUMNS = [
   "net_margin","sector","market_cap_basic","volume",
   "exchange","average_volume_10d_calc",
   "earnings_release_next_date","Volatility.D","Volatility.M",
-  "Perf.3M","Perf.6M"
+  "Perf.3M","Perf.6M",
+  "EMA10","EMA20","Perf.W",
+  "average_volume_30d_calc","average_volume_90d_calc"
 ];
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
@@ -881,6 +891,7 @@ const SCREENERS = {
   sepa:     {name:'Minervini SEPA',      sub:'Trend Template + SEPA',  fund:true,  presets:true},
   momentum: {name:'פריצת שיא',           sub:'פריצת שיא 52ש׳ · מומנטום', fund:false, presets:false},
   power:    {name:'Power Play',           sub:'ריצה נפיצה + דשדוש הדוק', fund:false, presets:false},
+  qulla:    {name:'Qullamaggie',          sub:'Breakout — מהלך גדול + דשדוש צמוד ל-EMA', fund:false, presets:false},
   growth:   {name:'מסנן פונדמנטלי',      sub:'סקטורים נבחרים + צמיחה רבעונית', fund:false, presets:false},
   commodities: {name:'סחורות',           sub:'רשימת סחורות קבועה',       fund:false, presets:false},
 };
@@ -888,6 +899,7 @@ const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100},
+  qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:4,move6Min:30,move3Min:20,emaDistMax:2.5,weekRangeMax:5,volSharesMin:0.5},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
   commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
 };
@@ -1040,9 +1052,26 @@ function _powerPlayOK(bars, runPct){
   let postLow=best.high; for(let i=best.iHigh;i<w.length;i++){ if(w[i].l<postLow) postLow=w[i].l; }
   return (best.high-postLow)/best.high*100<=25;   // tight consolidation ≤25%
 }
+// Exact Qullamaggie checks from daily bars: ADR%20, distance to EMA10/20, 5-day change.
+// Returns false only on a definite fail; null (keep) when there isn't enough history.
+function _qullaExactOK(bars, adrMin, emaDistMax, weekMax){
+  if(!bars || bars.length<25) return null;
+  const n=bars.length, c=bars.map(b=>b.c);
+  let adr=0; for(let i=n-20;i<n;i++){ if(!bars[i].l) return null; adr+=(bars[i].h/bars[i].l-1)*100; }
+  adr/=20;
+  if(adr<adrMin) return false;
+  const ema=p=>{ const k=2/(p+1); let e=c[0]; for(let i=1;i<n;i++) e=c[i]*k+e*(1-k); return e; };
+  const close=c[n-1];
+  const dist=Math.min(Math.abs(close/ema(10)-1)*100, Math.abs(close/ema(20)-1)*100);
+  if(dist>emaDistMax) return false;
+  const wk=(close/c[n-6]-1)*100;
+  if(wk<-weekMax || wk>weekMax) return false;
+  return true;
+}
 async function validateExact(list, scr, onProgress){
-  if((scr!=='sepa'&&scr!=='power')||!HAS_SUPABASE||!list.length) return list;
+  if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
+  const adrMin=num('adrMin')||4, emaDistMax=num('emaDistMax')||2.5, weekMax=num('weekRangeMax')||5;
   async function worker(){
     while(idx<list.length){
       const r=list[idx++];
@@ -1050,6 +1079,8 @@ async function validateExact(list, scr, onProgress){
         const bars=await _fetchBars1y(r.ticker);
         if(scr==='sepa'){
           if(bars && _ma200Rising(bars)===false) r._exactFail=true;
+        } else if(scr==='qulla'){
+          if(_qullaExactOK(bars, adrMin, emaDistMax, weekMax)===false) r._exactFail=true;
         } else {
           if(bars){ if(_powerPlayOK(bars,runMin)===false) r._exactFail=true; }
           else {
@@ -1216,6 +1247,13 @@ function calcScore(r, scr='sepa'){
     const revS=Math.min(Math.max(r.revQoq??0,0),150)/150*50;
     return Math.round(clamp(epsS+revS,0,100));
   }
+  if(scr==='qulla'){
+    const moveS = Math.min(clamp(r.perf6??0,0,150)/150,1)*40;
+    const adrS  = Math.min(clamp(r.volD??0,0,8)/8,1)*20;
+    const emaS  = (r.emaDist==null||!isFinite(r.emaDist))?0:clamp(1-r.emaDist/(num('emaDistMax')||2.5),0,1)*20;
+    const tightS= r.perfW==null?0:clamp(1-Math.abs(r.perfW)/(num('weekRangeMax')||5),0,1)*20;
+    return Math.round(clamp(moveS+adrS+emaS+tightS,0,100));
+  }
   if(scr==='momentum'||scr==='power'||scr==='commodities'){
     const rsS   = clamp(r.rs,0,99)/99*50;
     const hiS   = clamp((1-Math.abs(r.fromHighPct)/25),0,1)*25;
@@ -1256,6 +1294,12 @@ const FIELD_PRESETS = {
   roeMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[17,'17% — מינרוויני'],[20,'20%'],[25,'25%'],[30,'30%'],[40,'40%']],
   epsQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15% — קלאסי'],[25,'25%'],[40,'40%'],[60,'60%'],[100,'100%']],
   revQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25% — קלאסי'],[40,'40%'],[60,'60%'],[100,'100%']],
+  adrMin:       [[2,'2%'],[3,'3%'],[3.5,'3.5%'],[4,'4% — קולאמאגי'],[5,'5%'],[6,'6%'],[8,'8%']],
+  move6Min:     [[20,'20%'],[30,'30% — מינימום'],[50,'50% — מועדף'],[75,'75%'],[100,'100%'],[150,'150%']],
+  move3Min:     [[10,'10%'],[20,'20% — קלאסי'],[30,'30%'],[50,'50%'],[75,'75%'],[100,'100%']],
+  emaDistMax:   [[1,'1% — צמוד מאוד'],[1.5,'1.5%'],[2,'2%'],[2.5,'2.5% — קלאסי'],[3.5,'3.5%'],[5,'5%']],
+  weekRangeMax: [[3,'±3% — הדוק מאוד'],[5,'±5% — קלאסי'],[7,'±7%'],[10,'±10%']],
+  volSharesMin: [[0.1,'100K+'],[0.25,'250K+'],[0.5,'500K+ — קלאסי'],[1,'1M+'],[2,'2M+'],[5,'5M+']],
 };
 let _fieldPanel=null, _fieldPanelInput=null;
 function closeFieldPicker(){
@@ -1323,13 +1367,13 @@ function applyPreset(key, btn){
   const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+PRESET_NAMES[key];
 }
 
-const SCREENER_HEADS = {sepa:'טכני — Trend Template', momentum:'טכני — מומנטום', power:'טכני — Power Play', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
+const SCREENER_HEADS = {sepa:'טכני — Trend Template', momentum:'טכני — מומנטום', power:'טכני — Power Play', qulla:'טכני — Qullamaggie Breakout', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
 function setScreener(key, applyDef=true){
   if(!SCREENERS[key]) return;
   activeScreener=key;
   try{ localStorage.setItem('sepa_screener', key); }catch(e){}
   const cfg=SCREENERS[key], panel=$('filterPanel');
-  ['sepa','momentum','power'].forEach(k=>panel.classList.remove('panel-'+k));
+  Object.keys(SCREENERS).forEach(k=>panel.classList.remove('panel-'+k));
   panel.classList.add('panel-'+key);
   $('filterSections').classList.toggle('single', !cfg.fund);
   const sub=$('filterSub'); if(sub) sub.textContent=cfg.sub;
@@ -1427,7 +1471,7 @@ async function scan(force=false){
 
     allResults = applyFilters(universe, rsMap);
     allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
-    const needsExact = activeScreener==='sepa' || activeScreener==='power';
+    const needsExact = activeScreener==='sepa' || activeScreener==='power' || activeScreener==='qulla';
 
     if(!isCommodities){
       ttUniverse = {};
@@ -1553,7 +1597,10 @@ function applyFilters(universe, rsMap, opts={}){
     const d=r.d;
     const close=d[C.close],s50=d[C.SMA50],s150=d[C.SMA150],s200=d[C.SMA200];
     const hi=d[C.price_52_week_high],lo=d[C.price_52_week_low],mc=d[C.market_cap_basic];
-    if([close,s50,s150,s200,hi,lo].some(v=>v==null)) continue;
+    // Qullamaggie deliberately keeps young IPOs (no 150/200-day history yet) in play —
+    // only close/high/low/SMA50 are required there; every other screener needs the full MA set.
+    if(scr==='qulla'){ if([close,s50,hi,lo].some(v=>v==null)) continue; }
+    else if([close,s50,s150,s200,hi,lo].some(v=>v==null)) continue;
     if(close<priceMin||mc<mcMin) continue;
     const avgVol=d[C.average_volume_10d_calc], vol=d[C.volume];
     const dollarVol=(avgVol!=null)?close*avgVol:null;
@@ -1597,6 +1644,24 @@ function applyFilters(universe, rsMap, opts={}){
       const strong=rs>=rsMin;
       checks={run,near,up,strong};
       pass=run&&near&&up&&strong;
+    } else if(scr==='qulla'){
+      const ema10=d[C.EMA10], ema20=d[C.EMA20], perfW=d[C['Perf.W']];
+      const avg30=d[C.average_volume_30d_calc], avg90=d[C.average_volume_90d_calc];
+      const sharesMin=num('volSharesMin')*1e6;
+      const volOk=avg30!=null && avg30>=sharesMin && (avg90==null || avg90>=sharesMin);
+      const adrOk=volD!=null && volD>=num('adrMin');
+      // SMA200 alignment enforced only when the stock is old enough to have one (keeps IPOs)
+      const trendOk=close>s50 && (s200==null || (close>s200 && s50>s200));
+      const move6Ok=perf6!=null && perf6>=num('move6Min');
+      const move3Ok=perf3!=null && perf3>=num('move3Min');
+      const emaDist=Math.min(
+        ema10!=null?Math.abs(close/ema10-1)*100:Infinity,
+        ema20!=null?Math.abs(close/ema20-1)*100:Infinity);
+      const surfOk=emaDist<=num('emaDistMax');
+      const wMax=num('weekRangeMax');
+      const tightOk=perfW!=null && perfW>=-wMax && perfW<=wMax;
+      checks={volOk,adrOk,trendOk,move6Ok,move3Ok,surfOk,tightOk};
+      pass=volOk&&adrOk&&trendOk&&move6Ok&&move3Ok&&surfOk&&tightOk;
     } else {
       const t1=close>s150&&close>s200, t2=s150>s200, t3=s50>s150&&s50>s200;
       const t4=perf6!=null&&perf6>0;
@@ -1615,6 +1680,10 @@ function applyFilters(universe, rsMap, opts={}){
       vol, avgVol, dollarVol, earnIn,
       fromHighPct, fromLowPct:(close/lo-1)*100,
       rangePos:(close-lo)/(hi-lo), perfY, perf3, perf6, volD, volM,
+      perfW:d[C['Perf.W']],
+      emaDist:Math.min(
+        d[C.EMA10]!=null?Math.abs(close/d[C.EMA10]-1)*100:Infinity,
+        d[C.EMA20]!=null?Math.abs(close/d[C.EMA20]-1)*100:Infinity),
       eps, epsQoq, rev, revQoq, roe, nm, score:0, checks
     });
   }
@@ -1734,6 +1803,8 @@ function renderTable(rows){
     ? 'ציון מורכב 0–100: RS (40%) + EPS (25%) + הכנסות (20%) + קרבה לשיא (15%)'
     : scKind==='growth'
     ? 'ציון צמיחה 0–100: EPS QoQ (50%) + מכירות QoQ (50%)'
+    : scKind==='qulla'
+    ? 'ציון Qullamaggie 0–100: מהלך 6ח׳ (40%) + ADR (20%) + צמידות ל-EMA (20%) + הידוק שבועי (20%)'
     : 'ציון מומנטום 0–100: RS (50%) + קרבה לשיא (25%) + ביצוע 3-6ח׳ (25%)';
   const head='<tr>'
     +'<th style="width:30px"></th>'
@@ -1762,6 +1833,8 @@ function renderTable(rows){
       const epsS=Math.round(Math.min(Math.max(r.epsQoq??0,0),100)/100*50);
       const revS=sc-epsS;
       scTip='ציון צמיחה: '+sc+'/100\nEPS QoQ: '+epsS+'/50\nמכירות QoQ: '+revS+'/50';
+    } else if(r.scoreKind==='qulla'){
+      scTip='ציון Qullamaggie: '+sc+'/100\nמהלך 6ח׳: '+pct(r.perf6)+'\nADR: '+pct(r.volD)+'\nמרחק מ-EMA10/20: '+(isFinite(r.emaDist)&&r.emaDist!=null?r.emaDist.toFixed(1)+'%':'—')+'\nשינוי שבועי: '+pct(r.perfW);
     } else if(r.scoreKind==='momentum'||r.scoreKind==='power'||r.scoreKind==='commodities'){
       const rsS=Math.round(clamp(r.rs,0,99)/99*50);
       const hiS=Math.round(clamp((1-Math.abs(r.fromHighPct)/25),0,1)*25);
@@ -1832,9 +1905,11 @@ function renderGallery(){
   g.innerHTML=results.map(r=>{
     const wl=watchlist.has(r.ticker);
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
-    const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : r.scoreKind==='growth' ? 'GRW' : r.scoreKind==='commodities' ? 'COMM' : 'SEPA';
+    const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : r.scoreKind==='qulla' ? 'QUL' : r.scoreKind==='growth' ? 'GRW' : r.scoreKind==='commodities' ? 'COMM' : 'SEPA';
     const scTitle = r.scoreKind==='growth'
       ? 'ציון צמיחה '+r.score+'/100 — EPS QoQ 50% + מכירות QoQ 50%'
+      : r.scoreKind==='qulla'
+      ? 'ציון Qullamaggie '+r.score+'/100 — מהלך 6ח׳ 40% + ADR 20% + צמידות EMA 20% + הידוק 20%'
       : (r.scoreKind==='momentum'||r.scoreKind==='power'||r.scoreKind==='commodities')
       ? 'ציון מומנטום '+r.score+'/100 — RS 50% + קרבה לשיא 25% + ביצוע 25%'
       : 'ציון SEPA '+r.score+'/100 — RS 40% + EPS 25% + הכנסות 20% + קרבה לשיא 15%';
@@ -2109,6 +2184,8 @@ function saveFilterPrefs(){
       liqMin:num('liqMin'),earnDays:num('earnDays'),runMin:num('runMin'),
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
       epsQoqMin:num('epsQoqMin'),revQoqMin:num('revQoqMin'),
+      adrMin:num('adrMin'),move6Min:num('move6Min'),move3Min:num('move3Min'),
+      emaDistMax:num('emaDistMax'),weekRangeMax:num('weekRangeMax'),volSharesMin:num('volSharesMin'),
       useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,requireEpsAccel:$('requireEpsAccel')?.checked
     }));
   } catch(e){}
@@ -2125,6 +2202,8 @@ function loadFilterPrefs(){
     set('liqMin',p.liqMin); set('earnDays',p.earnDays); set('runMin',p.runMin);
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     set('epsQoqMin',p.epsQoqMin); set('revQoqMin',p.revQoqMin);
+    set('adrMin',p.adrMin); set('move6Min',p.move6Min); set('move3Min',p.move3Min);
+    set('emaDistMax',p.emaDistMax); set('weekRangeMax',p.weekRangeMax); set('volSharesMin',p.volSharesMin);
     if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
     if($('requireProfit')&&p.requireProfit!=null) $('requireProfit').checked=p.requireProfit;
     if($('requireEpsAccel')&&p.requireEpsAccel!=null) $('requireEpsAccel').checked=p.requireEpsAccel;
