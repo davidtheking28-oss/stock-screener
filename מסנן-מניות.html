@@ -713,11 +713,11 @@ tbody tr:last-child td { border-bottom: none; }
             </div>
             <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="number" id="fromLow" value="30" min="0" max="500" onfocus="openFieldPicker(this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="runMin" value="100" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">ריצה נפיצה תוך ~8 שבועות (OHLC)</span></div>
-            <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="number" id="adrMin" value="4" min="0" step="0.5" onfocus="openFieldPicker(this)"></div><span class="hint">תנודתיות יומית ממוצעת 20 יום</span></div>
+            <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="number" id="adrMin" value="3.5" min="0" step="0.5" onfocus="openFieldPicker(this)"></div><span class="hint">תנודתיות יומית ממוצעת 20 יום</span></div>
             <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="move6Min" value="30" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">זינוק קודם — עדיף 50%+</span></div>
             <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="move3Min" value="20" min="0" onfocus="openFieldPicker(this)"></div></div>
-            <div class="field f-qulla"><label for="emaDistMax">מרחק מ-EMA10/20 מקס&#8217; (%)</label><div class="field-combo"><input type="number" id="emaDistMax" value="2.5" min="0" step="0.5" onfocus="openFieldPicker(this)"></div><span class="hint">&#8220;surfing&#8221; הממוצעים 10/20</span></div>
-            <div class="field f-qulla"><label for="weekRangeMax">דשדוש 5 ימים מקס&#8217; (&#177;%)</label><div class="field-combo"><input type="number" id="weekRangeMax" value="5" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">שינוי שבועי בטווח צר</span></div>
+            <div class="field f-qulla"><label for="emaDistMax">מרחק מ-EMA10/20 מקס&#8217; (%)</label><div class="field-combo"><input type="number" id="emaDistMax" value="3.5" min="0" step="0.5" onfocus="openFieldPicker(this)"></div><span class="hint">&#8220;surfing&#8221; הממוצעים 10/20</span></div>
+            <div class="field f-qulla"><label for="weekRangeMax">דשדוש 5 ימים מקס&#8217; (&#177;%)</label><div class="field-combo"><input type="number" id="weekRangeMax" value="7" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">שינוי שבועי בטווח צר</span></div>
             <div class="field f-qulla"><label for="volSharesMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="number" id="volSharesMin" value="0.5" min="0" step="0.1" onfocus="openFieldPicker(this)"></div><span class="hint">ממוצע 30/90 יום</span></div>
             <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" onfocus="openFieldPicker(this)"></div></div>
             <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="number" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
@@ -899,7 +899,7 @@ const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100},
-  qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:4,move6Min:30,move3Min:20,emaDistMax:2.5,weekRangeMax:5,volSharesMin:0.5},
+  qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3.5,move6Min:30,move3Min:20,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
   commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
 };
@@ -1071,7 +1071,7 @@ function _qullaExactOK(bars, adrMin, emaDistMax, weekMax){
 async function validateExact(list, scr, onProgress){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
-  const adrMin=num('adrMin')||4, emaDistMax=num('emaDistMax')||2.5, weekMax=num('weekRangeMax')||5;
+  const adrMin=num('adrMin')||3.5, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
   async function worker(){
     while(idx<list.length){
       const r=list[idx++];
@@ -1294,11 +1294,11 @@ const FIELD_PRESETS = {
   roeMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[17,'17% — מינרוויני'],[20,'20%'],[25,'25%'],[30,'30%'],[40,'40%']],
   epsQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15% — קלאסי'],[25,'25%'],[40,'40%'],[60,'60%'],[100,'100%']],
   revQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25% — קלאסי'],[40,'40%'],[60,'60%'],[100,'100%']],
-  adrMin:       [[2,'2%'],[3,'3%'],[3.5,'3.5%'],[4,'4% — קולאמאגי'],[5,'5%'],[6,'6%'],[8,'8%']],
+  adrMin:       [[2,'2%'],[3,'3%'],[3.5,'3.5% — ברירת מחדל'],[4,'4% — קולאמאגי מקורי'],[5,'5%'],[6,'6%'],[8,'8%']],
   move6Min:     [[20,'20%'],[30,'30% — מינימום'],[50,'50% — מועדף'],[75,'75%'],[100,'100%'],[150,'150%']],
   move3Min:     [[10,'10%'],[20,'20% — קלאסי'],[30,'30%'],[50,'50%'],[75,'75%'],[100,'100%']],
-  emaDistMax:   [[1,'1% — צמוד מאוד'],[1.5,'1.5%'],[2,'2%'],[2.5,'2.5% — קלאסי'],[3.5,'3.5%'],[5,'5%']],
-  weekRangeMax: [[3,'±3% — הדוק מאוד'],[5,'±5% — קלאסי'],[7,'±7%'],[10,'±10%']],
+  emaDistMax:   [[1,'1% — צמוד מאוד'],[1.5,'1.5%'],[2,'2%'],[2.5,'2.5% — הדוק'],[3.5,'3.5% — ברירת מחדל'],[5,'5%']],
+  weekRangeMax: [[3,'±3% — הדוק מאוד'],[5,'±5% — הדוק'],[7,'±7% — ברירת מחדל'],[10,'±10%']],
   volSharesMin: [[0.1,'100K+'],[0.25,'250K+'],[0.5,'500K+ — קלאסי'],[1,'1M+'],[2,'2M+'],[5,'5M+']],
 };
 let _fieldPanel=null, _fieldPanelInput=null;
