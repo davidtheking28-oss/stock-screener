@@ -713,9 +713,9 @@ tbody tr:last-child td { border-bottom: none; }
             </div>
             <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="number" id="fromLow" value="30" min="0" max="500" onfocus="openFieldPicker(this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="runMin" value="100" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">ריצה נפיצה תוך ~8 שבועות (OHLC)</span></div>
-            <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="number" id="adrMin" value="3.5" min="0" step="0.5" onfocus="openFieldPicker(this)"></div><span class="hint">תנודתיות יומית ממוצעת 20 יום</span></div>
-            <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="move6Min" value="30" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">זינוק קודם — עדיף 50%+</span></div>
-            <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="move3Min" value="20" min="0" onfocus="openFieldPicker(this)"></div></div>
+            <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="number" id="adrMin" value="3" min="0" step="0.5" onfocus="openFieldPicker(this)"></div><span class="hint">תנודתיות יומית ממוצעת 20 יום</span></div>
+            <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="move6Min" value="20" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">זינוק קודם — עדיף 50%+</span></div>
+            <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="move3Min" value="10" min="0" onfocus="openFieldPicker(this)"></div></div>
             <div class="field f-qulla"><label for="emaDistMax">מרחק מ-EMA10/20 מקס&#8217; (%)</label><div class="field-combo"><input type="number" id="emaDistMax" value="3.5" min="0" step="0.5" onfocus="openFieldPicker(this)"></div><span class="hint">&#8220;surfing&#8221; הממוצעים 10/20</span></div>
             <div class="field f-qulla"><label for="weekRangeMax">דשדוש 5 ימים מקס&#8217; (&#177;%)</label><div class="field-combo"><input type="number" id="weekRangeMax" value="7" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">שינוי שבועי בטווח צר</span></div>
             <div class="field f-qulla"><label for="volSharesMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="number" id="volSharesMin" value="0.5" min="0" step="0.1" onfocus="openFieldPicker(this)"></div><span class="hint">ממוצע 30/90 יום</span></div>
@@ -899,7 +899,7 @@ const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100},
-  qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3.5,move6Min:30,move3Min:20,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
+  qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3,move6Min:20,move3Min:10,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
   commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
 };
@@ -911,6 +911,7 @@ const COL_DEFS = [
   {key:'price',  label:'מחיר',       defaultOn:true},
   {key:'score',  label:'ציון SEPA',  defaultOn:true},
   {key:'rs',     label:'RS',         defaultOn:true},
+  {key:'adr',    label:'ADR%',       defaultOn:true},
   {key:'perfY',  label:'ביצʹ 1Y',  defaultOn:true},
   {key:'perf3',  label:'ביצʹ 3M',  defaultOn:false},
   {key:'eps',    label:'EPS YoY',    defaultOn:true},
@@ -1071,7 +1072,7 @@ function _qullaExactOK(bars, adrMin, emaDistMax, weekMax){
 async function validateExact(list, scr, onProgress){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
-  const adrMin=num('adrMin')||3.5, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
+  const adrMin=num('adrMin')||3, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
   async function worker(){
     while(idx<list.length){
       const r=list[idx++];
@@ -1098,6 +1099,7 @@ async function validateExact(list, scr, onProgress){
   return list.filter(r=>!r._exactFail);
 }
 let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
+if(!('adr' in colVis)) colVis.adr = true;
 let searchQuery = '';
 let newToday = new Set();
 
@@ -1294,9 +1296,9 @@ const FIELD_PRESETS = {
   roeMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[17,'17% — מינרוויני'],[20,'20%'],[25,'25%'],[30,'30%'],[40,'40%']],
   epsQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15% — קלאסי'],[25,'25%'],[40,'40%'],[60,'60%'],[100,'100%']],
   revQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25% — קלאסי'],[40,'40%'],[60,'60%'],[100,'100%']],
-  adrMin:       [[2,'2%'],[3,'3%'],[3.5,'3.5% — ברירת מחדל'],[4,'4% — קולאמאגי מקורי'],[5,'5%'],[6,'6%'],[8,'8%']],
-  move6Min:     [[20,'20%'],[30,'30% — מינימום'],[50,'50% — מועדף'],[75,'75%'],[100,'100%'],[150,'150%']],
-  move3Min:     [[10,'10%'],[20,'20% — קלאסי'],[30,'30%'],[50,'50%'],[75,'75%'],[100,'100%']],
+  adrMin:       [[2,'2%'],[3,'3% — ברירת מחדל'],[3.5,'3.5%'],[4,'4% — קולאמאגי מקורי'],[5,'5%'],[6,'6%'],[8,'8%']],
+  move6Min:     [[20,'20% — ברירת מחדל'],[30,'30% — מקורי'],[50,'50% — מועדף'],[75,'75%'],[100,'100%'],[150,'150%']],
+  move3Min:     [[10,'10% — ברירת מחדל'],[20,'20% — מקורי'],[30,'30%'],[50,'50%'],[75,'75%'],[100,'100%']],
   emaDistMax:   [[1,'1% — צמוד מאוד'],[1.5,'1.5%'],[2,'2%'],[2.5,'2.5% — הדוק'],[3.5,'3.5% — ברירת מחדל'],[5,'5%']],
   weekRangeMax: [[3,'±3% — הדוק מאוד'],[5,'±5% — הדוק'],[7,'±7% — ברירת מחדל'],[10,'±10%']],
   volSharesMin: [[0.1,'100K+'],[0.25,'250K+'],[0.5,'500K+ — קלאסי'],[1,'1M+'],[2,'2M+'],[5,'5M+']],
@@ -1743,7 +1745,7 @@ function renderSectorStrength(){
    SORT & VIEW
 ════════════════════════════════════ */
 const SORTS={
-  ticker:r=>r.ticker, close:r=>r.close, rs:r=>r.rs, score:r=>r.score,
+  ticker:r=>r.ticker, close:r=>r.close, rs:r=>r.rs, score:r=>r.score, adr:r=>r.volD??0,
   mc:r=>r.mc, vol:r=>r.vol??0, liq:r=>r.dollarVol??0, fromHigh:r=>r.fromHighPct,
   perfY:r=>r.perfY??-1e9, perf3:r=>r.perf3??-1e9, eps:r=>r.eps??-1e9,
   rev:r=>r.rev??-1e9, roe:r=>r.roe??-1e9, nm:r=>r.nm??-1e9, range:r=>r.rangePos
@@ -1812,6 +1814,7 @@ function renderTable(rows){
     +(colVis.price ? th('מחיר','close','מחיר סגירה אחרון') : '')
     +(colVis.score ? th(scHeadLbl,'score',scHeadTip) : '')
     +(colVis.rs    ? th('RS','rs','דירוג יחסי 1–99') : '')
+    +(colVis.adr   ? th('ADR%','adr','תנודתיות יומית ממוצעת — בסיס לגודל פוזיציה וסטופ') : '')
     +(colVis.perfY ? th('ביצֹ 1Y','perfY','שינוי מחיר ב-12 חודשים האחרונים') : '')
     +(colVis.perf3 ? th('ביצֹ 3M','perf3','שינוי מחיר ב-3 חודשים האחרונים') : '')
     +(colVis.eps   ? th('EPS YoY','eps','צמיחת רווח למניה שנה/שנה') : '')
@@ -1870,6 +1873,7 @@ function renderTable(rows){
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
+      +col('adr',    (()=>{const a=r.volD;const c=a==null?'var(--text3)':a>=5?'var(--green)':a>=3.5?'var(--amber)':'var(--text3)';return '<td><span class="mn" style="color:'+c+';font-weight:600">'+(a==null?'—':a.toFixed(1)+'%')+'</span></td>';})())
       +col('perfY',  '<td><span class="mn '+((r.perfY??0)>=0?'pos':'neg')+'">'+pct(r.perfY)+'</span></td>')
       +col('perf3',  '<td><span class="mn '+((r.perf3??0)>=0?'pos':'neg')+'">'+pct(r.perf3)+'</span></td>')
       +col('eps',    (()=>{const q=r.epsQoq;const arr=q==null?'':q>5?'<span style="color:var(--green);font-size:10px;margin-right:2px">↑</span>':q<-5?'<span style="color:var(--red);font-size:10px;margin-right:2px">↓</span>':'<span style="color:var(--text3);font-size:10px;margin-right:2px">→</span>';const tip=q!=null?'שנה/שנה: '+pct(r.eps)+' · רבעון מול קודם: '+pct(q):'צמיחת רווח למניה שנה/שנה';return '<td title="'+tip+'">'+arr+'<span class="mn '+((r.eps??0)>=0?'pos':'neg')+'">'+pct(r.eps)+'</span></td>';})())
