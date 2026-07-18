@@ -585,7 +585,7 @@ tbody tr:last-child td { border-bottom: none; }
 .ticker-search {
   background: var(--bg2); border: 1px solid var(--border);
   color: var(--text); border-radius: 8px;
-  padding: 5px 10px; font: 13px var(--mono); width: 120px;
+  padding: 5px 10px; font: 500 13px var(--sans); width: 130px;
   transition: width 0.2s ease-out, border-color 0.12s;
 }
 .ticker-search:focus { outline: none; border-color: var(--accent); width: 160px; }
@@ -776,8 +776,8 @@ tbody tr:last-child td { border-bottom: none; }
           <button class="view-tab" id="tabWatchlist" onclick="setView('watchlist')">&#9733; מעקב</button>
         </div>
         <input type="search" id="tickerSearch" class="ticker-search" placeholder="חיפוש מניה..."
-          oninput="searchQuery=this.value.trim().toUpperCase();if(view==='table'||view==='watchlist')render()"
-          onkeydown="if(event.key==='Escape'){this.value='';searchQuery='';if(view==='table'||view==='watchlist')render();}event.stopPropagation()">
+          oninput="searchQuery=this.value.trim().toUpperCase();render()"
+          onkeydown="if(event.key==='Escape'){this.value='';searchQuery='';render();}event.stopPropagation()">
         <div class="col-picker" id="colPickerWrap" style="display:none">
           <button class="btn-ghost" onclick="toggleColPicker(event)" title="בחר עמודות">עמודות &#8862;</button>
           <div class="col-picker-panel" id="colPickerPanel"></div>
@@ -1900,13 +1900,17 @@ function renderGallery(){
     const hint = allResults.length>0 ? 'הסקטור הנוכחי ריק — נסה "כל הסקטורים"' : 'שנה את הפילטרים והסרוק שנית';
     g.innerHTML=emptyHtml('אין תוצאות בגלריה', hint); _galleryKey=''; return;
   }
-  const _key=results.map(r=>r.sym).join(',');
+  const rows = searchQuery ? results.filter(r=>r.ticker.includes(searchQuery)||r.name.toUpperCase().includes(searchQuery)) : results;
+  if(!rows.length){
+    g.innerHTML=emptyHtml('לא נמצאה מניה תואמת','נקה את החיפוש כדי לראות את כל הגרפים'); _galleryKey=''; return;
+  }
+  const _key=rows.map(r=>r.sym).join(',');
   if(_key===_galleryKey && g.querySelector('.gcard')){
-    g.querySelectorAll('.gcard .star-btn').forEach((btn,i)=>{ const r=results[i]; if(!r) return; const on=watchlist.has(r.ticker); btn.className='star-btn '+(on?'on':'off'); btn.textContent=on?'★':'☆'; });
+    g.querySelectorAll('.gcard .star-btn').forEach((btn,i)=>{ const r=rows[i]; if(!r) return; const on=watchlist.has(r.ticker); btn.className='star-btn '+(on?'on':'off'); btn.textContent=on?'★':'☆'; });
     return;
   }
   _galleryKey=_key;
-  g.innerHTML=results.map(r=>{
+  g.innerHTML=rows.map(r=>{
     const wl=watchlist.has(r.ticker);
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : r.scoreKind==='qulla' ? 'QUL' : r.scoreKind==='growth' ? 'GRW' : r.scoreKind==='commodities' ? 'COMM' : 'SEPA';
