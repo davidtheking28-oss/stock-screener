@@ -1172,7 +1172,7 @@ function loadUniverseCache(){
 
 function saveResultsCache(){
   try {
-    localStorage.setItem(RESULTS_CACHE_KEY, JSON.stringify({allResults, time:Date.now(), nt:[...newToday]}));
+    localStorage.setItem(RESULTS_CACHE_KEY, JSON.stringify({allResults, scr:activeScreener, time:Date.now(), nt:[...newToday]}));
   } catch(e){}
 }
 
@@ -1180,8 +1180,9 @@ function loadResultsCache(){
   try {
     const raw = localStorage.getItem(RESULTS_CACHE_KEY);
     if(!raw) return;
-    const {allResults:ar, time, nt} = JSON.parse(raw);
+    const {allResults:ar, scr, time, nt} = JSON.parse(raw);
     if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(RESULTS_CACHE_KEY); return; }
+    if(scr && scr !== activeScreener) return;
     allResults = ar;
     if(Array.isArray(nt) && new Date(time).toDateString()===new Date().toDateString()) newToday = new Set(nt);
     applySectorFilter(); sortResults();
@@ -1252,8 +1253,8 @@ function calcScore(r, scr='sepa'){
   if(scr==='qulla'){
     const moveS = Math.min(clamp(r.perf6??0,0,150)/150,1)*40;
     const adrS  = Math.min(clamp(r.volD??0,0,8)/8,1)*20;
-    const emaS  = (r.emaDist==null||!isFinite(r.emaDist))?0:clamp(1-r.emaDist/(num('emaDistMax')||2.5),0,1)*20;
-    const tightS= r.perfW==null?0:clamp(1-Math.abs(r.perfW)/(num('weekRangeMax')||5),0,1)*20;
+    const emaS  = (r.emaDist==null||!isFinite(r.emaDist))?0:clamp(1-r.emaDist/(num('emaDistMax')||3.5),0,1)*20;
+    const tightS= r.perfW==null?0:clamp(1-Math.abs(r.perfW)/(num('weekRangeMax')||7),0,1)*20;
     return Math.round(clamp(moveS+adrS+emaS+tightS,0,100));
   }
   if(scr==='momentum'||scr==='power'||scr==='commodities'){
@@ -1417,7 +1418,7 @@ async function checkAndSaveHistory(tickers){
   const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
   const currentSet = new Set(tickers);
   const {data:prev} = await _sb.from('screener_history')
-    .select('ticker,first_seen,last_seen').eq('user_id',_currentUser.id);
+    .select('ticker,first_seen,last_seen').eq('user_id',_currentUser.id).eq('screener',activeScreener);
   const known = new Map((prev||[]).map(h=>[h.ticker,h]));
   if(watchlist.size > 0 && prev){
     const exits = prev.filter(h=>watchlist.has(h.ticker) && !currentSet.has(h.ticker) && h.last_seen >= yesterday).map(h=>h.ticker);
@@ -1427,11 +1428,11 @@ async function checkAndSaveHistory(tickers){
   fresh.forEach(t=>newToday.add(t));
   tickers.forEach(t=>{ if(known.get(t)?.first_seen===today) newToday.add(t); });
   if(fresh.length) await _sb.from('screener_history').insert(
-    fresh.map(t=>({user_id:_currentUser.id, ticker:t, first_seen:today, last_seen:today}))
+    fresh.map(t=>({user_id:_currentUser.id, screener:activeScreener, ticker:t, first_seen:today, last_seen:today}))
   );
   const seen = tickers.filter(t=>known.has(t));
   if(seen.length) await _sb.from('screener_history').update({last_seen:today})
-    .eq('user_id',_currentUser.id).in('ticker',seen);
+    .eq('user_id',_currentUser.id).eq('screener',activeScreener).in('ticker',seen);
   if(watchlist.size > 0){
     const wlNew = [...newToday].filter(t=>watchlist.has(t));
     if(wlNew.length) toast('נכנסו לסינון היום: '+wlNew.join(', '), 6000);
@@ -2097,6 +2098,7 @@ async function loadUserData(){
   ]);
   if(wlData) watchlist = new Set(wlData.map(r=>r.ticker));
   if(prefData?.col_vis) colVis = prefData.col_vis;
+  if(!('adr' in colVis)) colVis.adr = true;
 }
 
 function updateAuthUI(){
@@ -2202,11 +2204,11 @@ function saveFilterPrefs(){
 function loadFilterPrefs(){
   try {
     const p=JSON.parse(localStorage.getItem('sepa_filters')||'null'); if(!p) return;
-    if((p.v||0)<2){ if(p.fromLow==25) p.fromLow=30; p.v=2; try{ localStorage.setItem('sepa_filters', JSON.stringify(p)); }catch(e){} }
+    if((p.v||0)<2){ if(p.fromLow==25) p.fromLow=30; if(p.mcMin!=null&&p.mcMin>=50) p.mcMin=p.mcMin/1000; p.v=2; try{ localStorage.setItem('sepa_filters', JSON.stringify(p)); }catch(e){} }
     const set=(id,v)=>{ const el=$(id); if(el&&v!=null) el.value=v; };
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
     set('priceMin',p.priceMin);
-    if(p.mcMin!=null){ let v=p.mcMin; if(v>=50) v=v/1000; $('mcMin').value=v; }
+    set('mcMin',p.mcMin);
     set('liqMin',p.liqMin); set('earnDays',p.earnDays); set('runMin',p.runMin);
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     set('epsQoqMin',p.epsQoqMin); set('revQoqMin',p.revQoqMin);
