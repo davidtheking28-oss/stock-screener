@@ -253,16 +253,6 @@ body {
   padding: 14px 16px;
   display: flex; flex-direction: column;
 }
-.fund-note {
-  margin-top: auto; padding-top: 14px;
-}
-.fund-note-inner {
-  border-top: 1px dashed var(--border2); padding-top: 12px;
-  display: flex; flex-direction: column; gap: 5px;
-}
-.fund-note-title { font: 700 10px var(--sans); letter-spacing: 1px; text-transform: uppercase; color: var(--text2); }
-.fund-note p { font-size: 11px; line-height: 1.65; color: var(--text3); }
-.fund-note b { color: var(--text2); font-weight: 700; }
 .filter-section h3 {
   font-size: 10px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; margin-bottom: 14px;
@@ -306,7 +296,6 @@ input[type=number]:focus, select:focus {
 .toggle input { accent-color: var(--accent); width: 13px; height: 13px; }
 
 .filter-actions { display: flex; align-items: center; gap: 14px; margin-top: 16px; border-top: 1px solid var(--border2); padding-top: 14px; }
-.note-text { font-size: 12px; color: var(--text3); line-height: 1.7; }
 
 /* ── Buttons ── */
 button { font-family: var(--sans); cursor: pointer; border: none; transition: all 0.12s; }
@@ -749,17 +738,10 @@ tbody tr:last-child td { border-bottom: none; }
             <label class="toggle"><input type="checkbox" id="requireProfit" checked> שולי רווח חיוביים</label>
             <label class="toggle"><input type="checkbox" id="requireEpsAccel"> האצה ב-EPS (רבעון אחרון &ge; קודם)</label>
           </div>
-          <div class="fund-note">
-            <div class="fund-note-inner">
-              <div class="fund-note-title">איך מחושב ציון SEPA</div>
-              <p><b>RS 40%</b> · <b>EPS 25%</b> · <b>הכנסות 20%</b> · <b>קרבה לשיא 15%</b>. ה-Trend Template דורש מבנה <b>MA50&gt;MA150&gt;MA200</b> והמחיר מעליהם.</p>
-            </div>
-          </div>
         </div>
       </div>
       <div class="filter-actions">
         <button class="btn-scan" id="scanBtnPanel" onclick="scan()">סרוק את השוק</button>
-        <div class="note-text">MA200 עולה מוערך דרך מבנה MA50&gt;MA150&gt;MA200 + מומנטום 6ח&#8217; חיובי · RS משוקלל בסגנון IBD (40% לרבעון האחרון) · נתונים מ-TradingView בזמן אמת</div>
       </div>
     </div>
   </div>
