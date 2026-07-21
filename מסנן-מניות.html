@@ -887,7 +887,7 @@ const SCREENER_DEFAULTS = {
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3,move6Min:20,move3Min:10,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
-  finviz:   {priceMin:3,mcMin:0.3,liqMin:0,earnDays:0,perfYMin:30,finvizVolMin:0.1},
+  finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
   commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
 };
@@ -1268,7 +1268,7 @@ function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var
 function scoreBorder(s)  { return s>=80?'rgba(46,204,113,0.28)':s>=60?'rgba(245,185,74,0.28)':'rgba(117,137,168,0.22)'; }
 function scoreBg(s)      { return s>=80?'rgba(46,204,113,0.13)':s>=60?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)'; }
 
-function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : '$'+m+'M'; }
+function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : m<1 ? '$'+Math.round(m*1000)+'K' : '$'+m+'M'; }
 function updUnitHints(){
   const lh=$('liqHint'); if(lh) lh.textContent='נפח דולרי ממוצע · ≈ '+fmtMoneyM(num('liqMin'))+' ליום';
   const mh=$('mcHint'); if(mh) mh.textContent='≈ '+fmtMoneyM(num('mcMin')*1000)+' ומעלה';
@@ -1284,7 +1284,7 @@ const FIELD_PRESETS = {
   runMin:   [[50,'50%'],[75,'75%'],[100,'100% — קלאסי'],[125,'125%'],[150,'150%'],[175,'175%'],[200,'200%'],[250,'250%']],
   priceMin: [[1,'$1+'],[2,'$2+'],[3,'$3+'],[5,'$5+'],[7,'$7+'],[10,'$10+ — קלאסי'],[15,'$15+'],[20,'$20+'],[30,'$30+'],[50,'$50+'],[100,'$100+']],
   mcMin:    [[0,'הכל'],[0.05,'$50M+'],[0.1,'$100M+'],[0.3,'$300M+'],[0.5,'$500M+'],[1,'$1B+'],[2,'$2B+ — קלאסי'],[5,'$5B+'],[10,'$10B+'],[50,'$50B+'],[200,'$200B+']],
-  liqMin:   [[1,'$1M+'],[2,'$2M+'],[5,'$5M+'],[10,'$10M+'],[15,'$15M+'],[20,'$20M+ — קלאסי'],[30,'$30M+'],[50,'$50M+'],[100,'$100M+'],[200,'$200M+']],
+  liqMin:   [[0,'ללא סינון'],[0.1,'$100K+'],[0.25,'$250K+'],[0.5,'$500K+'],[1,'$1M+'],[2,'$2M+'],[5,'$5M+'],[10,'$10M+'],[15,'$15M+'],[20,'$20M+ — קלאסי'],[30,'$30M+'],[50,'$50M+'],[100,'$100M+'],[200,'$200M+']],
   earnDays: [[0,'כבוי'],[2,'2 ימים'],[3,'3 ימים'],[5,'5 ימים — קלאסי'],[7,'7 ימים'],[10,'10 ימים'],[14,'14 ימים'],[21,'21 ימים']],
   epsMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25% — קלאסי'],[40,'40%'],[60,'60%'],[100,'100%'],[150,'150%']],
   revMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[20,'20% — קלאסי'],[30,'30%'],[50,'50%'],[75,'75%']],
