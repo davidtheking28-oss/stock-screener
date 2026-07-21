@@ -932,6 +932,13 @@ let view = localStorage.getItem('sepa_view')||'table', activeRow = -1;
 let _galleryKey = '';
 const _ohlcCache = new Map();
 let _ohlcLd = 0, _ohlcIO = null; const _ohlcQ = [];
+// Registry of live chart/observer pairs so a gallery rebuild (search, sort,
+// re-scan) can dispose the old ones instead of leaking canvases + RAF loops.
+let _ohlcCharts = [];
+function _ohlcDisposeAll(){
+  _ohlcCharts.forEach(({chart,ro})=>{ try{ro.disconnect();}catch(e){} try{chart.remove();}catch(e){} });
+  _ohlcCharts.length = 0;
+}
 function _ohlcMsg(el,t){ el.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px">'+t+'</div>'; }
 async function _ohlcDraw(el){
   if(!HAS_SUPABASE){
@@ -991,7 +998,9 @@ async function _ohlcDraw(el){
     vs.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
     vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:_cv('--chart-vol')||'rgba(255,255,255,0.25)'})));
     chart.timeScale().fitContent();
-    new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth})).observe(box);
+    const ro=new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth}));
+    ro.observe(box);
+    _ohlcCharts.push({chart,ro});
   }catch(e){ _ohlcMsg(el,'<span>שגיאה</span> <button onclick="event.stopPropagation();_ohlcRetry(this)" style="margin-right:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text2);border-radius:5px;padding:2px 8px;font:600 11px var(--sans);cursor:pointer">↻</button>'); }
 }
 function _ohlcRetry(btn){
@@ -1903,11 +1912,11 @@ function renderGallery(){
   const g=$('galleryView');
   if(!results.length){
     const hint = allResults.length>0 ? 'הסקטור הנוכחי ריק — נסה "כל הסקטורים"' : 'שנה את הפילטרים והסרוק שנית';
-    g.innerHTML=emptyHtml('אין תוצאות בגלריה', hint); _galleryKey=''; return;
+    _ohlcDisposeAll(); g.innerHTML=emptyHtml('אין תוצאות בגלריה', hint); _galleryKey=''; return;
   }
   const rows = searchQuery ? results.filter(r=>r.ticker.includes(searchQuery)||r.name.toUpperCase().includes(searchQuery)) : results;
   if(!rows.length){
-    g.innerHTML=emptyHtml('לא נמצאה מניה תואמת','נקה את החיפוש כדי לראות את כל הגרפים'); _galleryKey=''; return;
+    _ohlcDisposeAll(); g.innerHTML=emptyHtml('לא נמצאה מניה תואמת','נקה את החיפוש כדי לראות את כל הגרפים'); _galleryKey=''; return;
   }
   const _key=rows.map(r=>r.sym).join(',');
   if(_key===_galleryKey && g.querySelector('.gcard')){
@@ -1915,6 +1924,7 @@ function renderGallery(){
     return;
   }
   _galleryKey=_key;
+  _ohlcDisposeAll();
   g.innerHTML=rows.map(r=>{
     const wl=watchlist.has(r.ticker);
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
