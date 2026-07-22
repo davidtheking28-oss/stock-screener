@@ -202,6 +202,7 @@ body {
 #filterPanel.panel-growth .f-tech, #filterPanel.panel-commodities .f-tech, #filterPanel.panel-qulla .f-tech, #filterPanel.panel-finviz .f-tech { display: none; }
 #filterPanel.panel-sepa .f-growth, #filterPanel.panel-momentum .f-growth, #filterPanel.panel-power .f-growth, #filterPanel.panel-commodities .f-growth, #filterPanel.panel-qulla .f-growth, #filterPanel.panel-finviz .f-growth { display: none; }
 #filterPanel.panel-commodities .f-base { display: none; }
+#filterPanel.panel-finviz .f-liq { display: none; }
 #filterPanel.panel-sepa .f-commodities, #filterPanel.panel-momentum .f-commodities, #filterPanel.panel-power .f-commodities, #filterPanel.panel-growth .f-commodities, #filterPanel.panel-qulla .f-commodities, #filterPanel.panel-finviz .f-commodities { display: none; }
 #filterPanel.panel-sepa .f-qulla, #filterPanel.panel-momentum .f-qulla, #filterPanel.panel-power .f-qulla, #filterPanel.panel-growth .f-qulla, #filterPanel.panel-commodities .f-qulla, #filterPanel.panel-finviz .f-qulla { display: none; }
 #filterPanel.panel-sepa .f-finviz, #filterPanel.panel-momentum .f-finviz, #filterPanel.panel-power .f-finviz, #filterPanel.panel-growth .f-finviz, #filterPanel.panel-commodities .f-finviz, #filterPanel.panel-qulla .f-finviz { display: none; }
@@ -714,7 +715,7 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field f-finviz"><label for="finvizVolMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="number" id="finvizVolMin" value="0.1" min="0" step="0.05" onfocus="openFieldPicker(this)"></div><span class="hint">ממוצע 90 יום</span></div>
             <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" onfocus="openFieldPicker(this)"></div></div>
             <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="number" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
-            <div class="field f-base"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
+            <div class="field f-base f-liq"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
             <div class="field f-base"><label for="earnDays">חסום דוח בעוד (ימים)</label><div class="field-combo"><input type="number" id="earnDays" value="5" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
             <div class="field f-commodities" style="grid-column:1 / -1">
               <label>סחורות (קבוע)</label>
