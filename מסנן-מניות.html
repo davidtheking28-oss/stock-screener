@@ -1583,7 +1583,9 @@ function computeRS(universe){
   };
   const valid=universe.map(r=>({s:r.s,p:rsRaw(r.d)})).filter(r=>r.p!=null).sort((a,b)=>a.p-b.p);
   const n=valid.length; const map={};
-  valid.forEach((row,i)=>{ map[row.s]=Math.max(1,Math.min(99,Math.round((i/(n-1))*98)+1)); });
+  // n<=1 means there's nothing to rank against — divide-by-zero (i/(n-1)) would
+  // yield NaN; give the lone stock a neutral mid-scale rating instead.
+  valid.forEach((row,i)=>{ map[row.s]= n<=1 ? 50 : Math.max(1,Math.min(99,Math.round((i/(n-1))*98)+1)); });
   return map;
 }
 
@@ -1607,8 +1609,12 @@ function applyFilters(universe, rsMap, opts={}){
     const close=d[C.close],s50=d[C.SMA50],s150=d[C.SMA150],s200=d[C.SMA200];
     const hi=d[C.price_52_week_high],lo=d[C.price_52_week_low],mc=d[C.market_cap_basic];
     // Qullamaggie deliberately keeps young IPOs (no 150/200-day history yet) in play —
-    // only close/high/low/SMA50 are required there; every other screener needs the full MA set.
+    // only close/high/low/SMA50 are required there. Commodities is a fixed ticker
+    // whitelist that never looks at SMA trend, so it only needs close/high/low —
+    // requiring the full MA set could drop one of the 12 tickers on a data gap.
+    // Every other screener needs the full MA set.
     if(scr==='qulla'){ if([close,s50,hi,lo].some(v=>v==null)) continue; }
+    else if(scr==='commodities'){ if([close,hi,lo].some(v=>v==null)) continue; }
     else if([close,s50,s150,s200,hi,lo].some(v=>v==null)) continue;
     if(close<priceMin||mc<mcMin) continue;
     const avgVol=d[C.average_volume_10d_calc], vol=d[C.volume];
