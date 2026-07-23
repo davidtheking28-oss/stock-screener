@@ -1259,10 +1259,16 @@ function calcScore(r, scr='sepa'){
     return Math.round(clamp(epsS+revS,0,100));
   }
   if(scr==='qulla'){
+    // `||` would treat an explicit 0 (a valid, if extreme, "must be exact" filter
+    // value the user can type) as unset and silently swap in the default —
+    // NaN-check instead so 0 is honored; the row already passed the same
+    // threshold in applyFilters to get here, so emaDist/perfW is ~0 too.
+    const emaMax = num('emaDistMax'); const emaMaxUsed = Number.isNaN(emaMax) ? 3.5 : emaMax;
+    const wkMax  = num('weekRangeMax'); const wkMaxUsed  = Number.isNaN(wkMax) ? 7 : wkMax;
     const moveS = Math.min(clamp(r.perf6??0,0,150)/150,1)*40;
     const adrS  = Math.min(clamp(r.volD??0,0,8)/8,1)*20;
-    const emaS  = (r.emaDist==null||!isFinite(r.emaDist))?0:clamp(1-r.emaDist/(num('emaDistMax')||3.5),0,1)*20;
-    const tightS= r.perfW==null?0:clamp(1-Math.abs(r.perfW)/(num('weekRangeMax')||7),0,1)*20;
+    const emaS  = (r.emaDist==null||!isFinite(r.emaDist))?0: emaMaxUsed>0 ? clamp(1-r.emaDist/emaMaxUsed,0,1)*20 : 20;
+    const tightS= r.perfW==null?0: wkMaxUsed>0 ? clamp(1-Math.abs(r.perfW)/wkMaxUsed,0,1)*20 : 20;
     return Math.round(clamp(moveS+adrS+emaS+tightS,0,100));
   }
   if(scr==='finviz'){
@@ -1618,13 +1624,17 @@ function applyFilters(universe, rsMap, opts={}){
     const d=r.d;
     const close=d[C.close],s50=d[C.SMA50],s150=d[C.SMA150],s200=d[C.SMA200];
     const hi=d[C.price_52_week_high],lo=d[C.price_52_week_low],mc=d[C.market_cap_basic];
-    // Qullamaggie deliberately keeps young IPOs (no 150/200-day history yet) in play —
-    // only close/high/low/SMA50 are required there. Commodities is a fixed ticker
-    // whitelist that never looks at SMA trend, so it only needs close/high/low —
-    // requiring the full MA set could drop one of the 12 tickers on a data gap.
-    // Every other screener needs the full MA set.
-    if(scr==='qulla'){ if([close,s50,hi,lo].some(v=>v==null)) continue; }
-    else if(scr==='commodities'){ if([close,hi,lo].some(v=>v==null)) continue; }
+    // Each screener only requires the MAs its own pass-logic actually reads —
+    // requiring the full set unconditionally silently drops young IPOs (no
+    // 150/200-day history yet) from screeners that never look at S150/S200
+    // in the first place. Qullamaggie needs S50 only; commodities and growth
+    // read no SMA at all (fixed ticker list / sector+earnings only); power
+    // needs S50 only; momentum and the yearly-momentum screener need S50+S200
+    // (no S150); SEPA (the default) is the one screener that actually checks
+    // S150, so it alone needs the full set.
+    if(scr==='qulla'||scr==='power'){ if([close,s50,hi,lo].some(v=>v==null)) continue; }
+    else if(scr==='commodities'||scr==='growth'){ if([close,hi,lo].some(v=>v==null)) continue; }
+    else if(scr==='momentum'||scr==='finviz'){ if([close,s50,s200,hi,lo].some(v=>v==null)) continue; }
     else if([close,s50,s150,s200,hi,lo].some(v=>v==null)) continue;
     if(close<priceMin||mc<mcMin) continue;
     const avgVol=d[C.average_volume_10d_calc], vol=d[C.volume];
@@ -1712,7 +1722,7 @@ function applyFilters(universe, rsMap, opts={}){
       close, rs, sector:d[C.sector]||'—', mc,
       vol, avgVol, dollarVol, earnIn,
       fromHighPct, fromLowPct:(close/lo-1)*100,
-      rangePos:(close-lo)/(hi-lo), perfY, perf3, perf6, volD, volM,
+      rangePos:hi>lo?(close-lo)/(hi-lo):0.5, perfY, perf3, perf6, volD, volM,
       perfW:d[C['Perf.W']],
       emaDist:Math.min(
         d[C.EMA10]!=null?Math.abs(close/d[C.EMA10]-1)*100:Infinity,
