@@ -763,8 +763,8 @@ tbody tr:last-child td { border-bottom: none; }
           <button class="view-tab" id="tabWatchlist" onclick="setView('watchlist')">&#9733; מעקב</button>
         </div>
         <input type="search" id="tickerSearch" class="ticker-search" placeholder="חיפוש מניה..."
-          oninput="searchQuery=this.value.trim().toUpperCase();render()"
-          onkeydown="if(event.key==='Escape'){this.value='';searchQuery='';render();}event.stopPropagation()">
+          oninput="_searchInput(this.value)"
+          onkeydown="if(event.key==='Escape'){this.value='';_searchInput('',true);}event.stopPropagation()">
         <div class="col-picker" id="colPickerWrap" style="display:none">
           <button class="btn-ghost" onclick="toggleColPicker(event)" title="בחר עמודות">עמודות &#8862;</button>
           <div class="col-picker-panel" id="colPickerPanel"></div>
@@ -1100,6 +1100,16 @@ let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.f
 if(!('adr' in colVis)) colVis.adr = true;
 let searchQuery = '';
 let newToday = new Set();
+// Debounced search — typing fast used to trigger a full render() (gallery view
+// disposes+recreates every chart + re-fetches OHLC) on every single keystroke,
+// visibly stuttering. Only the final value after a short pause actually renders;
+// Escape (immediate=true) still clears instantly.
+let _searchTimer = null;
+function _searchInput(val, immediate=false){
+  clearTimeout(_searchTimer);
+  const apply = () => { searchQuery = val.trim().toUpperCase(); render(); };
+  if(immediate) apply(); else _searchTimer = setTimeout(apply, 200);
+}
 
 /* ════════════════════════════════════
    UTILS
