@@ -58,9 +58,21 @@ async function fetchYahoo(sym: string, range: string) {
   if (!res) throw new Error('no data');
   const ts: number[] = res.timestamp || [];
   const q = res.indicators?.quote?.[0] || {};
-  return ts.map((t, i) => ({
+  const bars = ts.map((t, i) => ({
     t, o: q.open?.[i], h: q.high?.[i], l: q.low?.[i], c: q.close?.[i], v: q.volume?.[i],
-  })).filter((b) => b.o != null && b.c != null);
+  }));
+  // Yahoo intermittently ships the most recent trading day with open/high/low/volume
+  // populated but close:null (the close hasn't "finalized" in their chart payload yet,
+  // even well after market close) — our filter below would drop the whole day,
+  // making every chart look one full trading day stale. meta.regularMarketPrice is
+  // the last traded price, so patch it in when it falls within that bar's own
+  // high/low range (sanity check against using a stale/mismatched meta value).
+  const last = bars[bars.length - 1];
+  const rmp = res.meta?.regularMarketPrice;
+  if (last && last.c == null && rmp != null && last.l != null && last.h != null && rmp >= last.l && rmp <= last.h) {
+    last.c = rmp;
+  }
+  return bars.filter((b) => b.o != null && b.c != null);
 }
 
 function ok(sym: string, bars: unknown, src: string) {
