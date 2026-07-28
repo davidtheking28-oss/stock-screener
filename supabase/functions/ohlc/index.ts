@@ -18,7 +18,10 @@ const SB_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 function mapSymbol(raw: string): string {
   const s = raw.includes(':') ? raw.split(':')[1] : raw;
-  return s.replace('.', '-').toUpperCase().slice(0, 12);
+  // TradingView writes class/preferred shares as BRK.B and USB/PP; Yahoo wants
+  // BRK-B and USB-PP. Only the dot was translated, so every preferred share 404'd
+  // and its chart fell back to whatever stale bars were already cached.
+  return s.replace(/[./]/g, '-').toUpperCase().slice(0, 12);
 }
 
 async function dbGet(ckey: string): Promise<{ bars: unknown; age: number } | null> {
@@ -69,8 +72,15 @@ async function fetchYahoo(sym: string, range: string) {
   // high/low range (sanity check against using a stale/mismatched meta value).
   const last = bars[bars.length - 1];
   const rmp = res.meta?.regularMarketPrice;
-  if (last && last.c == null && rmp != null && last.l != null && last.h != null && rmp >= last.l && rmp <= last.h) {
-    last.c = rmp;
+  const rmt = res.meta?.regularMarketTime;
+  // Only trust rmp for this bar if it belongs to the same session — otherwise a
+  // symbol that stopped trading days ago would get its last price stamped onto a
+  // day it never traded.
+  const sameDay = last != null && rmt != null &&
+    new Date(rmt * 1000).toISOString().slice(0, 10) === new Date(last.t * 1000).toISOString().slice(0, 10);
+  if (last && last.c == null && rmp != null && sameDay && last.l != null && last.h != null) {
+    // Clamp: after-hours prints legitimately fall outside the regular-session range.
+    last.c = Math.min(last.h, Math.max(last.l, rmp));
   }
   return bars.filter((b) => b.o != null && b.c != null);
 }
