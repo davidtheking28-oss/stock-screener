@@ -83,7 +83,14 @@ async function fetchYahoo(sym: string, range: string) {
     last.c = Math.min(last.h, Math.max(last.l, rmp));
   }
   await fillGaps(sym, bars);
-  return bars.filter((b) => b.o != null && b.c != null);
+  return bars.filter((b) => b.o != null && b.c != null).map((b) => ({
+    ...b,
+    // Yahoo ships the occasional thin-name bar with high < open (an opening
+    // auction print their high/low never absorbed). A candle whose body escapes
+    // its own wick can't be drawn, so widen the range to contain open and close.
+    h: Math.max(b.h ?? b.o, b.o, b.c),
+    l: Math.min(b.l ?? b.o, b.o, b.c),
+  }));
 }
 
 const dayOf = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
