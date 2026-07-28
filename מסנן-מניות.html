@@ -957,7 +957,7 @@ async function _ohlcDraw(el){
     if(mc && Date.now()-mc.t<OHLC_TTL) bars=mc.bars;
     if(!bars){
       try{
-        const sc=JSON.parse(sessionStorage.getItem('ohlc_'+sym));
+        const sc=JSON.parse(sessionStorage.getItem('ohlc_v2_'+sym));
         if(sc && sc.t && Date.now()-sc.t<OHLC_TTL) bars=sc.bars;
       }catch(e){}
     }
@@ -965,7 +965,7 @@ async function _ohlcDraw(el){
       const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON}});
       const j=await r.json();
       bars=Array.isArray(j.bars)?j.bars:[];
-      try{ sessionStorage.setItem('ohlc_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
+      try{ sessionStorage.setItem('ohlc_v2_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
     }
     _ohlcCache.set(sym,{bars,t:Date.now()});
     // A newer renderGallery() call (e.g. exact-validation refresh right after the
@@ -1006,7 +1006,7 @@ async function _ohlcDraw(el){
 }
 function _ohlcRetry(btn){
   const el=btn.closest('.tv-lazy'); const sym=el.dataset.sym;
-  _ohlcCache.delete(sym); try{sessionStorage.removeItem('ohlc_'+sym);}catch(e){}
+  _ohlcCache.delete(sym); try{sessionStorage.removeItem('ohlc_v2_'+sym);}catch(e){}
   _ohlcMsg(el,'<div style="opacity:0.25"><span class="spinner"></span></div>');
   _ohlcDraw(el);
 }
@@ -1021,13 +1021,13 @@ async function _fetchBars1y(sym){
   const TTL=30*60*1000;
   const c=_valBars.get(sym);
   if(c && Date.now()-c.t<TTL) return c.bars;
-  try{ const sc=JSON.parse(sessionStorage.getItem('ohlc1y_'+sym)); if(sc && sc.t && Date.now()-sc.t<TTL){ _valBars.set(sym,{bars:sc.bars,t:sc.t}); return sc.bars; } }catch(e){}
+  try{ const sc=JSON.parse(sessionStorage.getItem('ohlc1y_v2_'+sym)); if(sc && sc.t && Date.now()-sc.t<TTL){ _valBars.set(sym,{bars:sc.bars,t:sc.t}); return sc.bars; } }catch(e){}
   try{
     const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?range=1y&symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON}});
     if(!r.ok) return null;
     const j=await r.json(); const bars=Array.isArray(j.bars)?j.bars:[];
     _valBars.set(sym,{bars,t:Date.now()});
-    try{ sessionStorage.setItem('ohlc1y_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
+    try{ sessionStorage.setItem('ohlc1y_v2_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
     return bars;
   }catch(e){ return null; }
 }
