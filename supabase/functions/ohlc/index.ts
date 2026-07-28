@@ -82,7 +82,50 @@ async function fetchYahoo(sym: string, range: string) {
     // Clamp: after-hours prints legitimately fall outside the regular-session range.
     last.c = Math.min(last.h, Math.max(last.l, rmp));
   }
+  await fillGaps(sym, bars);
   return bars.filter((b) => b.o != null && b.c != null);
+}
+
+const dayOf = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
+
+// Yahoo's daily series sporadically loses whole sessions — on 2026-07-24 roughly
+// 80% of US tickers came back as an all-null row, leaving a visible hole in the
+// middle of every chart. Their intraday series still has those sessions, so
+// rebuild the missing daily bar by aggregating the hourly one. Never touches the
+// newest bar (the meta patch above owns that) and never invents a session that
+// has no intraday prints, so a genuinely untraded day stays absent.
+async function fillGaps(sym: string, bars: { t: number; o?: number; h?: number; l?: number; c?: number; v?: number }[]) {
+  const holes = bars.slice(0, -1).filter((b) => b.o == null || b.c == null);
+  if (!holes.length) return;
+  const from = Math.min(...holes.map((b) => b.t)) - 86400;
+  const to = Math.max(...holes.map((b) => b.t)) + 2 * 86400;
+  try {
+    const r = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1h&period1=${from}&period2=${to}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } },
+    );
+    if (!r.ok) return;
+    const res = (await r.json())?.chart?.result?.[0];
+    const ts: number[] = res?.timestamp || [];
+    const q = res?.indicators?.quote?.[0] || {};
+    const want = new Set(holes.map((b) => dayOf(b.t)));
+    const agg = new Map<string, { o: number; h: number; l: number; c: number; v: number; n: number }>();
+    ts.forEach((t, i) => {
+      const o = q.open?.[i], h = q.high?.[i], l = q.low?.[i], c = q.close?.[i];
+      const d = dayOf(t);
+      if (o == null || c == null || h == null || l == null || !want.has(d)) return;
+      const a = agg.get(d);
+      if (!a) agg.set(d, { o, h, l, c, v: q.volume?.[i] || 0, n: 1 });
+      else { a.h = Math.max(a.h, h); a.l = Math.min(a.l, l); a.c = c; a.v += q.volume?.[i] || 0; a.n++; }
+    });
+    for (const b of holes) {
+      const a = agg.get(dayOf(b.t));
+      // A real session spans several hourly bars; a single one is Yahoo's
+      // live-price stub, not a day's trading.
+      if (!a || a.n < 2) continue;
+      b.o = a.o; b.h = a.h; b.l = a.l; b.c = a.c; b.v = a.v;
+    }
+  } catch { /* gap filling is best-effort — a hole beats a wrong bar */ }
 }
 
 function ok(sym: string, bars: unknown, src: string) {
