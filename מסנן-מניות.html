@@ -1481,11 +1481,17 @@ async function scan(force=false){
     $('statBar').innerHTML='<span class="spinner"></span> מחשב RS Rating ומסנן...';
     const rsMap = isCommodities ? computeRS(universe) : (_rsMapMem ?? (_rsMapMem = computeRS(universe)));
 
-    const up = isCommodities ? 0 : universe.filter(r=>{
+    // denominator counts only names with a full MA set — ~8% of the universe are
+    // recent IPOs with no SMA150/200 yet, and leaving them in understated breadth
+    // by ~3pt (enough to flip the amber/red threshold).
+    let up=0, rated=0;
+    if(!isCommodities) for(const r of universe){
       const d=r.d,c=d[C.close],s50=d[C.SMA50],s150=d[C.SMA150],s200=d[C.SMA200];
-      return c&&s50&&s150&&s200&&c>s150&&c>s200&&s150>s200&&s50>s150&&c>s50;
-    }).length;
-    const bPct = Math.round(up/universe.length*100);
+      if(!(c&&s50&&s150&&s200)) continue;
+      rated++;
+      if(c>s150&&c>s200&&s150>s200&&s50>s150&&c>s50) up++;
+    }
+    const bPct = rated ? Math.round(up/rated*100) : 0;
     const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--amber)':'var(--red)';
     if(!isCommodities){
       $('breadthDot').style.background = bCol;
