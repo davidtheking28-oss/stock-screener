@@ -123,7 +123,11 @@ async function fillGaps(sym: string, bars: { t: number; o?: number; h?: number; 
       // A real session spans several hourly bars; a single one is Yahoo's
       // live-price stub, not a day's trading.
       if (!a || a.n < 2) continue;
-      b.o = a.o; b.h = a.h; b.l = a.l; b.c = a.c; b.v = a.v;
+      b.o = a.o; b.c = a.c; b.v = a.v;
+      // The opening auction print lands in the first hourly bar's open but not
+      // always in its high/low, which can leave high < open on thin names.
+      b.h = Math.max(a.h, a.o, a.c);
+      b.l = Math.min(a.l, a.o, a.c);
     }
   } catch { /* gap filling is best-effort — a hole beats a wrong bar */ }
 }
