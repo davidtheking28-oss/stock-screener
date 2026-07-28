@@ -148,11 +148,17 @@ Deno.serve(async (req: Request) => {
     const rsMap = computeRS(universe);
     const results = applyClassicSEPA(universe, rsMap);
 
-    const up = universe.filter(r => {
+    // Denominator counts only names with a full MA set — must stay identical to the
+    // client-side breadth in מסנן-מניות.html, otherwise the history sparkline drawn
+    // from these rows disagrees with the live label above it.
+    let up = 0, rated = 0;
+    for (const r of universe) {
       const d = r.d, c = d[C.close] as number, s50 = d[C.SMA50] as number, s150 = d[C.SMA150] as number, s200 = d[C.SMA200] as number;
-      return c && s50 && s150 && s200 && c > s150 && c > s200 && s150 > s200 && s50 > s150 && c > s50;
-    }).length;
-    const breadth = Math.round(up / universe.length * 100);
+      if (!(c && s50 && s150 && s200)) continue;
+      rated++;
+      if (c > s150 && c > s200 && s150 > s200 && s50 > s150 && c > s50) up++;
+    }
+    const breadth = rated ? Math.round(up / rated * 100) : 0;
 
     // Cron fires at 22:10 UTC, which is already past midnight in Israel (UTC+2/+3) —
     // using the UTC date here would label the scan with yesterday's date from the
