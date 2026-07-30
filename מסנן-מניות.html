@@ -1983,14 +1983,13 @@ function renderTable(rows){
   tv.innerHTML='<table><thead>'+head+'</thead><tbody>'+bodyRows.slice(0,TABLE_CHUNK).join('')+'</tbody></table>';
   if(bodyRows.length>TABLE_CHUNK){
     const tb=tv.querySelector('tbody');
-    let i=TABLE_CHUNK;
-    const step=()=>{
+    // The tail goes in as one append rather than a drip: every insert relayouts
+    // the whole table, so more chunks means more total work and rows that trail
+    // in for seconds. One extra frame is enough — the click has already painted.
+    requestAnimationFrame(()=>{
       if(token!==_tableToken||!tb.isConnected) return;
-      tb.insertAdjacentHTML('beforeend', bodyRows.slice(i,i+TABLE_CHUNK).join(''));
-      i+=TABLE_CHUNK;
-      if(i<bodyRows.length) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
+      tb.insertAdjacentHTML('beforeend', bodyRows.slice(TABLE_CHUNK).join(''));
+    });
   }
 }
 
