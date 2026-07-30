@@ -1476,6 +1476,10 @@ function showSkeleton(){
     +'<td><div class="skel" style="width:52px;height:13px"></div></td>'
     +'</tr>';
   tv.innerHTML='<table><tbody>'+skRow.repeat(10)+'</tbody></table>';
+  // The skeleton leaves <tr>s behind, so renderTable's "rows already drawn" guard
+  // would treat them as a valid render and keep the placeholder on screen when a
+  // rescan produces an identical result set. Drop the memo key with the content.
+  _tableKey='';
 }
 
 async function checkAndSaveHistory(tickers){
