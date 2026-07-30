@@ -443,8 +443,11 @@ tbody tr:last-child td { border-bottom: none; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 12px; padding: 14px; }
 /* Skip layout and paint for cards scrolled out of view — the 500-result
    screeners otherwise spend ~130ms laying out the whole grid on every render.
-   The intrinsic size keeps the scrollbar honest for cards not yet laid out. */
-.gcard { background: var(--bg3); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color 0.18s ease-out, transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s ease-out; content-visibility: auto; contain-intrinsic-size: auto 420px; }
+   The intrinsic size must match the real card height (338px at every breakpoint —
+   fixed-height chart plus fixed head and stats rows); overestimating it inflates
+   the scroll height and the browser then thrashes layout correcting it as cards
+   render, which cost ~1.8s of style+layout in a single frame while scrolling. */
+.gcard { background: var(--bg3); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color 0.18s ease-out, transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s ease-out; content-visibility: auto; contain-intrinsic-size: auto 338px; }
 .gcard:hover { border-color: oklch(64% 0.2 258 / 0.45); transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.4), 0 0 0 1px oklch(64% 0.2 258 / 0.08); }
 .gcard:active { transform: translateY(-1px); }
 .gcard-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 12px 14px 11px; min-height: 79px; }
