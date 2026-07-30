@@ -933,12 +933,44 @@ let view = localStorage.getItem('sepa_view')||'table', activeRow = -1;
 let _galleryKey = '';
 const _ohlcCache = new Map();
 let _ohlcLd = 0, _ohlcIO = null; const _ohlcQ = [];
-// Registry of live chart/observer pairs so a gallery rebuild (search, sort,
-// re-scan) can dispose the old ones instead of leaking canvases + RAF loops.
-let _ohlcCharts = [];
+// Live charts, keyed by their card so one can be torn down on its own when it
+// scrolls away — a gallery rebuild (search, sort, re-scan) clears the lot.
+const _ohlcCharts = new Map();
+const _OHLC_SPINNER = '<div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div>';
 function _ohlcDisposeAll(){
   _ohlcCharts.forEach(({chart,ro})=>{ try{ro.disconnect();}catch(e){} try{chart.remove();}catch(e){} });
-  _ohlcCharts.length = 0;
+  _ohlcCharts.clear();
+}
+// Cards the observer currently wants drawn. A card can scroll away while its
+// fetch is still in flight; without this the late-arriving chart would install
+// itself off-screen and never be reclaimed.
+const _ohlcWanted = new WeakSet();
+function _ohlcDispose(el){
+  _ohlcWanted.delete(el);
+  const c=_ohlcCharts.get(el); if(!c) return;
+  try{c.ro.disconnect();}catch(e){} try{c.chart.remove();}catch(e){}
+  _ohlcCharts.delete(el);
+  el.innerHTML=_OHLC_SPINNER;
+}
+// Only cards near the viewport hold a live chart. Each one costs a canvas, a
+// ResizeObserver and its own RAF loop, so the 500-result screeners used to build
+// up hundreds of them while scrolling and drop frames badly. Bars stay in
+// _ohlcCache, so scrolling back redraws without a refetch.
+function _ohlcObserve(g){
+  _ohlcIO?.disconnect();
+  _ohlcIO=new IntersectionObserver(ents=>{
+    for(const e of ents){
+      if(e.isIntersecting){
+        _ohlcWanted.add(e.target);
+        if(!_ohlcCharts.has(e.target) && !_ohlcQ.includes(e.target)) _ohlcQ.push(e.target);
+      }else{
+        const i=_ohlcQ.indexOf(e.target); if(i>=0) _ohlcQ.splice(i,1);
+        _ohlcDispose(e.target);
+      }
+    }
+    _ohlcNext();
+  },{rootMargin:'700px 0px'});
+  g.querySelectorAll('.tv-lazy').forEach(el=>_ohlcIO.observe(el));
 }
 function _ohlcMsg(el,t){ el.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px">'+t+'</div>'; }
 async function _ohlcDraw(el){
@@ -949,6 +981,7 @@ async function _ohlcDraw(el){
     el.innerHTML='<iframe style="width:calc(100% + 52px);margin-left:-52px;height:200px;border:none" loading="lazy" src="https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(el.dataset.sym)+'&interval=D&from='+from+'&to='+to+'&hide_top_toolbar=1&hide_legend=1&saveimage=0&theme=dark&style=0&timezone=Etc%2FUTC&locale=he_IL&overrides='+ov+'&studies_overrides='+st+'"></iframe>';
     return;
   }
+  if(_ohlcCharts.has(el)) return;
   const sym=el.dataset.sym;
   const OHLC_TTL=30*60*1000;
   try{
@@ -1001,11 +1034,13 @@ async function _ohlcDraw(el){
     chart.timeScale().fitContent();
     const ro=new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth}));
     ro.observe(box);
-    _ohlcCharts.push({chart,ro});
+    if(!_ohlcWanted.has(el)){ try{ro.disconnect();}catch(e){} try{chart.remove();}catch(e){} el.innerHTML=_OHLC_SPINNER; return; }
+    _ohlcCharts.set(el,{chart,ro});
   }catch(e){ _ohlcMsg(el,'<span>שגיאה</span> <button onclick="event.stopPropagation();_ohlcRetry(this)" style="margin-right:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text2);border-radius:5px;padding:2px 8px;font:600 11px var(--sans);cursor:pointer">↻</button>'); }
 }
 function _ohlcRetry(btn){
   const el=btn.closest('.tv-lazy'); const sym=el.dataset.sym;
+  _ohlcDispose(el); _ohlcWanted.add(el);
   _ohlcCache.delete(sym); try{sessionStorage.removeItem('ohlc_v2_'+sym);}catch(e){}
   _ohlcMsg(el,'<div style="opacity:0.25"><span class="spinner"></span></div>');
   _ohlcDraw(el);
@@ -1995,14 +2030,7 @@ function renderGallery(){
   }).join('');
 
   _ohlcQ.length = 0;
-  _ohlcIO?.disconnect();
-  // Result sets here are the filtered SEPA/Trend Template candidates (typically
-  // a few dozen), not the full market universe — small enough to queue every
-  // card's chart immediately instead of waiting for it to scroll into view.
-  // _ohlcDraw() guards against a superseded render (see isConnected check there),
-  // so this is safe even if this fires again before the first batch finishes.
-  g.querySelectorAll('.tv-lazy').forEach(el=>{ _ohlcQ.push(el); });
-  _ohlcNext();
+  _ohlcObserve(g);
 }
 
 /* ════════════════════════════════════
