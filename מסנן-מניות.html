@@ -441,7 +441,10 @@ tbody tr:last-child td { border-bottom: none; }
 
 /* ── Gallery ── */
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 12px; padding: 14px; }
-.gcard { background: var(--bg3); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color 0.18s ease-out, transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s ease-out; }
+/* Skip layout and paint for cards scrolled out of view — the 500-result
+   screeners otherwise spend ~130ms laying out the whole grid on every render.
+   The intrinsic size keeps the scrollbar honest for cards not yet laid out. */
+.gcard { background: var(--bg3); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color 0.18s ease-out, transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s ease-out; content-visibility: auto; contain-intrinsic-size: auto 420px; }
 .gcard:hover { border-color: oklch(64% 0.2 258 / 0.45); transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.4), 0 0 0 1px oklch(64% 0.2 258 / 0.08); }
 .gcard:active { transform: translateY(-1px); }
 .gcard-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 12px 14px 11px; min-height: 79px; }
@@ -931,6 +934,8 @@ const _savedSort = JSON.parse(localStorage.getItem('sepa_sort')||'null');
 let sortKey = _savedSort?.sortKey||'rs', sortDir = _savedSort?.sortDir??-1;
 let view = localStorage.getItem('sepa_view')||'table', activeRow = -1;
 let _galleryKey = '';
+let _tableToken = 0;
+const TABLE_CHUNK = 120;
 const _ohlcCache = new Map();
 let _ohlcLd = 0, _ohlcIO = null; const _ohlcQ = [];
 // Live charts, keyed by their card so one can be torn down on its own when it
@@ -1968,9 +1973,25 @@ function renderTable(rows){
       +col('mc',     '<td><span class="mn">'+fmtB(r.mc)+'</span></td>')
       +col('sector', '<td><span class="sector-tag">'+r.sector.split(' ').slice(0,2).join(' ')+'</span></td>')
       +'</tr>';
-  }).join('');
+  });
 
-  tv.innerHTML='<table><thead>'+head+'</thead><tbody>'+bodyRows+'</tbody></table>';
+  // Painting 500+ rows in one shot costs ~90ms of parsing plus ~130ms of table
+  // layout, which lands as a visible hitch on every sort, search or view switch.
+  // A screenful goes in immediately and the rest streams in across later frames;
+  // the token drops the stream if another render supersedes this one.
+  const token = ++_tableToken;
+  tv.innerHTML='<table><thead>'+head+'</thead><tbody>'+bodyRows.slice(0,TABLE_CHUNK).join('')+'</tbody></table>';
+  if(bodyRows.length>TABLE_CHUNK){
+    const tb=tv.querySelector('tbody');
+    let i=TABLE_CHUNK;
+    const step=()=>{
+      if(token!==_tableToken||!tb.isConnected) return;
+      tb.insertAdjacentHTML('beforeend', bodyRows.slice(i,i+TABLE_CHUNK).join(''));
+      i+=TABLE_CHUNK;
+      if(i<bodyRows.length) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
 }
 
 /* ════════════════════════════════════
