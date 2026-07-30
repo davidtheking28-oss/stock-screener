@@ -2058,13 +2058,20 @@ function renderGallery(){
   _ohlcQ.length = 0;
   g.innerHTML=cards.slice(0,GALLERY_CHUNK).join('');
   _ohlcObserve(g);
-  if(cards.length>GALLERY_CHUNK){
-    requestAnimationFrame(()=>{
-      if(token!==_galleryToken) return;
-      g.insertAdjacentHTML('beforeend', cards.slice(GALLERY_CHUNK).join(''));
-      _ohlcObserve(g);
-    });
-  }
+  // The tail used to go in as a single insert; on the 536-result yearly-momentum
+  // screener that is ~780KB of markup and blocks one frame for ~500ms on a phone.
+  // Spread it over frames instead, and re-observe only once at the end —
+  // _ohlcObserve rebuilds the observer over every card, so calling it per chunk
+  // would be quadratic.
+  let at = GALLERY_CHUNK;
+  const step = () => {
+    if(token!==_galleryToken) return;
+    if(at>=cards.length){ _ohlcObserve(g); return; }
+    g.insertAdjacentHTML('beforeend', cards.slice(at, at+GALLERY_CHUNK*2).join(''));
+    at += GALLERY_CHUNK*2;
+    requestAnimationFrame(step);
+  };
+  if(cards.length>GALLERY_CHUNK) requestAnimationFrame(step);
 }
 
 /* ════════════════════════════════════
