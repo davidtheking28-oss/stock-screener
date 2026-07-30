@@ -937,6 +937,7 @@ const _savedSort = JSON.parse(localStorage.getItem('sepa_sort')||'null');
 let sortKey = _savedSort?.sortKey||'rs', sortDir = _savedSort?.sortDir??-1;
 let view = localStorage.getItem('sepa_view')||'table', activeRow = -1;
 let _galleryKey = '', _tableKey = '';
+let _tableRows = [], _tableAt = 0;
 let _tableToken = 0, _galleryToken = 0;
 const TABLE_CHUNK = 120, GALLERY_CHUNK = 60;
 const _ohlcCache = new Map();
@@ -1996,22 +1997,24 @@ function renderTable(rows){
       +'</tr>';
   });
 
-  // Painting 500+ rows in one shot costs ~90ms of parsing plus ~130ms of table
-  // layout, which lands as a visible hitch on every sort, search or view switch.
-  // A screenful goes in immediately and the rest streams in across later frames;
-  // the token drops the stream if another render supersedes this one.
-  const token = ++_tableToken;
-  tv.innerHTML='<table><thead>'+head+'</thead><tbody>'+bodyRows.slice(0,TABLE_CHUNK).join('')+'</tbody></table>';
-  if(bodyRows.length>TABLE_CHUNK){
-    const tb=tv.querySelector('tbody');
-    // The tail goes in as one append rather than a drip: every insert relayouts
-    // the whole table, so more chunks means more total work and rows that trail
-    // in for seconds. One extra frame is enough — the click has already painted.
-    requestAnimationFrame(()=>{
-      if(token!==_tableToken||!tb.isConnected) return;
-      tb.insertAdjacentHTML('beforeend', bodyRows.slice(TABLE_CHUNK).join(''));
-    });
-  }
+  // Table layout cost scales with the row count and can't be avoided by splitting
+  // the insert — measured at 4x CPU throttle, laying out the yearly-momentum
+  // screener took 1374ms at 541 rows, 469ms at 150 and 352ms at 80, and it is paid
+  // again every time the table is unhidden. So hold only a window of rows in the
+  // DOM and extend it as the user scrolls; nothing is dropped, it just arrives
+  // when it is about to be looked at.
+  _tableToken++;
+  _tableRows = bodyRows;
+  _tableAt = Math.min(TABLE_CHUNK, bodyRows.length);
+  tv.innerHTML='<table><thead>'+head+'</thead><tbody>'+bodyRows.slice(0,_tableAt).join('')+'</tbody></table>';
+}
+
+function _tableMore(){
+  if(_tableAt>=_tableRows.length) return;
+  const tb=$('tableView').querySelector('tbody'); if(!tb) return;
+  const next=_tableRows.slice(_tableAt,_tableAt+TABLE_CHUNK);
+  tb.insertAdjacentHTML('beforeend', next.join(''));
+  _tableAt+=next.length;
 }
 
 /* ════════════════════════════════════
@@ -2369,7 +2372,11 @@ const _updScrollTopBtn = () => {
   _scrollTopBtn.classList.toggle('show', window.scrollY > 600 || $('tableView').scrollTop > 400);
 };
 window.addEventListener('scroll', _updScrollTopBtn, {passive: true});
-$('tableView').addEventListener('scroll', _updScrollTopBtn, {passive: true});
+$('tableView').addEventListener('scroll', () => {
+  _updScrollTopBtn();
+  const tv=$('tableView');
+  if(tv.scrollTop+tv.clientHeight > tv.scrollHeight-700) _tableMore();
+}, {passive: true});
 _scrollTopBtn.onclick = () => {
   window.scrollTo({top: 0, behavior: 'smooth'});
   $('tableView').scrollTo({top: 0, behavior: 'smooth'});
