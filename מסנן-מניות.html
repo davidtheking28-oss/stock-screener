@@ -934,8 +934,8 @@ const _savedSort = JSON.parse(localStorage.getItem('sepa_sort')||'null');
 let sortKey = _savedSort?.sortKey||'rs', sortDir = _savedSort?.sortDir??-1;
 let view = localStorage.getItem('sepa_view')||'table', activeRow = -1;
 let _galleryKey = '';
-let _tableToken = 0;
-const TABLE_CHUNK = 120;
+let _tableToken = 0, _galleryToken = 0;
+const TABLE_CHUNK = 120, GALLERY_CHUNK = 60;
 const _ohlcCache = new Map();
 let _ohlcLd = 0, _ohlcIO = null; const _ohlcQ = [];
 // Live charts, keyed by their card so one can be torn down on its own when it
@@ -2013,7 +2013,7 @@ function renderGallery(){
   }
   _galleryKey=_key;
   _ohlcDisposeAll();
-  g.innerHTML=rows.map(r=>{
+  const cards=rows.map(r=>{
     const wl=watchlist.has(r.ticker);
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : r.scoreKind==='qulla' ? 'QUL' : r.scoreKind==='growth' ? 'GRW' : r.scoreKind==='commodities' ? 'COMM' : 'SEPA';
@@ -2047,10 +2047,21 @@ function renderGallery(){
       +stat('EPS YoY', r.eps, r.epsQoq!=null?'שנה מול שנה: '+pct(r.eps)+' · רבעון מול הקודם: '+pct(r.epsQoq):'צמיחת רווח למניה, שנה מול שנה')
       +'<div class="gstat" title="מרחק מהשיא של 52 שבועות"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(fhUp?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>'
       +'</div></div>';
-  }).join('');
+  });
 
+  // 529 cards is ~860KB of markup and the parse alone blocks for ~330ms. Put a
+  // few screenfuls up straight away and let the rest land next frame.
+  const token = ++_galleryToken;
   _ohlcQ.length = 0;
+  g.innerHTML=cards.slice(0,GALLERY_CHUNK).join('');
   _ohlcObserve(g);
+  if(cards.length>GALLERY_CHUNK){
+    requestAnimationFrame(()=>{
+      if(token!==_galleryToken) return;
+      g.insertAdjacentHTML('beforeend', cards.slice(GALLERY_CHUNK).join(''));
+      _ohlcObserve(g);
+    });
+  }
 }
 
 /* ════════════════════════════════════
