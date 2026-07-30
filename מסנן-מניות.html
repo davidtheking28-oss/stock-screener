@@ -936,7 +936,7 @@ let watchlist  = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
 const _savedSort = JSON.parse(localStorage.getItem('sepa_sort')||'null');
 let sortKey = _savedSort?.sortKey||'rs', sortDir = _savedSort?.sortDir??-1;
 let view = localStorage.getItem('sepa_view')||'table', activeRow = -1;
-let _galleryKey = '';
+let _galleryKey = '', _tableKey = '';
 let _tableToken = 0, _galleryToken = 0;
 const TABLE_CHUNK = 120, GALLERY_CHUNK = 60;
 const _ohlcCache = new Map();
@@ -1885,11 +1885,29 @@ function renderTable(rows){
     const hint = allResults.length>0
       ? 'הסקטור הנוכחי ריק — נסה "כל הסקטורים"'
       : 'נסה פריסט שמרני, הורד RS מינימום או הסר פילטרים פונדמנטליים';
-    tv.innerHTML=emptyHtml('אין תוצאות',hint);
+    tv.innerHTML=emptyHtml('אין תוצאות',hint); _tableKey='';
     return;
   }
 
   const scKind = rows[0]?.scoreKind || 'sepa';
+  // Flipping between the gallery and the table rebuilt all 538 rows every time,
+  // and with auto table layout that append relayouts the whole table — ~1.5s on a
+  // throttled phone for a view switch that changed nothing. Reuse the existing
+  // rows whenever the inputs that shape them are unchanged, patching only the
+  // stars (the one thing that can change without changing the key).
+  const _tKey = view+'|'+sortKey+'|'+sortDir+'|'+scKind+'|'
+    +COL_DEFS.map(c=>colVis[c.key]?1:0).join('')+'|'+rows.map(r=>r.sym).join(',');
+  if(_tKey===_tableKey && tv.querySelector('tbody tr')){
+    tv.querySelectorAll('tbody .star-btn').forEach((btn,i)=>{
+      const r=rows[i]; if(!r) return;
+      const on=watchlist.has(r.ticker);
+      btn.className='star-btn '+(on?'on':'off');
+      btn.textContent=on?'★':'☆';
+      btn.setAttribute('aria-label', on?'הסר מרשימת מעקב':'הוסף לרשימת מעקב');
+    });
+    return;
+  }
+  _tableKey=_tKey;
   const scHeadLbl = scKind==='sepa' ? 'ציון SEPA' : 'ציון';
   const scHeadTip = scKind==='sepa'
     ? 'ציון מורכב 0–100: RS (40%) + EPS (25%) + הכנסות (20%) + קרבה לשיא (15%)'
