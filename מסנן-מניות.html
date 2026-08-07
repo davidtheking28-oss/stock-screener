@@ -1479,7 +1479,10 @@ function showSkeleton(){
   // The skeleton leaves <tr>s behind, so renderTable's "rows already drawn" guard
   // would treat them as a valid render and keep the placeholder on screen when a
   // rescan produces an identical result set. Drop the memo key with the content.
+  // The window has to go too — the skeleton has a <tbody>, so a scroll during the
+  // scan would otherwise staple the previous scan's rows under the placeholder.
   _tableKey='';
+  _tableResetWindow();
 }
 
 async function checkAndSaveHistory(tickers){
@@ -1890,7 +1893,7 @@ function renderTable(rows){
     const hint = allResults.length>0
       ? 'הסקטור הנוכחי ריק — נסה "כל הסקטורים"'
       : 'נסה פריסט שמרני, הורד RS מינימום או הסר פילטרים פונדמנטליים';
-    tv.innerHTML=emptyHtml('אין תוצאות',hint); _tableKey='';
+    tv.innerHTML=emptyHtml('אין תוצאות',hint); _tableKey=''; _tableResetWindow();
     return;
   }
 
@@ -2004,22 +2007,31 @@ function renderTable(rows){
   // Table layout cost scales with the row count and can't be avoided by splitting
   // the insert — measured at 4x CPU throttle, laying out the yearly-momentum
   // screener took 1374ms at 541 rows, 469ms at 150 and 352ms at 80, and it is paid
-  // again every time the table is unhidden. So hold only a window of rows in the
-  // DOM and extend it as the user scrolls; nothing is dropped, it just arrives
-  // when it is about to be looked at.
-  _tableToken++;
+  // again every time the table is unhidden. So put a screenful up straight away and
+  // let the rest stream in across frames; nothing is dropped and nothing waits on
+  // the user, the cost is just spread instead of landing in one frame.
+  const token = ++_tableToken;
   _tableRows = bodyRows;
   _tableAt = Math.min(TABLE_CHUNK, bodyRows.length);
   tv.innerHTML='<table><thead>'+head+'</thead><tbody>'+bodyRows.slice(0,_tableAt).join('')+'</tbody></table>';
+  const step = () => {
+    if(token!==_tableToken || !_tableMore()) return;
+    requestAnimationFrame(step);
+  };
+  if(bodyRows.length>_tableAt) requestAnimationFrame(step);
 }
 
+// Returns false once there is nothing left to add, so the streamer knows to stop.
 function _tableMore(){
-  if(_tableAt>=_tableRows.length) return;
-  const tb=$('tableView').querySelector('tbody'); if(!tb) return;
+  if(_tableAt>=_tableRows.length) return false;
+  const tb=$('tableView').querySelector('tbody'); if(!tb) return false;
   const next=_tableRows.slice(_tableAt,_tableAt+TABLE_CHUNK);
   tb.insertAdjacentHTML('beforeend', next.join(''));
   _tableAt+=next.length;
+  return _tableAt<_tableRows.length;
 }
+
+function _tableResetWindow(){ _tableRows=[]; _tableAt=0; _tableToken++; }
 
 /* ════════════════════════════════════
    GALLERY
@@ -2379,7 +2391,7 @@ window.addEventListener('scroll', _updScrollTopBtn, {passive: true});
 $('tableView').addEventListener('scroll', () => {
   _updScrollTopBtn();
   const tv=$('tableView');
-  if(tv.scrollTop+tv.clientHeight > tv.scrollHeight-700) _tableMore();
+  if(tv.scrollTop+tv.clientHeight > tv.scrollHeight-3000) _tableMore();
 }, {passive: true});
 _scrollTopBtn.onclick = () => {
   window.scrollTo({top: 0, behavior: 'smooth'});
