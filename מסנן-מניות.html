@@ -875,7 +875,7 @@ const COLUMNS = [
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
 const PRESETS = {
-  classic:      {rsMin:70,fromHigh:25,fromLow:25,priceMin:10,mcMin:2,  liqMin:20,earnDays:5,epsMin:25,revMin:20,roeMin:17},
+  classic:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5,epsMin:25,revMin:20,roeMin:17},
   aggressive:   {rsMin:80,fromHigh:15,fromLow:30,priceMin:15,mcMin:10, liqMin:30,earnDays:7,epsMin:40,revMin:30,roeMin:20},
   conservative: {rsMin:60,fromHigh:35,fromLow:15,priceMin:5, mcMin:0.3,liqMin:10,earnDays:0,epsMin:10,revMin:10,roeMin:8},
 };
@@ -907,6 +907,8 @@ const COL_DEFS = [
   {key:'score',  label:'ציון SEPA',  defaultOn:true},
   {key:'rs',     label:'RS',         defaultOn:true},
   {key:'adr',    label:'ADR%',       defaultOn:true},
+  {key:'vcp',    label:'VCP',        defaultOn:true},
+  {key:'rsline', label:'קו RS',      defaultOn:false},
   {key:'perfY',  label:'ביצʹ 1Y',  defaultOn:true},
   {key:'perf3',  label:'ביצʹ 3M',  defaultOn:false},
   {key:'eps',    label:'EPS YoY',    defaultOn:true},
@@ -1083,6 +1085,69 @@ function _ma200Rising(bars){
   if(today==null||monthAgo==null) return null;
   return today>monthAgo;
 }
+// Minervini's Volatility Contraction Pattern: a base of successive pullbacks,
+// each shallower than the one before it, on drying-up volume. Walks the last
+// `lookback` bars, cuts the base at each swing high, and measures the drawdown
+// that follows it. Returns null when there isn't enough history to judge.
+// {contractions, lastDepth, tighteningOK, volDryUp, pivot, distToPivot}
+function _vcp(bars, lookback=90){
+  if(!bars || bars.length<60) return null;
+  const w=bars.slice(-lookback), n=w.length, k=3;
+  // Swing highs as fractals — a bar whose high tops the k bars on either side.
+  // A running-high scan would miss the pattern entirely: in a real VCP the
+  // rallies tighten *under* the prior high rather than exceeding it, so only
+  // one leg would ever be recorded.
+  const highs=[];
+  for(let i=k;i<n-k;i++){
+    let top=true;
+    for(let j=i-k;j<=i+k;j++){ if(j!==i && w[j].h>w[i].h){ top=false; break; } }
+    if(!top) continue;
+    if(highs.length && i-highs[highs.length-1]<=k){          // collapse a cluster
+      if(w[i].h>w[highs[highs.length-1]].h) highs[highs.length-1]=i;
+    } else highs.push(i);
+  }
+  const last=w[n-1].c;
+  if(!highs.length) return {contractions:0, lastDepth:null, tighteningOK:false,
+                            volDryUp:null, pivot:null, distToPivot:null};
+  // Depth of each pullback: swing high → lowest low before the next swing high.
+  // The final leg runs to the last bar, so an in-progress pullback still counts.
+  const legs=[];
+  for(let a=0;a<highs.length;a++){
+    const from=highs[a], to=(a+1<highs.length)?highs[a+1]:n;
+    let lo=Infinity;
+    for(let i=from;i<to;i++) if(w[i].l<lo) lo=w[i].l;
+    if(lo<w[from].h) legs.push({depth:(w[from].h-lo)/w[from].h*100, at:from});
+  }
+  const real=legs.filter(l=>l.depth>=3);            // ignore noise-level dips
+  const pivot=w[highs[highs.length-1]].h;           // the level a breakout clears
+  const distToPivot=(last/pivot-1)*100;
+  if(real.length<2) return {contractions:real.length, lastDepth:real.length?real[real.length-1].depth:null,
+                            tighteningOK:false, volDryUp:null, pivot, distToPivot};
+  const tighteningOK=real[real.length-1].depth<real[real.length-2].depth;
+  // Volume across the newest contraction vs the rest of the base — Minervini
+  // wants it drying up as the pattern tightens.
+  const volOf=(a,b)=>{ let s=0,c=0; for(let i=a;i<=b&&i<n;i++){ if(w[i].v!=null){s+=w[i].v;c++;} } return c?s/c:null; };
+  const at=real[real.length-1].at;
+  const recentVol=volOf(at,n-1), baseVol=volOf(0,at);
+  const volDryUp=(recentVol==null||baseVol==null||baseVol===0)?null:recentVol<baseVol;
+  return {contractions:real.length, lastDepth:real[real.length-1].depth, tighteningOK, volDryUp, pivot, distToPivot};
+}
+// Relative-strength line = price / benchmark. Minervini and IBD both read the
+// RS line making a new high *before* price clears its own pivot as the strongest
+// tell in a base. Bars are aligned on timestamp — a missing benchmark day just
+// drops that point rather than shifting the whole series.
+function _rsLine(bars, benchBars, lookback=60){
+  if(!bars || !benchBars) return null;
+  const bm=new Map(benchBars.map(b=>[b.t,b.c]));
+  const series=[];
+  for(const b of bars){ const bc=bm.get(b.t); if(bc) series.push(b.c/bc); }
+  if(series.length<lookback) return null;
+  const w=series.slice(-lookback);
+  const cur=w[w.length-1];
+  let max=-Infinity; for(const v of w) if(v>max) max=v;
+  if(!(max>0)) return null;
+  return {atHigh: cur>=max*0.999, pctFromHigh:(cur/max-1)*100};
+}
 function _powerPlayOK(bars, runPct){
   if(!bars || bars.length<45) return null;
   const w=bars.slice(-55), need=1+runPct/100;
@@ -1115,11 +1180,17 @@ async function validateExact(list, scr, onProgress){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   const adrMin=num('adrMin')||3, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
+  // One benchmark fetch for the whole pass — the RS line is price/SPY.
+  const spy=await _fetchBars1y('SPY').catch(()=>null);
   async function worker(){
     while(idx<list.length){
       const r=list[idx++];
       try{
         const bars=await _fetchBars1y(r.ticker);
+        // Bars are already in hand for every screener that gets here, so the
+        // base shape and the RS line come for free — they annotate the row
+        // rather than filtering it.
+        if(bars){ r.vcp=_vcp(bars); r.rsLine=_rsLine(bars, spy); }
         if(scr==='sepa'){
           if(bars && _ma200Rising(bars)===false) r._exactFail=true;
         } else if(scr==='qulla'){
@@ -1846,7 +1917,13 @@ const SORTS={
   ticker:r=>r.ticker, close:r=>r.close, rs:r=>r.rs, score:r=>r.score, adr:r=>r.volD??0,
   mc:r=>r.mc, vol:r=>r.vol??0, liq:r=>r.dollarVol??0, fromHigh:r=>r.fromHighPct,
   perfY:r=>r.perfY??-1e9, perf3:r=>r.perf3??-1e9, eps:r=>r.eps??-1e9,
-  rev:r=>r.rev??-1e9, roe:r=>r.roe??-1e9, nm:r=>r.nm??-1e9, range:r=>r.rangePos
+  rev:r=>r.rev??-1e9, roe:r=>r.roe??-1e9, nm:r=>r.nm??-1e9, range:r=>r.rangePos,
+  // Rank a clean, tightening base above a loose one; ties break on how close
+  // price sits to the pivot (nearer = more actionable).
+  vcp:r=>{ const v=r.vcp; if(!v||!v.contractions) return -1e9;
+           return v.contractions*10 + (v.tighteningOK?50:0) + (v.volDryUp?25:0)
+                  + (v.distToPivot==null?0:Math.max(-20,v.distToPivot)); },
+  rsline:r=>r.rsLine?(r.rsLine.atHigh?0:r.rsLine.pctFromHigh):-1e9
 };
 function sortResults(){ const f=SORTS[sortKey]||SORTS.score; results.sort((a,b)=>(f(a)>f(b)?1:f(a)<f(b)?-1:0)*sortDir); }
 function setSort(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k;sortDir=-1;} sortResults(); render(); try{localStorage.setItem('sepa_sort',JSON.stringify({sortKey,sortDir}));}catch(e){} }
@@ -1931,6 +2008,8 @@ function renderTable(rows){
     +(colVis.score ? th(scHeadLbl,'score',scHeadTip) : '')
     +(colVis.rs    ? th('RS','rs','דירוג יחסי 1–99') : '')
     +(colVis.adr   ? th('ADR%','adr','תנודתיות יומית ממוצעת — בסיס לגודל פוזיציה וסטופ') : '')
+    +(colVis.vcp   ? th('VCP','vcp','התכווצות תנודתיות — מספר ההתכווצויות בבסיס. ✓ = מתהדק על נפח מתייבש') : '')
+    +(colVis.rsline? th('קו RS','rsline','קו העוצמה היחסית מול SPY — שיא חדש לפני פריצת המחיר הוא סימן חוזק') : '')
     +(colVis.perfY ? th('ביצֹ 1Y','perfY','שינוי מחיר ב-12 חודשים האחרונים') : '')
     +(colVis.perf3 ? th('ביצֹ 3M','perf3','שינוי מחיר ב-3 חודשים האחרונים') : '')
     +(colVis.eps   ? th('EPS YoY','eps','צמיחת רווח למניה שנה/שנה') : '')
@@ -1990,6 +2069,25 @@ function renderTable(rows){
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
       +col('adr',    (()=>{const a=r.volD;const c=a==null?'var(--text3)':a>=5?'var(--green)':a>=3.5?'var(--amber)':'var(--text3)';return '<td><span class="mn" style="color:'+c+';font-weight:600">'+(a==null?'—':a.toFixed(1)+'%')+'</span></td>';})())
+      +col('vcp',    (()=>{
+          const v=r.vcp;
+          if(!v||!v.contractions) return '<td><span class="mn" style="color:var(--text3)">—</span></td>';
+          const tight=v.tighteningOK && v.contractions>=2;
+          const c=tight?(v.volDryUp?'var(--green)':'var(--amber)'):'var(--text3)';
+          const tip='‏'+v.contractions+' התכווצויות · האחרונה '+v.lastDepth.toFixed(1)+'%'
+            +(v.volDryUp==null?'':' · נפח '+(v.volDryUp?'מתייבש':'לא מתייבש'))
+            +(v.distToPivot==null?'':' · '+Math.abs(v.distToPivot).toFixed(1)+'% מנקודת הפריצה');
+          return '<td title="'+tip+'"><span class="mn" style="color:'+c+';font-weight:600">'
+            +v.contractions+'T'+(tight&&v.volDryUp?' ✓':'')+'</span></td>';
+        })())
+      +col('rsline', (()=>{
+          const l=r.rsLine;
+          if(!l) return '<td><span class="mn" style="color:var(--text3)">—</span></td>';
+          const c=l.atHigh?'var(--green)':l.pctFromHigh>=-5?'var(--amber)':'var(--text3)';
+          const tip=l.atHigh?'קו ה-RS בשיא חדש מול SPY':'קו ה-RS '+Math.abs(l.pctFromHigh).toFixed(1)+'% מתחת לשיא מול SPY';
+          return '<td title="'+tip+'"><span class="mn" style="color:'+c+';font-weight:600">'
+            +(l.atHigh?'שיא':l.pctFromHigh.toFixed(1)+'%')+'</span></td>';
+        })())
       +col('perfY',  '<td><span class="mn '+((r.perfY??0)>=0?'pos':'neg')+'">'+pct(r.perfY)+'</span></td>')
       +col('perf3',  '<td><span class="mn '+((r.perf3??0)>=0?'pos':'neg')+'">'+pct(r.perf3)+'</span></td>')
       +col('eps',    (()=>{const q=r.epsQoq;const arr=q==null?'':q>5?'<span style="color:var(--green);font-size:10px;margin-right:2px">↑</span>':q<-5?'<span style="color:var(--red);font-size:10px;margin-right:2px">↓</span>':'<span style="color:var(--text3);font-size:10px;margin-right:2px">→</span>';const tip=q!=null?'שנה/שנה: '+pct(r.eps)+' · רבעון מול קודם: '+pct(q):'צמיחת רווח למניה שנה/שנה';return '<td title="'+tip+'">'+arr+'<span class="mn '+((r.eps??0)>=0?'pos':'neg')+'">'+pct(r.eps)+'</span></td>';})())
@@ -2163,7 +2261,7 @@ function closeModal(){ $('modal').classList.remove('open'); $('modalChart').inne
 ════════════════════════════════════ */
 function exportCSV(){
   if(!results.length){ toast('אין תוצאות לייצוא'); return; }
-  const head=['Ticker','Name','Exchange','Price','Score','RS','Perf.Y%','Perf.3M%','Perf.6M%','From High%','Range%','EPS%','EPS QoQ%','Rev%','ROE%','Net Margin%','Volume','Avg Vol','Market Cap','Sector'];
+  const head=['Ticker','Name','Exchange','Price','Score','RS','Perf.Y%','Perf.3M%','Perf.6M%','From High%','Range%','EPS%','EPS QoQ%','Rev%','ROE%','Net Margin%','Volume','Avg Vol','Market Cap','Sector','VCP Contractions','VCP Last Depth%','VCP Vol DryUp','Pivot','Dist To Pivot%','RS Line At High','RS Line From High%'];
   const lines=[head.join(',')];
   results.forEach(r=>lines.push([
     r.ticker,'"'+(r.name||'').replace(/"/g,'')+'"',r.exch,
@@ -2172,7 +2270,13 @@ function exportCSV(){
     r.fromHighPct.toFixed(1),(r.rangePos*100).toFixed(1),
     (r.eps??'').toString(),(r.epsQoq??'').toString(),
     (r.rev??'').toString(),(r.roe??'').toString(),(r.nm??'').toString(),
-    r.vol??'',r.avgVol??'',Math.round(r.mc||0),'"'+r.sector+'"'
+    r.vol??'',r.avgVol??'',Math.round(r.mc||0),'"'+r.sector+'"',
+    r.vcp?.contractions??'', r.vcp?.lastDepth!=null?r.vcp.lastDepth.toFixed(1):'',
+    r.vcp?.volDryUp==null?'':(r.vcp.volDryUp?'yes':'no'),
+    r.vcp?.pivot!=null?r.vcp.pivot.toFixed(2):'',
+    r.vcp?.distToPivot!=null?r.vcp.distToPivot.toFixed(1):'',
+    r.rsLine?(r.rsLine.atHigh?'yes':'no'):'',
+    r.rsLine?r.rsLine.pctFromHigh.toFixed(1):''
   ].join(',')));
   const blob=new Blob(['﻿'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);

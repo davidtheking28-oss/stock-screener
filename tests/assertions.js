@@ -93,6 +93,79 @@
     check('applyFilters commodities: only listed tickers', eqSet(out, ['GLD']), 'got ' + JSON.stringify(out));
   }
 
+  // ── _vcp ──
+  {
+    // helper: build bars with an explicit volume series
+    const mkv = (closes, vols) => closes.map((c, i) => ({
+      t: i * 86400, o: c, h: c * 1.005, l: c * 0.995, c,
+      v: vols ? vols[i] : 1000
+    }));
+    // Three contractions, each shallower: -20%, -12%, -6%, volume drying up.
+    const leg = (from, to, len) => Array.from({ length: len }, (_, i) => from + (to - from) * (i / (len - 1)));
+    const vcpCloses = [].concat(
+      leg(100, 140, 30),  // advance
+      leg(140, 112, 12),  // -20%
+      leg(112, 138, 12),
+      leg(138, 121, 10),  // -12%
+      leg(121, 139, 10),
+      leg(139, 131, 8)    // -6%
+    );
+    const vcpVols = [].concat(
+      Array(30).fill(2000), Array(12).fill(1800), Array(12).fill(1400),
+      Array(10).fill(1100), Array(10).fill(900), Array(8).fill(500)
+    );
+    const v = _vcp(mkv(vcpCloses, vcpVols));
+    check('_vcp: successive shallower pullbacks → >=2 contractions', v && v.contractions >= 2,
+      'got ' + JSON.stringify(v));
+    check('_vcp: last contraction tighter than the previous → tighteningOK', v && v.tighteningOK === true,
+      'got ' + JSON.stringify(v));
+    check('_vcp: volume drying into the pivot → volDryUp', v && v.volDryUp === true,
+      'got ' + JSON.stringify(v));
+    check('_vcp: pivot is the base high, price below it → negative distToPivot',
+      v && v.distToPivot < 0, 'got ' + JSON.stringify(v));
+
+    // Widening pullbacks (-6% then -20%) must NOT read as tightening.
+    const wide = [].concat(leg(100, 140, 30), leg(140, 132, 10), leg(132, 141, 10), leg(141, 113, 12));
+    const wv = _vcp(mkv(wide));
+    check('_vcp: widening pullbacks → tighteningOK false', wv && wv.tighteningOK === false,
+      'got ' + JSON.stringify(wv));
+
+    check('_vcp: too few bars → null', _vcp(mkv(leg(100, 110, 20))) === null);
+
+    // A straight run-up with no pullback has nothing to contract.
+    const straight = _vcp(mkv(leg(100, 180, 80)));
+    check('_vcp: uninterrupted advance → no real contractions',
+      straight && straight.contractions === 0, 'got ' + JSON.stringify(straight));
+  }
+
+  // ── _rsLine ──
+  {
+    const bar = (t, c) => ({ t, o: c, h: c, l: c, c, v: 1000 });
+    const flatBench = Array.from({ length: 80 }, (_, i) => bar(i * 86400, 100));
+    // Stock outperforming a flat benchmark → RS line at its high.
+    const strong = Array.from({ length: 80 }, (_, i) => bar(i * 86400, 100 + i));
+    const s = _rsLine(strong, flatBench);
+    check('_rsLine: outperformer → RS line at new high', s && s.atHigh === true, 'got ' + JSON.stringify(s));
+    check('_rsLine: at high → pctFromHigh ~0', s && Math.abs(s.pctFromHigh) < 0.2, 'got ' + JSON.stringify(s));
+
+    // Rolled over near the end → RS line off its high.
+    const fading = Array.from({ length: 80 }, (_, i) => bar(i * 86400, i < 60 ? 100 + i : 160 - (i - 60) * 2));
+    const f = _rsLine(fading, flatBench);
+    check('_rsLine: faded vs benchmark → not at high', f && f.atHigh === false, 'got ' + JSON.stringify(f));
+    check('_rsLine: faded → negative pctFromHigh', f && f.pctFromHigh < -5, 'got ' + JSON.stringify(f));
+
+    // Benchmark rising faster than the stock → underperformance.
+    const benchFast = Array.from({ length: 80 }, (_, i) => bar(i * 86400, 100 + i * 3));
+    const u = _rsLine(strong, benchFast);
+    check('_rsLine: benchmark outruns stock → not at high', u && u.atHigh === false, 'got ' + JSON.stringify(u));
+
+    check('_rsLine: too little overlap → null', _rsLine(strong.slice(0, 10), flatBench) === null);
+    check('_rsLine: no benchmark → null', _rsLine(strong, null) === null);
+    // Misaligned timestamps must drop points, not silently shift the series.
+    const shifted = Array.from({ length: 80 }, (_, i) => bar(i * 86400 + 1, 100));
+    check('_rsLine: non-overlapping timestamps → null', _rsLine(strong, shifted) === null);
+  }
+
   setScreener('sepa', true); // restore
   return R;
 })()
