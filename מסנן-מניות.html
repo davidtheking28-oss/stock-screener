@@ -219,6 +219,22 @@ body {
   background: rgba(79,131,255,0.18); border-color: var(--accent);
   color: #a8c0ff; box-shadow: 0 0 0 1px rgba(79,131,255,0.2);
 }
+.jrnl-btn {
+  margin-top: 4px; width: 22px; height: 22px; padding: 0;
+  display: block; border-radius: 5px; cursor: pointer;
+  border: 1px solid rgba(79,131,255,0.35); background: rgba(79,131,255,0.08);
+  color: var(--accent); font: 700 14px var(--sans); line-height: 1;
+  transition: all 0.15s;
+}
+.jrnl-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.preset-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+.preset-save { border-style: dashed; }
+.preset-mine { display: inline-flex; align-items: center; gap: 6px; }
+.preset-x {
+  font-size: 10px; line-height: 1; opacity: 0.45; padding: 2px;
+  border-radius: 3px; transition: all 0.15s;
+}
+.preset-x:hover { opacity: 1; color: var(--red); background: rgba(231,76,60,0.14); }
 .field-combo { position: relative; }
 .field-combo input[type=number] { cursor: pointer; padding-left: 28px; }
 .field-combo::after {
@@ -690,6 +706,9 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="preset-btn active" onclick="applyPreset('classic',this)">קלאסי Minervini</button>
         <button class="preset-btn" onclick="applyPreset('aggressive',this)">אגרסיבי</button>
         <button class="preset-btn" onclick="applyPreset('conservative',this)">שמרני</button>
+        <span class="preset-sep"></span>
+        <span id="myPresets"></span>
+        <button class="preset-btn preset-save" onclick="saveMyPreset()" title="שמור את הערכים הנוכחיים כפריסט">+ שמור</button>
       </div>
       <div class="filter-sections" id="filterSections">
         <div class="filter-section">
@@ -1274,6 +1293,34 @@ function copyTicker(e, ticker){
   navigator.clipboard?.writeText(ticker).then(()=>toast(ticker+' הועתק ✓'));
 }
 
+/* ── Trading-journal bridge ──
+   The screener runs in an iframe inside the journal. When it does, each row
+   offers to hand its setup over so the trade can be logged without retyping
+   the symbol, entry and stop. Outside the frame the button never renders. */
+const JOURNAL_ORIGIN='https://davidtheking28-oss.github.io';
+const IN_JOURNAL=(()=>{ try{ return window.parent && window.parent!==window; }catch(e){ return false; } })();
+function sendToJournal(e, ticker){
+  e.stopPropagation();
+  const r=results.find(x=>x.ticker===ticker) || allResults.find(x=>x.ticker===ticker);
+  if(!r) return;
+  // Stop below the base low when the pattern gives one, else an ADR-based stop.
+  const adr=r.volD??3;
+  const stop=(r.vcp&&r.vcp.pivot&&r.vcp.lastDepth!=null)
+    ? +(r.close*(1-Math.min(r.vcp.lastDepth,adr*2.5)/100)).toFixed(2)
+    : +(r.close*(1-adr*2/100)).toFixed(2);
+  try{
+    window.parent.postMessage({
+      type:'tj:add-trade',
+      payload:{
+        symbol:r.ticker, entryPrice:+r.close.toFixed(2), stop,
+        pivot:r.vcp?.pivot!=null?+r.vcp.pivot.toFixed(2):null,
+        sector:r.sector, rs:r.rs, score:r.score, screener:activeScreener
+      }
+    }, JOURNAL_ORIGIN);
+    toast(ticker+' נשלח ליומן ✓');
+  }catch(err){ toast('לא ניתן לשלוח ליומן'); }
+}
+
 /* ════════════════════════════════════
    UNIVERSE CACHE
 ════════════════════════════════════ */
@@ -1505,6 +1552,55 @@ function applyPreset(key, btn){
   btn.classList.add('active');
   updUnitHints();
   const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+PRESET_NAMES[key];
+}
+
+/* ── Saved presets ──
+   The three built-ins are fixed thresholds; a trader iterating on their own
+   numbers had nowhere to keep them. These store every field the screener
+   currently shows, per screener, so switching back restores the whole setup. */
+const MY_PRESETS_KEY='sepa_my_presets_v1';
+const PRESET_FIELDS=['rsMin','fromHigh','fromLow','priceMin','mcMin','liqMin','earnDays','runMin',
+  'epsMin','revMin','roeMin','epsQoqMin','revQoqMin','adrMin','move6Min','move3Min',
+  'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin'];
+function _myPresets(){ try{ return JSON.parse(localStorage.getItem(MY_PRESETS_KEY)||'{}')||{}; }catch(e){ return {}; } }
+function _writeMyPresets(o){ try{ localStorage.setItem(MY_PRESETS_KEY, JSON.stringify(o)); }catch(e){} }
+function saveMyPreset(){
+  const name=(prompt('שם לפריסט:')||'').trim();
+  if(!name) return;
+  const all=_myPresets();
+  const vals={_screener:activeScreener};
+  PRESET_FIELDS.forEach(k=>{ const el=$(k); if(el&&el.value!=='') vals[k]=el.value; });
+  ['useFund','requireProfit','requireEpsAccel'].forEach(k=>{ const el=$(k); if(el) vals[k]=el.checked; });
+  all[name]=vals;
+  _writeMyPresets(all);
+  renderMyPresets();
+  toast('נשמר: '+name);
+}
+function applyMyPreset(name, btn){
+  const p=_myPresets()[name]; if(!p) return;
+  if(p._screener && p._screener!==activeScreener) setScreener(p._screener, false);
+  PRESET_FIELDS.forEach(k=>{ const el=$(k); if(el && p[k]!=null) el.value=p[k]; });
+  ['useFund','requireProfit','requireEpsAccel'].forEach(k=>{ const el=$(k); if(el && typeof p[k]==='boolean') el.checked=p[k]; });
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  btn?.classList.add('active');
+  updUnitHints(); toggleFundFields(); saveFilterPrefs();
+  const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+name;
+}
+function deleteMyPreset(e, name){
+  e.stopPropagation();
+  if(!confirm('למחוק את הפריסט "'+name+'"?')) return;
+  const all=_myPresets(); delete all[name]; _writeMyPresets(all);
+  renderMyPresets(); toast('נמחק: '+name);
+}
+function renderMyPresets(){
+  const host=$('myPresets'); if(!host) return;
+  const all=_myPresets(); const names=Object.keys(all);
+  host.innerHTML=names.map(n=>
+    '<button class="preset-btn preset-mine" onclick="applyMyPreset('+JSON.stringify(n).replace(/"/g,'&quot;')+',this)" title="'+
+    (all[n]._screener?('מסנן: '+(SCREENERS[all[n]._screener]?.name||all[n]._screener)):'')+'">'+
+    esc(n).replace(/\\'/g,"'")+
+    '<span class="preset-x" onclick="deleteMyPreset(event,'+JSON.stringify(n).replace(/"/g,'&quot;')+')" title="מחק">✕</span></button>'
+  ).join('');
 }
 
 const SCREENER_HEADS = {sepa:'טכני — Trend Template', momentum:'טכני — מומנטום', power:'טכני — Power Play', qulla:'טכני — Qullamaggie Breakout', finviz:'טכני — מומנטום שנתי', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
@@ -2063,7 +2159,9 @@ function renderTable(rows){
     const isNew = newToday.has(r.ticker);
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
-      +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button></td>'
+      +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button>'
+        +(IN_JOURNAL?'<button class="jrnl-btn" onclick="sendToJournal(event,\''+r.ticker+'\')" title="הוסף ליומן המסחר" aria-label="הוסף ליומן המסחר">+</button>':'')
+      +'</td>'
       +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+earnB+'</div><div class="cname">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
@@ -2483,6 +2581,7 @@ function loadFilterPrefs(){
 loadFilterPrefs();
 setScreener(activeScreener, false);
 updUnitHints();
+renderMyPresets();
 loadUniverseCache();
 loadResultsCache();
 initAuth().then(loadDailyStatus);
