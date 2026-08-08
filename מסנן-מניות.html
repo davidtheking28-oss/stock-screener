@@ -1132,7 +1132,9 @@ async function _ohlcDraw(el){
       layout:{background:{color:_cv('--chart-bg')||'#0a1120'},textColor:_cv('--chart-txt')||'#5b6b85',fontSize:10,fontFamily:'JetBrains Mono, monospace',attributionLogo:false},
       grid:{vertLines:{color:gridCol},horzLines:{color:gridCol}},
       rightPriceScale:{borderColor:axisCol},
-      timeScale:{borderColor:axisCol,rightOffset:5,fixLeftEdge:false,fixRightEdge:false},
+      // rightOffset reserves empty bars after the last candle. Zero keeps the
+      // newest bar against the price scale, which is where the eye goes first.
+      timeScale:{borderColor:axisCol,rightOffset:0,fixLeftEdge:false,fixRightEdge:false},
       handleScroll:{pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false,mouseWheel:false},
       handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:{time:true,price:true}},
     });
@@ -1144,8 +1146,22 @@ async function _ohlcDraw(el){
     vs.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
     vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:_cv('--chart-vol')||'rgba(255,255,255,0.25)'})));
     chart.timeScale().fitContent();
-    const ro=new ResizeObserver(()=>chart.applyOptions({width:box.clientWidth}));
+    // Re-fit on every resize, not just re-width. fitContent ran once against
+    // whatever width the box had at creation, and lightweight-charts keeps the
+    // bar spacing it had when the width changes - so any card that widened
+    // afterwards (grid settling, content-visibility rendering it late, a
+    // scrollbar coming and going) kept the old spacing and left the last candle
+    // stranded well short of the right edge, while a card that never resized
+    // sat flush. That is why two cards in the same grid disagreed.
+    const ro=new ResizeObserver(()=>{
+      chart.applyOptions({width:box.clientWidth});
+      chart.timeScale().fitContent();
+    });
     ro.observe(box);
+    // The price scale settles its own width a frame after the first paint, which
+    // shifts the plot area without resizing the container, so the resize
+    // observer never hears about it and a few cards end up short of the edge.
+    requestAnimationFrame(()=>{ try{ chart.timeScale().fitContent(); }catch(e){} });
     if(!_ohlcWanted.has(el)){ try{ro.disconnect();}catch(e){} try{chart.remove();}catch(e){} el.innerHTML=_OHLC_SPINNER; return; }
     _ohlcCharts.set(el,{chart,ro});
   }catch(e){ _ohlcMsg(el,'<span>שגיאה</span> <button onclick="event.stopPropagation();_ohlcRetry(this)" style="margin-right:6px;background: var(--fill2);border:1px solid rgba(255,255,255,0.1);color:var(--text2);border-radius:5px;padding:2px 8px;font:600 11px var(--sans);cursor:pointer">↻</button>'); }
