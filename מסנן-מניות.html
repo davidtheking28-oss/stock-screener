@@ -219,6 +219,19 @@ body {
   background: rgba(79,131,255,0.18); border-color: var(--accent);
   color: #a8c0ff; box-shadow: 0 0 0 1px rgba(79,131,255,0.2);
 }
+/* ── Screener track record ── */
+.perf-panel {
+  display: none; flex-wrap: wrap; align-items: center; gap: 14px;
+  margin: 10px 0 4px; padding: 9px 13px;
+  border: 1px solid var(--border); border-radius: 9px;
+  background: rgba(255,255,255,0.015);
+}
+.perf-panel.show { display: flex; }
+.perf-title { font: 700 10px var(--sans); color: var(--text2); letter-spacing: 0.9px; text-transform: uppercase; }
+.perf-stat { display: inline-flex; align-items: baseline; gap: 5px; }
+.perf-stat-lbl { font: 600 10px var(--sans); color: var(--text3); }
+.perf-stat-val { font: 700 13px var(--mono-data); font-variant-numeric: tabular-nums; }
+.perf-note { font: 500 10px var(--sans); color: var(--text3); margin-right: auto; }
 .jrnl-btn {
   margin-top: 4px; width: 22px; height: 22px; padding: 0;
   display: block; border-radius: 5px; cursor: pointer;
@@ -800,6 +813,7 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
     </div>
     <div id="sectorStrength" class="sector-strength"></div>
+    <div id="perfPanel" class="perf-panel"></div>
     <div class="results-legend">
       <span class="lg-grp"><i class="lg-dot lg-hi"></i>חזק 80+</span>
       <span class="lg-grp"><i class="lg-dot lg-mid"></i>בינוני 60–79</span>
@@ -2497,11 +2511,12 @@ function closeAuthModal(){ $('authModal').classList.remove('open'); }
 async function loadDailyStatus(){
   if(!HAS_SUPABASE) return;
   try{
-    const r=await fetch(SUPABASE_URL+'/rest/v1/screener_daily?select=scan_date,summary&order=scan_date.desc&limit=30',
+    const r=await fetch(SUPABASE_URL+'/rest/v1/screener_daily?select=scan_date,summary&order=scan_date.desc&limit=90',
       {headers:{apikey:SUPABASE_ANON,Authorization:'Bearer '+SUPABASE_ANON}});
     if(!r.ok) return;
     const rows=await r.json(); if(!rows.length) return;
     drawBreadthSpark(rows);
+    renderScreenerPerf(rows);
     const {scan_date, summary}=rows[0];
     if(localStorage.getItem('sepa_daily_dismissed')===scan_date) return;
     const ent=summary?.entries||[], ex=summary?.exits||[], perf=summary?.perf;
@@ -2533,6 +2548,44 @@ function drawBreadthSpark(rows){
   const col=last>=50?'var(--green)':last>=35?'var(--amber)':'var(--red)';
   el.innerHTML='<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><polyline points="'+poly+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
   el.title='בריאות שוק — אחוז המניות במגמת עלייה, '+n+' סריקות לילה אחרונות (עדכני: '+last+'%)';
+  el.classList.add('show');
+}
+/* The nightly job already records how each day's entries went 5/10/20 trading
+   days later, but it was only ever shown for the newest scan and then
+   dismissed. Averaging it over every stored scan answers the question that
+   actually matters: is this screen making money? Each day's figure is weighted
+   by how many stocks it covered, so a 1-stock day cannot swing the average.
+   Only the nightly SEPA scan is recorded — screener_daily has no screener
+   column — so this is SEPA's record, not a comparison across the seven. */
+function renderScreenerPerf(rows){
+  const el=$('perfPanel'); if(!el) return;
+  const acc={d5:{s:0,n:0},d10:{s:0,n:0},d20:{s:0,n:0}};
+  let days=0, entries=0;
+  for(const row of rows){
+    const p=row.summary?.perf; if(!p) continue;
+    let counted=false;
+    for(const k of ['d5','d10','d20']){
+      const v=p[k]; if(!v||!v.n||v.avg==null) continue;
+      acc[k].s+=v.avg*v.n; acc[k].n+=v.n; counted=true;
+    }
+    if(counted) days++;
+    entries+=(row.summary?.entries||[]).length;
+  }
+  if(!acc.d5.n && !acc.d10.n && !acc.d20.n) return;
+  const cell=(lbl,a)=>{
+    if(!a.n) return '';
+    const avg=a.s/a.n, c=avg>=0?'var(--green)':'var(--red)';
+    return '<span class="perf-stat"><span class="perf-stat-lbl">'+lbl+'</span>'
+      +'<span class="perf-stat-val" style="color:'+c+'">'+(avg>=0?'+':'')+avg.toFixed(2)+'%</span></span>';
+  };
+  // A handful of scans is an anecdote, not an edge — say so rather than
+  // letting a green number read as proof.
+  const thin=acc.d20.n<30;
+  el.innerHTML='<span class="perf-title">ביצועי הסינון</span>'
+    +cell('5 ימים',acc.d5)+cell('10 ימים',acc.d10)+cell('20 ימים',acc.d20)
+    +'<span class="perf-note">תשואה ממוצעת של מניות שנכנסו לסינון · '+days+' סריקות · '+entries+' כניסות'
+    +(thin?' · מדגם קטן, לא מסקנה':'')+'</span>';
+  el.title='ממוצע משוקלל לפי מספר המניות בכל סריקת לילה. נמדד מסריקת ה-SEPA הלילית בלבד.';
   el.classList.add('show');
 }
 function dismissDaily(d){
