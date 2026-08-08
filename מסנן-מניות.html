@@ -1016,7 +1016,7 @@ let _tableRows = [], _tableAt = 0;
 let _tableToken = 0, _galleryToken = 0;
 const TABLE_CHUNK = 120, GALLERY_CHUNK = 60;
 const _ohlcCache = new Map();
-let _ohlcLd = 0, _ohlcIO = null; const _ohlcQ = [];
+let _ohlcLd = 0, _ohlcIO = null, _ohlcKeepIO = null; const _ohlcQ = [];
 // Live charts, keyed by their card so one can be torn down on its own when it
 // scrolls away — a gallery rebuild (search, sort, re-scan) clears the lot.
 const _ohlcCharts = new Map();
@@ -1024,6 +1024,11 @@ const _OHLC_SPINNER = '<div style="height:100%;display:flex;align-items:center;j
 function _ohlcDisposeAll(){
   _ohlcCharts.forEach(({chart,ro})=>{ try{ro.disconnect();}catch(e){} try{chart.remove();}catch(e){} });
   _ohlcCharts.clear();
+  // The empty-state paths call this and then never re-observe, so the observers
+  // would be left watching nodes that are no longer in the document, with a
+  // queue still pointing at them.
+  _ohlcIO?.disconnect(); _ohlcKeepIO?.disconnect();
+  _ohlcQ.length = 0;
 }
 // Cards the observer currently wants drawn. A card can scroll away while its
 // fetch is still in flight; without this the late-arriving chart would install
@@ -1040,21 +1045,44 @@ function _ohlcDispose(el){
 // ResizeObserver and its own RAF loop, so the 500-result screeners used to build
 // up hundreds of them while scrolling and drop frames badly. Bars stay in
 // _ohlcCache, so scrolling back redraws without a refetch.
+// Loading and disposing used to share one 700px band. A card is 338px tall, so
+// that is barely two rows of runway - the chart started fetching about when it
+// scrolled into view, which is exactly when you are looking at it. And because
+// the same edge tore charts down, nudging the scroll back and forth refetched
+// them. Split the two: queue the draw on a wide outer band so it lands before
+// you arrive, and only reclaim once a card is well past that, which also gives
+// the hysteresis that stops small scroll oscillations from thrashing.
+const OHLC_LOAD_MARGIN = '2000px 0px';
+const OHLC_KEEP_MARGIN = '3400px 0px';
+// Observe the card, not the chart slot inside it. .gcard carries
+// content-visibility:auto, which skips rendering its *contents* while it is off
+// screen, and an IntersectionObserver on a descendant of a skipped subtree does
+// not fire. That capped the effective preload at whatever distance the browser
+// chose to start rendering, so no rootMargin here could take effect and the
+// chart began fetching about when it came into view. The card itself is the
+// skipped element rather than inside one, so it reports normally.
+function _lazyOf(card){ return card.querySelector?.('.tv-lazy') || null; }
 function _ohlcObserve(g){
   _ohlcIO?.disconnect();
+  _ohlcKeepIO?.disconnect();
   _ohlcIO=new IntersectionObserver(ents=>{
     for(const e of ents){
-      if(e.isIntersecting){
-        _ohlcWanted.add(e.target);
-        if(!_ohlcCharts.has(e.target) && !_ohlcQ.includes(e.target)) _ohlcQ.push(e.target);
-      }else{
-        const i=_ohlcQ.indexOf(e.target); if(i>=0) _ohlcQ.splice(i,1);
-        _ohlcDispose(e.target);
-      }
+      if(!e.isIntersecting) continue;
+      const el=_lazyOf(e.target); if(!el) continue;
+      _ohlcWanted.add(el);
+      if(!_ohlcCharts.has(el) && !_ohlcQ.includes(el)) _ohlcQ.push(el);
     }
     _ohlcNext();
-  },{rootMargin:'700px 0px'});
-  g.querySelectorAll('.tv-lazy').forEach(el=>_ohlcIO.observe(el));
+  },{rootMargin:OHLC_LOAD_MARGIN});
+  _ohlcKeepIO=new IntersectionObserver(ents=>{
+    for(const e of ents){
+      if(e.isIntersecting) continue;
+      const el=_lazyOf(e.target); if(!el) continue;
+      const i=_ohlcQ.indexOf(el); if(i>=0) _ohlcQ.splice(i,1);
+      _ohlcDispose(el);
+    }
+  },{rootMargin:OHLC_KEEP_MARGIN});
+  g.querySelectorAll('.gcard').forEach(card=>{ _ohlcIO.observe(card); _ohlcKeepIO.observe(card); });
 }
 function _ohlcMsg(el,t){ el.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px">'+t+'</div>'; }
 async function _ohlcDraw(el){
