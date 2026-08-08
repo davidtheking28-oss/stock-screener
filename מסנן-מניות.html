@@ -1084,6 +1084,28 @@ function _ohlcObserve(g){
   },{rootMargin:OHLC_KEEP_MARGIN});
   g.querySelectorAll('.gcard').forEach(card=>{ _ohlcIO.observe(card); _ohlcKeepIO.observe(card); });
 }
+// fitContent alone pins the newest candle hard against the price scale, which
+// reads cramped. A little air after it is what you want, but the pad has to be
+// expressed in pixels rather than bars: a 3-bar pad is 3px on a 250-bar chart
+// and 30px on a 25-bar one, so cards would disagree exactly the way they did
+// before. Convert through the post-fit bar spacing so every card gets the same
+// visual gap whatever its history length.
+const CHART_RIGHT_PAD_PX = 14;
+function _fitChart(chart, barCount){
+  const ts = chart.timeScale();
+  ts.fitContent();
+  if (!barCount) return;
+  const bs = ts.options?.().barSpacing;
+  if (!bs || !isFinite(bs) || bs <= 0) return;
+  // Widening the range also re-spaces the bars, so PAD/bs undershoots. After
+  // the fit the plot is bs*barCount wide; asking for p extra units re-spaces to
+  // W/(barCount+p), and we want p*that == PAD. Solving gives the line below,
+  // which lands the same pixel gap whether the card has 25 bars or 250.
+  const W = bs * barCount;
+  if (W <= CHART_RIGHT_PAD_PX) return;
+  const p = CHART_RIGHT_PAD_PX * barCount / (W - CHART_RIGHT_PAD_PX);
+  ts.setVisibleLogicalRange({ from: 0, to: (barCount - 1) + p });
+}
 function _ohlcMsg(el,t){ el.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px">'+t+'</div>'; }
 async function _ohlcDraw(el){
   if(!HAS_SUPABASE){
@@ -1145,7 +1167,7 @@ async function _ohlcDraw(el){
     const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:''});
     vs.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
     vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:_cv('--chart-vol')||'rgba(255,255,255,0.25)'})));
-    chart.timeScale().fitContent();
+    _fitChart(chart, bars.length);
     // Re-fit on every resize, not just re-width. fitContent ran once against
     // whatever width the box had at creation, and lightweight-charts keeps the
     // bar spacing it had when the width changes - so any card that widened
@@ -1155,13 +1177,13 @@ async function _ohlcDraw(el){
     // sat flush. That is why two cards in the same grid disagreed.
     const ro=new ResizeObserver(()=>{
       chart.applyOptions({width:box.clientWidth});
-      chart.timeScale().fitContent();
+      _fitChart(chart, bars.length);
     });
     ro.observe(box);
     // The price scale settles its own width a frame after the first paint, which
     // shifts the plot area without resizing the container, so the resize
     // observer never hears about it and a few cards end up short of the edge.
-    requestAnimationFrame(()=>{ try{ chart.timeScale().fitContent(); }catch(e){} });
+    requestAnimationFrame(()=>{ try{ _fitChart(chart, bars.length); }catch(e){} });
     if(!_ohlcWanted.has(el)){ try{ro.disconnect();}catch(e){} try{chart.remove();}catch(e){} el.innerHTML=_OHLC_SPINNER; return; }
     _ohlcCharts.set(el,{chart,ro});
   }catch(e){ _ohlcMsg(el,'<span>שגיאה</span> <button onclick="event.stopPropagation();_ohlcRetry(this)" style="margin-right:6px;background: var(--fill2);border:1px solid rgba(255,255,255,0.1);color:var(--text2);border-radius:5px;padding:2px 8px;font:600 11px var(--sans);cursor:pointer">↻</button>'); }
