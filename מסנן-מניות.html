@@ -327,10 +327,27 @@ body {
   content: ''; flex: 1; height: 1px;
   background-image: repeating-linear-gradient(90deg, var(--border2) 0 1px, transparent 1px 6px);
 }
-.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.field { display: flex; flex-direction: column; gap: 3px; }
+/* Rows are laid out as label / control / hint so the three parts line up
+   across the whole grid. Fields without a hint used to collapse shorter than
+   their neighbours, which knocked every following row out of alignment. */
+.fields {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px;
+  align-items: start;
+}
+.field {
+  display: grid; grid-template-rows: auto auto 1fr; gap: 3px;
+  align-content: start;
+}
 .field label { font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.2px; }
-.field .hint { font-size: 11px; color: var(--text3); margin-top: 1px; line-height: 1.4; }
+.field .hint {
+  font-size: 11px; color: var(--text3); margin-top: 1px; line-height: 1.4;
+  min-height: 1.4em;   /* reserve the row even when a field has no hint */
+}
+/* A threshold of 0 means "not filtering on this". Showing a bare 0 read as a
+   real limit; this states the state and steps the value back visually. */
+.field.is-off .field-combo input[type=number] { color: var(--text3); }
+.field.is-off .hint { color: var(--text3); opacity: 0.85; }
+.field .hint b { color: var(--text2); font-weight: 700; font-style: normal; }
 
 input[type=number], select {
   background: var(--fill); border: 1px solid var(--border);
@@ -791,10 +808,10 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field f-qulla"><label for="volSharesMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="number" id="volSharesMin" value="0.5" min="0" step="0.1" onfocus="openFieldPicker(this)"></div><span class="hint">ממוצע 30/90 יום</span></div>
             <div class="field f-finviz"><label for="perfYMin">ביצוע שנתי מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="perfYMin" value="30" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">Performance Year</span></div>
             <div class="field f-finviz"><label for="finvizVolMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="number" id="finvizVolMin" value="0.1" min="0" step="0.05" onfocus="openFieldPicker(this)"></div><span class="hint">ממוצע 90 יום</span></div>
-            <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" onfocus="openFieldPicker(this)"></div></div>
+            <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="priceHint">מסנן מניות אגורה</span></div>
             <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="number" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
             <div class="field f-base f-liq"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
-            <div class="field f-base"><label for="earnDays">חסום דוח בעוד (ימים)</label><div class="field-combo"><input type="number" id="earnDays" value="5" min="0" onfocus="openFieldPicker(this)"></div><span class="hint">דלג על דוח קרוב (0=כבוי)</span></div>
+            <div class="field f-base"><label for="earnDays">חסום דוח בעוד (ימים)</label><div class="field-combo"><input type="number" id="earnDays" value="5" min="0" oninput="updUnitHints()" onfocus="openFieldPicker(this)"></div><span class="hint" id="earnHint">מדלג על מניות עם דוח קרוב</span></div>
             <div class="field f-commodities" style="grid-column:1 / -1">
               <label>סחורות (קבוע)</label>
               <div class="sector-lock-tags">
@@ -1580,6 +1597,23 @@ function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : m
 function updUnitHints(){
   const lh=$('liqHint'); if(lh) lh.textContent='נפח דולרי ממוצע · ≈ '+fmtMoneyM(num('liqMin'))+' ליום';
   const mh=$('mcHint'); if(mh) mh.textContent='≈ '+fmtMoneyM(num('mcMin')*1000)+' ומעלה';
+
+  // A 0 in either of these is "off", not a threshold. Say so in words and mark
+  // the field, instead of leaving a bare 0 that reads like a real limit.
+  const setOff = (id, off) => { const f=$(id)?.closest('.field'); if(f) f.classList.toggle('is-off', off); };
+
+  const ed = num('earnDays'), eh = $('earnHint');
+  if (eh) eh.innerHTML = ed > 0
+    ? `מדלג על דוח בתוך <b>${ed}</b> ${ed===1?'יום':'ימים'}`
+    : 'כבוי — לא מסנן לפי דוחות';
+  setOff('earnDays', !(ed > 0));
+
+  const pm = num('priceMin'), ph = $('priceHint');
+  if (ph) ph.innerHTML = pm > 0 ? `מ-<b>$${pm}</b> ומעלה` : 'כבוי — כל מחיר';
+  setOff('priceMin', !(pm > 0));
+
+  setOff('mcMin', !(num('mcMin') > 0));
+  setOff('liqMin', !(num('liqMin') > 0));
 }
 
 /* ════════════════════════════════════
