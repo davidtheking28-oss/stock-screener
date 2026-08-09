@@ -343,6 +343,10 @@ body {
   font-size: 11px; color: var(--text3); margin-top: 1px; line-height: 1.4;
   min-height: 1.4em;   /* reserve the row even when a field has no hint */
 }
+.field:not(:has(.hint))::after {
+  content: ''; display: block;
+  font-size: 11px; line-height: 1.4; margin-top: 1px; min-height: 1.4em;
+}
 /* A threshold of 0 means "not filtering on this". Showing a bare 0 read as a
    real limit; this states the state and steps the value back visually. */
 .field.is-off .field-combo input[type=number] { color: var(--text3); }
@@ -1023,9 +1027,14 @@ let _scanToken = 0;
 let _rawUniverse = null, _rawTime = 0, _rsMapMem = null;
 let _commUniverse = null, _commTime = 0;
 const UNIVERSE_TTL = 15*60*1000;
+const SCAN_TIMEOUT = 30*1000;
 let _currentUser = null;
-let watchlist  = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
-const _savedSort = JSON.parse(localStorage.getItem('sepa_sort')||'null');
+// These three parse at script top level. One corrupted value used to throw here
+// and kill everything after it — prefs, cached results, auth, scroll handlers.
+const _lsJSON = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch(e) { return fb; } };
+const _wlRaw = _lsJSON('sepa_wl', []);
+let watchlist  = new Set(Array.isArray(_wlRaw) ? _wlRaw : []);
+const _savedSort = _lsJSON('sepa_sort', null);
 let sortKey = _savedSort?.sortKey||'rs', sortDir = _savedSort?.sortDir??-1;
 let view = localStorage.getItem('sepa_view')||'table', activeRow = -1;
 let _galleryKey = '', _tableKey = '';
@@ -1146,10 +1155,14 @@ async function _ohlcDraw(el){
       }catch(e){}
     }
     if(!bars){
-      const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON}});
+      const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON},signal:AbortSignal.timeout(SCAN_TIMEOUT)});
+      // A 500/429 still parses as JSON with no bars. Caching that empty array as
+      // if it were data pinned "אין נתונים" on the card for 30 minutes, through
+      // reloads, even after the service recovered.
+      if(!r.ok) throw new Error('OHLC '+r.status);
       const j=await r.json();
       bars=Array.isArray(j.bars)?j.bars:[];
-      try{ sessionStorage.setItem('ohlc_v2_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
+      if(bars.length) try{ sessionStorage.setItem('ohlc_v2_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
     }
     _ohlcCache.set(sym,{bars,t:Date.now()});
     // A newer renderGallery() call (e.g. exact-validation refresh right after the
@@ -1225,7 +1238,7 @@ async function _fetchBars1y(sym){
   if(c && Date.now()-c.t<TTL) return c.bars;
   try{ const sc=JSON.parse(sessionStorage.getItem('ohlc1y_v2_'+sym)); if(sc && sc.t && Date.now()-sc.t<TTL){ _valBars.set(sym,{bars:sc.bars,t:sc.t}); return sc.bars; } }catch(e){}
   try{
-    const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?range=1y&symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON}});
+    const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?range=1y&symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON},signal:AbortSignal.timeout(SCAN_TIMEOUT)});
     if(!r.ok) return null;
     const j=await r.json(); const bars=Array.isArray(j.bars)?j.bars:[];
     _valBars.set(sym,{bars,t:Date.now()});
@@ -1367,7 +1380,7 @@ async function validateExact(list, scr, onProgress){
   await Promise.all(Array.from({length:Math.min(20,total)}, worker));
   return list.filter(r=>!r._exactFail);
 }
-let colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
+let colVis = _lsJSON('sepa_colvis', null) || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
 if(!('adr' in colVis)) colVis.adr = true;
 let searchQuery = '';
 let newToday = new Set();
@@ -1386,7 +1399,10 @@ function _searchInput(val, immediate=false){
    UTILS
 ════════════════════════════════════ */
 const $   = id => document.getElementById(id);
-const num = id => parseFloat($(id)?.value ?? '0');
+// An empty input parses to NaN, and every threshold comparison against NaN is
+// false — so clearing one field silently rejected the entire universe while
+// validateInputs (which only tests < and >) reported everything fine.
+const num = id => { const v = parseFloat($(id)?.value); return Number.isFinite(v) ? v : 0; };
 const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
 const pct = v => v==null ? '—' : v.toFixed(1)+'%';
 const fmtB = v => {
@@ -1409,10 +1425,15 @@ function toast(msg, dur=2600){ _toastQ.push({msg,dur}); if(!_toastBusy) _toastNe
 function _toastNext(){ if(!_toastQ.length){_toastBusy=false;return;} _toastBusy=true; const {msg,dur}=_toastQ.shift(); const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>{ t.classList.remove('show'); setTimeout(_toastNext,260); },dur); }
 async function saveWL(ticker, adding){
   if(_currentUser && _sb){
-    if(adding){
-      await _sb.from('screener_watchlist').upsert({user_id:_currentUser.id, ticker});
-    } else {
-      await _sb.from('screener_watchlist').delete().eq('user_id',_currentUser.id).eq('ticker',ticker);
+    const { error } = adding
+      ? await _sb.from('screener_watchlist').upsert({user_id:_currentUser.id, ticker})
+      : await _sb.from('screener_watchlist').delete().eq('user_id',_currentUser.id).eq('ticker',ticker);
+    // Signed in, saveWL skips the localStorage fallback — so a failed write meant
+    // the star stayed lit and the change vanished on the next reload, silently.
+    if(error){
+      if(adding) watchlist.delete(ticker); else watchlist.add(ticker);
+      toast('שמירת רשימת המעקב נכשלה');
+      if(view==='table') renderTable(); else renderGallery();
     }
   } else {
     localStorage.setItem('sepa_wl', JSON.stringify([...watchlist]));
@@ -1534,7 +1555,8 @@ function toggleColPicker(e){
 async function setColVis(key, on){
   colVis[key]=on;
   if(_currentUser && _sb){
-    await _sb.from('screener_prefs').upsert({user_id:_currentUser.id, col_vis:colVis, updated_at:new Date().toISOString()});
+    const { error } = await _sb.from('screener_prefs').upsert({user_id:_currentUser.id, col_vis:colVis, updated_at:new Date().toISOString()});
+    if(error){ colVis[key]=!on; toast('שמירת העדפות העמודות נכשלה'); }
   } else {
     localStorage.setItem('sepa_colvis', JSON.stringify(colVis));
   }
@@ -1571,14 +1593,14 @@ function calcScore(r, scr='sepa'){
     return Math.round(clamp(moveS+adrS+emaS+tightS,0,100));
   }
   if(scr==='finviz'){
-    const hiS   = clamp(1-Math.abs(r.fromHighPct)/25,0,1)*50;
+    const hiS   = clamp(1-Math.max(0,-r.fromHighPct)/25,0,1)*50;
     const perfS = Math.min(clamp(r.perfY??0,0,300)/300,1)*30;
     const rsS   = clamp(r.rs,0,99)/99*20;
     return Math.round(clamp(hiS+perfS+rsS,0,100));
   }
   if(scr==='momentum'||scr==='power'||scr==='commodities'){
     const rsS   = clamp(r.rs,0,99)/99*50;
-    const hiS   = clamp((1-Math.abs(r.fromHighPct)/25),0,1)*25;
+    const hiS   = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*25;
     const pf    = Math.max(r.perf3??0,(r.perf6??0)/2);
     const perfS = Math.min(clamp(pf,0,150)/150,1)*25;
     return Math.round(clamp(rsS+hiS+perfS,0,100));
@@ -1586,7 +1608,7 @@ function calcScore(r, scr='sepa'){
   const rsS  = clamp(r.rs,0,99)/99*40;
   const epsS = Math.min(clamp(r.eps??0,0,300)/300,1)*25;
   const revS = Math.min(clamp(r.rev??0,0,200)/200,1)*20;
-  const hiS  = clamp((1-Math.abs(r.fromHighPct)/25),0,1)*15;
+  const hiS  = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15;
   return Math.round(clamp(rsS+epsS+revS+hiS,0,100));
 }
 function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var(--text3)'; }
@@ -1811,8 +1833,11 @@ async function checkAndSaveHistory(tickers){
   const today = new Date().toISOString().slice(0,10);
   const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
   const currentSet = new Set(tickers);
-  const {data:prev} = await _sb.from('screener_history')
+  const {data:prev, error:histErr} = await _sb.from('screener_history')
     .select('ticker,first_seen,last_seen').eq('user_id',_currentUser.id).eq('screener',activeScreener);
+  // A failed read used to look identical to "no history": every ticker was
+  // flagged חדש and the whole list was re-inserted as duplicates.
+  if(histErr){ console.error('[screener_history]', histErr); return; }
   const known = new Map((prev||[]).map(h=>[h.ticker,h]));
   if(watchlist.size > 0 && prev){
     const exits = prev.filter(h=>watchlist.has(h.ticker) && !currentSet.has(h.ticker) && h.last_seen >= yesterday).map(h=>h.ticker);
@@ -1916,7 +1941,7 @@ async function scan(force=false){
     }
   }catch(e){
     console.error(e);
-    $('statBar').innerHTML='<span style="color:var(--red)">שגיאה: '+e.message+'</span> <button onclick="scan()" style="background:transparent;border:1px solid var(--border);color:var(--text2);padding:3px 10px;border-radius:6px;font:600 11px var(--mono);cursor:pointer;margin-right:8px">↻ נסה שנית</button>';
+    $('statBar').innerHTML='<span style="color:var(--red)">שגיאה: '+(e.name==='TimeoutError'?'הבקשה ארכה יותר מדי':e.message)+'</span> <button onclick="scan()" style="background:transparent;border:1px solid var(--border);color:var(--text2);padding:3px 10px;border-radius:6px;font:600 11px var(--mono);cursor:pointer;margin-right:8px">↻ נסה שנית</button>';
   }finally{
     if(myToken===_scanToken) _setScanLoading(false);
   }
@@ -1940,12 +1965,12 @@ async function fetchUniverse(){
   };
   if(HAS_SUPABASE){
     const res=await fetch(SUPABASE_URL+'/functions/v1/scan-universe',
-      {method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},body:JSON.stringify(body)});
+      {method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},body:JSON.stringify(body),signal:AbortSignal.timeout(SCAN_TIMEOUT)});
     if(!res.ok) throw new Error('Scan service '+res.status);
     return (await res.json()).data||[];
   }
   const res=await fetch('https://scanner.tradingview.com/america/scan?label-product=screener-stock',
-    {method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body)});
+    {method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body),signal:AbortSignal.timeout(SCAN_TIMEOUT)});
   if(!res.ok) throw new Error('TradingView '+res.status);
   return (await res.json()).data||[];
 }
@@ -1959,12 +1984,12 @@ async function fetchCommodities(){
   };
   if(HAS_SUPABASE){
     const res=await fetch(SUPABASE_URL+'/functions/v1/scan-universe',
-      {method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},body:JSON.stringify(body)});
+      {method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},body:JSON.stringify(body),signal:AbortSignal.timeout(SCAN_TIMEOUT)});
     if(!res.ok) throw new Error('Scan service '+res.status);
     return (await res.json()).data||[];
   }
   const res=await fetch('https://scanner.tradingview.com/america/scan?label-product=screener-stock',
-    {method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body)});
+    {method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body),signal:AbortSignal.timeout(SCAN_TIMEOUT)});
   if(!res.ok) throw new Error('TradingView '+res.status);
   return (await res.json()).data||[];
 }
@@ -1973,7 +1998,14 @@ function computeRS(universe){
   const rsRaw = d => {
     const p3=d[C['Perf.3M']], p6=d[C['Perf.6M']], py=d[C['Perf.Y']];
     if(p3==null && p6==null && py==null) return null;
-    return 0.4*(p3??0) + 0.3*(p6??0) + 0.3*(py??0);
+    // A missing period used to count as 0%, which punished short-history names:
+    // a stock up 120% in 3M with no 6M/Y scored below one at 40/60/80. Weight
+    // only the periods that exist and renormalise.
+    let s=0, w=0;
+    if(p3!=null){ s+=0.4*p3; w+=0.4; }
+    if(p6!=null){ s+=0.3*p6; w+=0.3; }
+    if(py!=null){ s+=0.3*py; w+=0.3; }
+    return s/w;
   };
   const valid=universe.map(r=>({s:r.s,p:rsRaw(r.d)})).filter(r=>r.p!=null).sort((a,b)=>a.p-b.p);
   const n=valid.length; const map={};
@@ -1988,7 +2020,14 @@ function computeRS(universe){
 ════════════════════════════════════ */
 function applyFilters(universe, rsMap, opts={}){
   const scr = opts.skipFund ? 'sepa' : activeScreener;
-  const rsMin=num('rsMin'), fhPct=num('fromHigh')/100, flPct=num('fromLow')/100;
+  // skipFund builds the Trend Template reference set for the מעקב tab. It zeroed
+  // the fundamentals but left rsMin/fromHigh/fromLow reading whatever the current
+  // screener had in the inputs (Power leaves rsMin at 90), so watchlist names that
+  // do pass the real Trend Template were reported as failing it.
+  const _sd = SCREENER_DEFAULTS.sepa;
+  const rsMin = opts.skipFund ? _sd.rsMin : num('rsMin');
+  const fhPct = (opts.skipFund ? _sd.fromHigh : num('fromHigh'))/100;
+  const flPct = (opts.skipFund ? _sd.fromLow  : num('fromLow'))/100;
   const mcMin=opts.skipFund?0:num('mcMin')*1e9, priceMin=num('priceMin');
   const liqMin=opts.skipFund?0:num('liqMin')*1e6, earnGap=opts.skipFund?0:num('earnDays');
   const runMin=num('runMin');
@@ -2062,7 +2101,11 @@ function applyFilters(universe, rsMap, opts={}){
       const avg30=d[C.average_volume_30d_calc], avg90=d[C.average_volume_90d_calc];
       const sharesMin=num('volSharesMin')*1e6;
       const volOk=avg30!=null && avg30>=sharesMin && (avg90==null || avg90>=sharesMin);
-      const adrOk=volD!=null && volD>=num('adrMin');
+      // Volatility.D is one session's range, not the 20-day ADR this filter is
+      // named for, so a single quiet day dropped stocks whose real ADR is fine —
+      // and validateExact (which computes the true 20-bar ADR in _qullaExactOK)
+      // can only narrow the list, never rescue them. Coarse gate here, exact there.
+      const adrOk=volD==null || volD>=num('adrMin')*0.5;
       // SMA200 alignment enforced only when the stock is old enough to have one (keeps IPOs)
       const trendOk=close>s50 && (s200==null || (close>s200 && s50>s200));
       const move6Ok=perf6!=null && perf6>=num('move6Min');
@@ -2230,8 +2273,13 @@ function renderTable(rows){
   // throttled phone for a view switch that changed nothing. Reuse the existing
   // rows whenever the inputs that shape them are unchanged, patching only the
   // stars (the one thing that can change without changing the key).
+  // validateExact annotates rows with .vcp/.rsLine and checkAndSaveHistory fills
+  // newToday, then both call render() — with none of that in the key the early
+  // return kept serving stale HTML, so the VCP column read "—" forever and the
+  // חדש badge never appeared.
+  const _annot = rows.map(r => (r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')).join('');
   const _tKey = view+'|'+sortKey+'|'+sortDir+'|'+scKind+'|'
-    +COL_DEFS.map(c=>colVis[c.key]?1:0).join('')+'|'+rows.map(r=>r.sym).join(',');
+    +COL_DEFS.map(c=>colVis[c.key]?1:0).join('')+'|'+rows.map(r=>r.sym).join(',')+'|'+_annot;
   if(_tKey===_tableKey && tv.querySelector('tbody tr')){
     tv.querySelectorAll('tbody .star-btn').forEach((btn,i)=>{
       const r=rows[i]; if(!r) return;
@@ -2285,14 +2333,14 @@ function renderTable(rows){
       scTip='ציון Qullamaggie: '+sc+'/100\nמהלך 6ח׳: '+pct(r.perf6)+'\nADR: '+pct(r.volD)+'\nמרחק מ-EMA10/20: '+(isFinite(r.emaDist)&&r.emaDist!=null?r.emaDist.toFixed(1)+'%':'—')+'\nשינוי שבועי: '+pct(r.perfW);
     } else if(r.scoreKind==='momentum'||r.scoreKind==='power'||r.scoreKind==='commodities'){
       const rsS=Math.round(clamp(r.rs,0,99)/99*50);
-      const hiS=Math.round(clamp((1-Math.abs(r.fromHighPct)/25),0,1)*25);
+      const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*25);
       const perfS=sc-rsS-hiS;
       scTip='ציון מומנטום: '+sc+'/100\nRS: '+rsS+'/50\nקרבה לשיא: '+hiS+'/25\nביצוע 3-6ח׳: '+perfS+'/25';
     } else {
       const rsS=Math.round(clamp(r.rs,0,99)/99*40);
       const epsS=Math.round(Math.min(clamp(r.eps??0,0,300)/300,1)*25);
       const revS=Math.round(Math.min(clamp(r.rev??0,0,200)/200,1)*20);
-      const hiS=Math.round(clamp((1-Math.abs(r.fromHighPct)/25),0,1)*15);
+      const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15);
       scTip='ציון SEPA: '+sc+'/100\nRS: '+rsS+'/40\nEPS: '+epsS+'/25\nהכנסות: '+revS+'/20\nקרבה לשיא: '+hiS+'/15';
     }
     const scEl='<div class="score-cell" title="'+scTip+'">'
@@ -2398,7 +2446,8 @@ function renderGallery(){
   if(!rows.length){
     _ohlcDisposeAll(); g.innerHTML=emptyHtml('לא נמצאה מניה תואמת','נקה את החיפוש כדי לראות את כל הגרפים'); _galleryKey=''; return;
   }
-  const _key=rows.map(r=>r.sym).join(',');
+  const _key=rows.map(r=>r.sym).join(',')+'|'
+    +rows.map(r=>(r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')).join('');
   if(_key===_galleryKey && g.querySelector('.gcard')){
     g.querySelectorAll('.gcard .star-btn').forEach((btn,i)=>{ const r=rows[i]; if(!r) return; const on=watchlist.has(r.ticker); btn.className='star-btn '+(on?'on':'off'); btn.textContent=on?'★':'☆'; });
     return;
@@ -2432,7 +2481,7 @@ function renderGallery(){
       +(earnB?'<div class="gcard-tags">'+earnB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+scoreColor(r.score)+';background:'+scoreBg(r.score)+'" title="'+scTitle+'"><span class="gb-lbl">'+scLbl+'</span> <b>'+r.score+'</b></span>'
-      +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — ביצוע יחסי מול השוק"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span></div></div>'
+      +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span></div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
@@ -2596,8 +2645,12 @@ async function initAuth(){
     updateAuthUI();
     if(event==='SIGNED_IN') await loadUserData();
     if(event==='SIGNED_OUT'){
-      watchlist = new Set(JSON.parse(localStorage.getItem('sepa_wl')||'[]'));
-      colVis = JSON.parse(localStorage.getItem('sepa_colvis')||'null') || Object.fromEntries(COL_DEFS.map(c=>[c.key,c.defaultOn]));
+      const wl = _lsJSON('sepa_wl', []);
+      watchlist = new Set(Array.isArray(wl) ? wl : []);
+      colVis = _lsJSON('sepa_colvis', null) || Object.fromEntries(COL_DEFS.map(c=>[c.key,c.defaultOn]));
+      buildColPicker();
+      _tableKey=''; _galleryKey='';
+      if(allResults.length) render();
     }
   });
 }
@@ -2610,6 +2663,11 @@ async function loadUserData(){
   if(wlData) watchlist = new Set(wlData.map(r=>r.ticker));
   if(prefData?.col_vis) colVis = prefData.col_vis;
   if(!('adr' in colVis)) colVis.adr = true;
+  // loadResultsCache() already rendered synchronously with the local defaults, so
+  // without this the signed-in user's saved columns and stars never showed up.
+  buildColPicker();
+  _tableKey=''; _galleryKey='';
+  if(allResults.length) render();
 }
 
 function updateAuthUI(){
@@ -2654,7 +2712,7 @@ async function loadDailyStatus(){
   if(!HAS_SUPABASE) return;
   try{
     const r=await fetch(SUPABASE_URL+'/rest/v1/screener_daily?select=scan_date,summary&order=scan_date.desc&limit=90',
-      {headers:{apikey:SUPABASE_ANON,Authorization:'Bearer '+SUPABASE_ANON}});
+      {headers:{apikey:SUPABASE_ANON,Authorization:'Bearer '+SUPABASE_ANON},signal:AbortSignal.timeout(SCAN_TIMEOUT)});
     if(!r.ok) return;
     const rows=await r.json(); if(!rows.length) return;
     drawBreadthSpark(rows);
@@ -2678,7 +2736,7 @@ async function loadDailyStatus(){
       +(perfBits.length?'<span title="תשואה ממוצעת עד היום של המניות שנכנסו לסינון לפני X ימי מסחר"><b style="color:var(--accent2)">ביצועי כניסות עבר:</b> '+perfBits.join(' · ')+'</span>':'')
       +'<button class="db-close" onclick="dismissDaily(\''+scan_date+'\')" aria-label="סגור">✕</button>';
     el.style.display='flex';
-  }catch(e){}
+  }catch(e){ console.error('[dailyStatus]', e); }
 }
 function drawBreadthSpark(rows){
   const el=$('breadthSpark'); if(!el) return;
