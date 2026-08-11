@@ -1191,13 +1191,25 @@ async function _ohlcDraw(el){
       }catch(e){}
     }
     if(!bars){
-      const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON},signal:AbortSignal.timeout(SCAN_TIMEOUT)});
+      // Several cards loading at once can race a transient blip (the shared
+      // Supabase egress IP getting momentarily rate-limited by Yahoo, a cold
+      // function start, a dropped packet) — one card would show a permanent
+      // "שגיאה" while its neighbors, which happened to fire a beat earlier or
+      // later, succeeded. Two quick retries absorb that before bothering the user.
+      let lastErr=null;
+      for(let attempt=0; attempt<3 && !bars; attempt++){
+        if(attempt>0) await new Promise(res=>setTimeout(res, 400*attempt));
+        try{
+          const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON},signal:AbortSignal.timeout(SCAN_TIMEOUT)});
+          if(!r.ok) throw new Error('OHLC '+r.status);
+          const j=await r.json();
+          bars=Array.isArray(j.bars)?j.bars:[];
+        }catch(e){ lastErr=e; }
+      }
+      if(!bars) throw (lastErr||new Error('OHLC failed'));
       // A 500/429 still parses as JSON with no bars. Caching that empty array as
       // if it were data pinned "אין נתונים" on the card for 30 minutes, through
       // reloads, even after the service recovered.
-      if(!r.ok) throw new Error('OHLC '+r.status);
-      const j=await r.json();
-      bars=Array.isArray(j.bars)?j.bars:[];
       if(bars.length) try{ sessionStorage.setItem('ohlc_v2_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
     }
     _ohlcCache.set(sym,{bars,t:Date.now()});
