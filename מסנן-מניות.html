@@ -2833,6 +2833,18 @@ function loadFilterPrefs(){
 
 loadFilterPrefs();
 setScreener(activeScreener, false);
+
+// Filters were only persisted after a completed scan or a preset click — edits
+// made in between (adjust a threshold, get interrupted, come back later) were
+// silently lost, reverting to whatever was last scanned. Save on every change,
+// debounced, so the panel always reflects where the user actually left off.
+(function(){
+  let t=null;
+  const panel=$('filterPanel');
+  if(!panel) return;
+  panel.addEventListener('input', () => { clearTimeout(t); t=setTimeout(saveFilterPrefs, 400); });
+  panel.addEventListener('change', () => { clearTimeout(t); t=setTimeout(saveFilterPrefs, 400); });
+})();
 updUnitHints();
 renderMyPresets();
 loadUniverseCache();
