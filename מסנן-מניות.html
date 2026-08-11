@@ -1018,6 +1018,27 @@ const COL_DEFS = [
 
 const UNIVERSE_CACHE_KEY = 'sepa_universe_v1';
 const RESULTS_CACHE_KEY  = 'sepa_scan_results_v1';
+const SCROLL_KEY = 'sepa_scroll_v1';
+
+// Restoring the right results is not enough on its own — landing back at the top
+// of a 500-row table still loses the user's place. Save the scroll offset as they
+// read, and put them back where they were once the table has rendered.
+function _saveScroll(){
+  try{ sessionStorage.setItem(SCROLL_KEY, String(window.scrollY|0)); }catch(e){}
+}
+function _restoreScroll(){
+  try{
+    const y = parseInt(sessionStorage.getItem(SCROLL_KEY)||'0', 10);
+    if(!y) return;
+    // Wait for the table to lay out, otherwise the page is still short and the
+    // browser clamps the scroll back to 0.
+    requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo(0, y)));
+  }catch(e){}
+}
+(function(){
+  let t=null;
+  window.addEventListener('scroll', ()=>{ clearTimeout(t); t=setTimeout(_saveScroll, 150); }, {passive:true});
+})();
 
 /* ════════════════════════════════════
    STATE
@@ -1524,10 +1545,17 @@ function loadResultsCache(){
     const isToday = d.toDateString() === new Date().toDateString();
     $('scanTime').textContent = isToday ? hh+':'+mm+' (מאוחסן)' : 'אמש '+hh+':'+mm;
     const rb=$('scanBtn'); if(rb) rb.style.display='';
+    // Results older than 30 min used to trigger an automatic full re-scan here.
+    // Every time the browser discarded and reloaded this page (switching away and
+    // back is enough), the whole universe was re-fetched and every row re-rendered
+    // — losing the user's place in the list with no way to decline. Stale data is
+    // now stated plainly and refreshing is one deliberate click.
     const stale = Date.now()-time > 30*60*1000;
     $('statBar').innerHTML='<b>'+results.length+'</b> מניות מסריקה '+(isToday?'ב-'+hh+':'+mm:'מאתמול')
-      +' <span style="color:var(--text3);font-size:11px">'+(stale?'· מרענן נתונים...':'· לחץ "סרוק שנית" לעדכון')+'</span>';
-    if(stale) setTimeout(()=>scan(true), 600);
+      + (stale
+          ? ' <button onclick="scan(true)" style="background:none;border:none;padding:0;margin-right:6px;font:inherit;font-size:11px;color:var(--accent);cursor:pointer;text-decoration:underline">· הנתונים ישנים — רענן</button>'
+          : ' <span style="color:var(--text3);font-size:11px">· לחץ "סרוק שנית" לעדכון</span>');
+    _restoreScroll();
   } catch(e){}
 }
 
