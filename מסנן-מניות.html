@@ -1023,21 +1023,36 @@ const SCROLL_KEY = 'sepa_scroll_v1';
 // Restoring the right results is not enough on its own — landing back at the top
 // of a 500-row table still loses the user's place. Save the scroll offset as they
 // read, and put them back where they were once the table has rendered.
+// The results table scrolls inside #tableView, not the window, so both offsets
+// have to be tracked to put the user back exactly where they were.
 function _saveScroll(){
-  try{ sessionStorage.setItem(SCROLL_KEY, String(window.scrollY|0)); }catch(e){}
+  try{
+    sessionStorage.setItem(SCROLL_KEY, JSON.stringify({
+      w: window.scrollY|0,
+      t: (document.getElementById('tableView')?.scrollTop|0) || 0
+    }));
+  }catch(e){}
 }
 function _restoreScroll(){
   try{
-    const y = parseInt(sessionStorage.getItem(SCROLL_KEY)||'0', 10);
-    if(!y) return;
-    // Wait for the table to lay out, otherwise the page is still short and the
-    // browser clamps the scroll back to 0.
-    requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo(0, y)));
+    const s = JSON.parse(sessionStorage.getItem(SCROLL_KEY)||'null');
+    if(!s || (!s.w && !s.t)) return;
+    // Wait for the table to lay out, otherwise it is still short and the browser
+    // clamps the offset back to 0.
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      if(s.w) window.scrollTo(0, s.w);
+      const tv = document.getElementById('tableView');
+      if(tv && s.t) tv.scrollTop = s.t;
+    }));
   }catch(e){}
 }
 (function(){
   let t=null;
-  window.addEventListener('scroll', ()=>{ clearTimeout(t); t=setTimeout(_saveScroll, 150); }, {passive:true});
+  const bump = ()=>{ clearTimeout(t); t=setTimeout(_saveScroll, 150); };
+  window.addEventListener('scroll', bump, {passive:true});
+  document.addEventListener('DOMContentLoaded', ()=>{
+    document.getElementById('tableView')?.addEventListener('scroll', bump, {passive:true});
+  });
 })();
 
 /* ════════════════════════════════════
@@ -2688,12 +2703,23 @@ async function loadUserData(){
     _sb.from('screener_watchlist').select('ticker').eq('user_id',_currentUser.id),
     _sb.from('screener_prefs').select('col_vis').eq('user_id',_currentUser.id).maybeSingle()
   ]);
+  // loadResultsCache() has already rendered from the local copy by the time this
+  // resolves. Re-rendering unconditionally meant every single page load redrew
+  // the whole table a beat after it first appeared — a visible flash that read
+  // as "it's loading the stocks again". Only redraw when the server copy really
+  // differs from what is already on screen.
+  const wlBefore = [...watchlist].sort().join(',');
+  const cvBefore = JSON.stringify(colVis);
+
   if(wlData) watchlist = new Set(wlData.map(r=>r.ticker));
   if(prefData?.col_vis) colVis = prefData.col_vis;
   if(!('adr' in colVis)) colVis.adr = true;
-  // loadResultsCache() already rendered synchronously with the local defaults, so
-  // without this the signed-in user's saved columns and stars never showed up.
-  buildColPicker();
+
+  const wlChanged = [...watchlist].sort().join(',') !== wlBefore;
+  const cvChanged = JSON.stringify(colVis) !== cvBefore;
+  if(!wlChanged && !cvChanged) return;
+
+  if(cvChanged) buildColPicker();
   _tableKey=''; _galleryKey='';
   if(allResults.length) render();
 }
