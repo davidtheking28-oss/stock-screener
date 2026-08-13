@@ -331,22 +331,39 @@ body {
    across the whole grid. Fields without a hint used to collapse shorter than
    their neighbours, which knocked every following row out of alignment. */
 .fields {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px;
   align-items: start;
 }
+/* Label and value sit on one line — the value is 1-3 digits, not a form
+   field, so it gets a compact fixed-width box instead of stretching the
+   full column width (that emptiness read as an unfinished AI form). The
+   hint drops to its own row underneath, spanning both. */
 .field {
-  display: grid; grid-template-rows: auto auto 1fr; gap: 3px;
-  align-content: start;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 10px; row-gap: 2px;
 }
-.field label { font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.2px; }
+.field label {
+  grid-column: 1; grid-row: 1; align-self: center;
+  font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.2px;
+}
+.field .field-combo { grid-column: 2; grid-row: 1; width: 86px; justify-self: end; }
 .field .hint {
-  font-size: 11px; color: var(--text3); margin-top: 1px; line-height: 1.4;
+  grid-column: 1 / -1; grid-row: 2;
+  font-size: 11px; color: var(--text3); line-height: 1.4;
   min-height: 1.4em;   /* reserve the row even when a field has no hint */
 }
 .field:not(:has(.hint))::after {
-  content: ''; display: block;
-  font-size: 11px; line-height: 1.4; margin-top: 1px; min-height: 1.4em;
+  content: ''; grid-column: 1 / -1; grid-row: 2;
+  font-size: 11px; line-height: 1.4; min-height: 1.4em;
 }
+/* The two locked-list fields (sectors, commodities) swap the value box for a
+   full-width tag row — give it its own row instead of squeezing into the
+   76px value column. */
+.field:has(.sector-lock-tags) { grid-template-rows: auto auto auto; }
+.field .sector-lock-tags { grid-column: 1 / -1; grid-row: 2; }
+.field:has(.sector-lock-tags) .hint { grid-row: 3; }
 /* A threshold of 0 means "not filtering on this". Showing a bare 0 read as a
    real limit; this states the state and steps the value back visually. */
 .field.is-off .field-combo input[type=number] { color: var(--text3); }
