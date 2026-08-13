@@ -330,8 +330,12 @@ body {
 /* Rows are laid out as label / control / hint so the three parts line up
    across the whole grid. Fields without a hint used to collapse shorter than
    their neighbours, which knocked every following row out of alignment. */
+/* Two field slots per row, each internally split label|box|spacer. The sub-
+   columns are shared via subgrid so label width lines up across every row —
+   plain auto-sizing per field left each row's box wherever its own label
+   text happened to end, a zigzag. */
 .fields {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px;
+  display: grid; grid-template-columns: auto auto 1fr auto auto 1fr; gap: 8px 10px;
   align-items: start;
 }
 /* Label and value sit on one line — the value is 1-3 digits, not a form
@@ -340,15 +344,13 @@ body {
    hint drops to its own row underneath, spanning both. */
 .field {
   display: grid;
-  /* Label + box are auto-sized so they cluster together; the 1fr spacer is
-     the LAST track, so in RTL it trails at the far (left) end instead of
-     splitting the pair apart — the row hugs its own right edge like text does. */
-  grid-template-columns: auto auto 1fr;
+  grid-column: span 3;
+  grid-template-columns: subgrid;
   grid-template-rows: auto auto;
-  column-gap: 10px; row-gap: 2px;
+  row-gap: 2px;
 }
 .field label {
-  grid-column: 1; grid-row: 1; align-self: center;
+  grid-column: 1; grid-row: 1; align-self: center; text-align: right;
   font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.2px;
 }
 .field .field-combo { grid-column: 2; grid-row: 1; width: 86px; }
@@ -898,13 +900,6 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
     </div>
     <div id="sectorStrength" class="sector-strength"></div>
-    <div class="results-legend">
-      <span class="lg-grp"><i class="lg-dot lg-hi"></i>חזק 80+</span>
-      <span class="lg-grp"><i class="lg-dot lg-mid"></i>בינוני 60–79</span>
-      <span class="lg-grp"><i class="lg-dot lg-lo"></i>חלש מתחת 60</span>
-      <span class="lg-sep"></span>
-      <span class="lg-grp"><span class="earn-badge soon">דוח 5י</span> דוח כספי קרוב</span>
-    </div>
     <div id="tableView" class="table-wrap"></div>
     <div id="galleryView" class="gallery" style="display:none"></div>
   </div>
