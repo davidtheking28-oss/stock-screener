@@ -895,7 +895,6 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
     </div>
     <div id="sectorStrength" class="sector-strength"></div>
-    <div id="perfPanel" class="perf-panel"></div>
     <div class="results-legend">
       <span class="lg-grp"><i class="lg-dot lg-hi"></i>חזק 80+</span>
       <span class="lg-grp"><i class="lg-dot lg-mid"></i>בינוני 60–79</span>
@@ -2559,14 +2558,6 @@ function renderGallery(){
   const cards=rows.map(r=>{
     const wl=watchlist.has(r.ticker);
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
-    const scLbl = r.scoreKind==='momentum' ? 'MOM' : r.scoreKind==='power' ? 'PWR' : r.scoreKind==='qulla' ? 'QUL' : r.scoreKind==='growth' ? 'GRW' : r.scoreKind==='commodities' ? 'COMM' : 'SEPA';
-    const scTitle = r.scoreKind==='growth'
-      ? 'ציון צמיחה '+r.score+'/100 — EPS QoQ 50% + מכירות QoQ 50%'
-      : r.scoreKind==='qulla'
-      ? 'ציון Qullamaggie '+r.score+'/100 — מהלך 6ח׳ 40% + ADR 20% + צמידות EMA 20% + הידוק 20%'
-      : (r.scoreKind==='momentum'||r.scoreKind==='power'||r.scoreKind==='commodities')
-      ? 'ציון מומנטום '+r.score+'/100 — RS 50% + קרבה לשיא 25% + ביצוע 25%'
-      : 'ציון SEPA '+r.score+'/100 — RS 40% + EPS 25% + הכנסות 20% + קרבה לשיא 15%';
     const priceStr = r.close>=100 ? Math.round(r.close).toLocaleString('en-US') : r.close.toFixed(2);
     const stat=(lbl,v,tip)=>{
       const up=(v??0)>=0, cls=up?'pos':'neg';
@@ -2582,7 +2573,6 @@ function renderGallery(){
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name">'+esc(r.name)+'</div>'
       +(earnB?'<div class="gcard-tags">'+earnB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
-      +'<span class="gbadge" style="color:'+scoreColor(r.score)+';background:'+scoreBg(r.score)+'" title="'+scTitle+'"><span class="gb-lbl">'+scLbl+'</span> <b>'+r.score+'</b></span>'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span></div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
