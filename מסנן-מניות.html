@@ -831,14 +831,8 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field f-qulla"><label for="volSharesMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="volSharesMin" value="0.5" min="0" step="0.1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ממוצע 30/90 יום</span></div>
             <div class="field f-finviz"><label for="perfYMin">ביצוע שנתי מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="perfYMin" value="30" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">Performance Year</span></div>
             <div class="field f-finviz"><label for="finvizVolMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="finvizVolMin" value="0.1" min="0" step="0.05" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ממוצע 90 יום</span></div>
-            <div class="field f-finviz" style="grid-column:1 / -1">
-              <label>מגמה (קבוע)</label>
-              <div class="sector-lock-tags">
-                <span class="sector-tag locked">מחיר מעל SMA50</span>
-                <span class="sector-tag locked">מחיר מעל SMA200</span>
-              </div>
-              <span class="hint">חובה תמיד — לא ניתן לכיבוי</span>
-            </div>
+            <div class="field f-finviz"><label for="smaTrend50">מחיר מול SMA50</label><div class="field-combo"><input type="text" inputmode="none" id="smaTrend50" value="1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-finviz"><label for="smaTrend200">מחיר מול SMA200</label><div class="field-combo"><input type="text" inputmode="none" id="smaTrend200" value="1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="text" inputmode="none" id="priceMin" value="10" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="priceHint">מסנן מניות אגורה</span></div>
             <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="text" inputmode="none" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
             <div class="field f-base f-liq"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="liqMin" value="20" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
@@ -1015,7 +1009,7 @@ const SCREENER_DEFAULTS = {
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3,move6Min:20,move3Min:10,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
-  finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1},
+  finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
   commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
 };
@@ -1747,6 +1741,8 @@ const FIELD_PRESETS = {
   volSharesMin: [[0.1,'100K+'],[0.25,'250K+'],[0.5,'500K+ — קלאסי'],[1,'1M+'],[2,'2M+'],[5,'5M+']],
   perfYMin:     [[10,'10%'],[20,'20%'],[30,'30% — קלאסי'],[50,'50%'],[75,'75%'],[100,'100%'],[200,'200%']],
   finvizVolMin: [[0.1,'100K+ — קלאסי'],[0.25,'250K+'],[0.5,'500K+'],[1,'1M+'],[2,'2M+']],
+  smaTrend50:  [[1,'מעל — קלאסי'],[0,'מתחת']],
+  smaTrend200: [[1,'מעל — קלאסי'],[0,'מתחת']],
 };
 // The box shows a short label ("+$300M"), not the raw threshold ("0.3") — so
 // what's picked in the dropdown always matches what's printed in the field.
@@ -1842,7 +1838,7 @@ function applyPreset(key, btn){
 const MY_PRESETS_KEY='sepa_my_presets_v1';
 const PRESET_FIELDS=['rsMin','fromHigh','fromLow','priceMin','mcMin','liqMin','earnDays','runMin',
   'epsMin','revMin','roeMin','epsQoqMin','revQoqMin','adrMin','move6Min','move3Min',
-  'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin'];
+  'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin','smaTrend50','smaTrend200'];
 function _myPresets(){ try{ return JSON.parse(localStorage.getItem(MY_PRESETS_KEY)||'{}')||{}; }catch(e){ return {}; } }
 function _writeMyPresets(o){ try{ localStorage.setItem(MY_PRESETS_KEY, JSON.stringify(o)); }catch(e){} }
 function saveMyPreset(){
@@ -2227,7 +2223,8 @@ function applyFilters(universe, rsMap, opts={}){
       const avg90=d[C.average_volume_90d_calc], avg30=d[C.average_volume_30d_calc];
       const avgRef=avg90??avg30??avgVol;
       const volOk=avgRef!=null && avgRef>=num('finvizVolMin')*1e6;
-      const trendOk=close>s50 && close>s200;
+      const above50=num('smaTrend50')!==0, above200=num('smaTrend200')!==0;
+      const trendOk=(above50?close>s50:close<s50) && (above200?close>s200:close<s200);
       const perfOk=perfY!=null && perfY>=num('perfYMin');
       checks={volOk,trendOk,perfOk};
       pass=volOk&&trendOk&&perfOk;
@@ -2921,6 +2918,7 @@ function saveFilterPrefs(){
       adrMin:num('adrMin'),move6Min:num('move6Min'),move3Min:num('move3Min'),
       emaDistMax:num('emaDistMax'),weekRangeMax:num('weekRangeMax'),volSharesMin:num('volSharesMin'),
       perfYMin:num('perfYMin'),finvizVolMin:num('finvizVolMin'),
+      smaTrend50:num('smaTrend50'),smaTrend200:num('smaTrend200'),
       useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,requireEpsAccel:$('requireEpsAccel')?.checked
     }));
   } catch(e){}
@@ -2940,6 +2938,7 @@ function loadFilterPrefs(){
     set('adrMin',p.adrMin); set('move6Min',p.move6Min); set('move3Min',p.move3Min);
     set('emaDistMax',p.emaDistMax); set('weekRangeMax',p.weekRangeMax); set('volSharesMin',p.volSharesMin);
     set('perfYMin',p.perfYMin); set('finvizVolMin',p.finvizVolMin);
+    set('smaTrend50',p.smaTrend50); set('smaTrend200',p.smaTrend200);
     if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
     if($('requireProfit')&&p.requireProfit!=null) $('requireProfit').checked=p.requireProfit;
     if($('requireEpsAccel')&&p.requireEpsAccel!=null) $('requireEpsAccel').checked=p.requireEpsAccel;
