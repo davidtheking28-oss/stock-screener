@@ -833,6 +833,14 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field f-qulla"><label for="volSharesMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="number" id="volSharesMin" value="0.5" min="0" step="0.1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ממוצע 30/90 יום</span></div>
             <div class="field f-finviz"><label for="perfYMin">ביצוע שנתי מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="perfYMin" value="30" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">Performance Year</span></div>
             <div class="field f-finviz"><label for="finvizVolMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="number" id="finvizVolMin" value="0.1" min="0" step="0.05" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ממוצע 90 יום</span></div>
+            <div class="field f-finviz" style="grid-column:1 / -1">
+              <label>מגמה (קבוע)</label>
+              <div class="sector-lock-tags">
+                <span class="sector-tag locked">מחיר מעל SMA50</span>
+                <span class="sector-tag locked">מחיר מעל SMA200</span>
+              </div>
+              <span class="hint">חובה תמיד — לא ניתן לכיבוי</span>
+            </div>
             <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="priceHint">מסנן מניות אגורה</span></div>
             <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="number" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
             <div class="field f-base f-liq"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
