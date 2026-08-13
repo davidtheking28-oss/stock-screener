@@ -277,7 +277,7 @@ body {
 }
 .preset-x:hover { opacity: 1; color: var(--red); background: rgba(231,76,60,0.14); }
 .field-combo { position: relative; }
-.field-combo input[type=number] { cursor: pointer; padding-left: 28px; }
+.field-combo input { cursor: pointer; padding-left: 28px; text-align: right; caret-color: transparent; }
 .field-combo::after {
   content: ''; position: absolute; left: 12px; top: 50%;
   width: 0; height: 0; margin-top: -2px;
@@ -366,11 +366,11 @@ body {
 .field:has(.sector-lock-tags) .hint { grid-row: 3; }
 /* A threshold of 0 means "not filtering on this". Showing a bare 0 read as a
    real limit; this states the state and steps the value back visually. */
-.field.is-off .field-combo input[type=number] { color: var(--text3); }
+.field.is-off .field-combo input { color: var(--text3); }
 .field.is-off .hint { color: var(--text3); opacity: 0.85; }
 .field .hint b { color: var(--text2); font-weight: 700; font-style: normal; }
 
-input[type=number], select {
+.field-combo input, select {
   background: var(--fill); border: 1px solid var(--border);
   color: var(--text); border-radius: var(--r2);
   padding: 7px 10px; width: 100%;
@@ -381,10 +381,8 @@ input[type=number], select {
   transition: border-color 0.15s var(--ease), background 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
 select option { background: #0d1831; color: #c8d8f0; }
-input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
-input[type=number]:hover, select:hover { border-color: rgba(255,255,255,0.2); background: var(--fill2); }
-input[type=number]:focus, select:focus {
+.field-combo input:hover, select:hover { border-color: rgba(255,255,255,0.2); background: var(--fill2); }
+.field-combo input:focus, select:focus {
   outline: none; border-color: var(--accent);
   background: oklch(64% 0.2 258 / 0.06); box-shadow: 0 0 0 3px oklch(64% 0.2 258 / 0.18);
 }
@@ -741,7 +739,7 @@ tbody tr:last-child td { border-bottom: none; }
   .results-controls .btn-ghost, .view-tab { min-height: 44px; }
   .screener-btn, .preset-btn, .field-picker-item { min-height: 44px; }
   .btn-rescan, .topbar .btn-ghost { min-height: 44px; }
-  input[type=number], select, .ticker-search { min-height: 44px; }
+  .field-combo input, select, .ticker-search { min-height: 44px; }
   .star-btn, .jrnl-btn { min-width: 44px; min-height: 44px; }
   .btn-scan { min-height: 44px; }
   /* The box itself stays small on purpose; the row it sits in is the target. */
@@ -809,10 +807,10 @@ tbody tr:last-child td { border-bottom: none; }
         <div class="filter-section">
           <h3 class="tech-head" id="techHead">טכני — Trend Template</h3>
           <div class="fields">
-            <div class="field f-tech"><label for="rsMin">RS Rating מינ&#8217;</label><div class="field-combo"><input type="number" id="rsMin" value="70" min="1" max="99" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ביצוע יחסי (0-99)</span></div>
-            <div class="field f-tech"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><div class="field-combo"><input type="number" id="fromHigh" value="25" min="0" max="100" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
-            <div class="field f-growth"><label for="epsQoqMin">EPS QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="epsQoqMin" value="15" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">רבעון מול הרבעון הקודם</span></div>
-            <div class="field f-growth"><label for="revQoqMin">מכירות QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="revQoqMin" value="25" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-tech"><label for="rsMin">RS Rating מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="rsMin" value="70" min="1" max="99" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ביצוע יחסי (0-99)</span></div>
+            <div class="field f-tech"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="fromHigh" value="25" min="0" max="100" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">עד כמה % מהשיא 52ש&#8217;</span></div>
+            <div class="field f-growth"><label for="epsQoqMin">EPS QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsQoqMin" value="15" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">רבעון מול הרבעון הקודם</span></div>
+            <div class="field f-growth"><label for="revQoqMin">מכירות QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="revQoqMin" value="25" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-growth" style="grid-column:1 / -1">
               <label>סקטורים (קבוע)</label>
               <div class="sector-lock-tags">
@@ -823,16 +821,16 @@ tbody tr:last-child td { border-bottom: none; }
               </div>
               <span class="hint">רק מניות מהסקטורים האלה יעברו את הסינון, ללא יוצא מהכלל</span>
             </div>
-            <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="number" id="fromLow" value="30" min="0" max="500" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
-            <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="runMin" value="100" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ריצה נפיצה תוך ~8 שבועות (OHLC)</span></div>
-            <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="number" id="adrMin" value="3" min="0" step="0.5" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">תנודתיות יומית ממוצעת 20 יום</span></div>
-            <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="move6Min" value="20" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">זינוק קודם — עדיף 50%+</span></div>
-            <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="move3Min" value="10" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
-            <div class="field f-qulla"><label for="emaDistMax">מרחק מ-EMA10/20 מקס&#8217; (%)</label><div class="field-combo"><input type="number" id="emaDistMax" value="3.5" min="0" step="0.5" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">&#8220;surfing&#8221; הממוצעים 10/20</span></div>
-            <div class="field f-qulla"><label for="weekRangeMax">דשדוש 5 ימים מקס&#8217; (&#177;%)</label><div class="field-combo"><input type="number" id="weekRangeMax" value="7" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">שינוי שבועי בטווח צר</span></div>
-            <div class="field f-qulla"><label for="volSharesMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="number" id="volSharesMin" value="0.5" min="0" step="0.1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ממוצע 30/90 יום</span></div>
-            <div class="field f-finviz"><label for="perfYMin">ביצוע שנתי מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="perfYMin" value="30" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">Performance Year</span></div>
-            <div class="field f-finviz"><label for="finvizVolMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="number" id="finvizVolMin" value="0.1" min="0" step="0.05" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ממוצע 90 יום</span></div>
+            <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="fromLow" value="30" min="0" max="500" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
+            <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="runMin" value="100" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ריצה נפיצה תוך ~8 שבועות (OHLC)</span></div>
+            <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="adrMin" value="3" min="0" step="0.5" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">תנודתיות יומית ממוצעת 20 יום</span></div>
+            <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move6Min" value="20" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">זינוק קודם — עדיף 50%+</span></div>
+            <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move3Min" value="10" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-qulla"><label for="emaDistMax">מרחק מ-EMA10/20 מקס&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="emaDistMax" value="3.5" min="0" step="0.5" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">&#8220;surfing&#8221; הממוצעים 10/20</span></div>
+            <div class="field f-qulla"><label for="weekRangeMax">דשדוש 5 ימים מקס&#8217; (&#177;%)</label><div class="field-combo"><input type="text" inputmode="none" id="weekRangeMax" value="7" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">שינוי שבועי בטווח צר</span></div>
+            <div class="field f-qulla"><label for="volSharesMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="volSharesMin" value="0.5" min="0" step="0.1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ממוצע 30/90 יום</span></div>
+            <div class="field f-finviz"><label for="perfYMin">ביצוע שנתי מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="perfYMin" value="30" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">Performance Year</span></div>
+            <div class="field f-finviz"><label for="finvizVolMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="finvizVolMin" value="0.1" min="0" step="0.05" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ממוצע 90 יום</span></div>
             <div class="field f-finviz" style="grid-column:1 / -1">
               <label>מגמה (קבוע)</label>
               <div class="sector-lock-tags">
@@ -841,10 +839,10 @@ tbody tr:last-child td { border-bottom: none; }
               </div>
               <span class="hint">חובה תמיד — לא ניתן לכיבוי</span>
             </div>
-            <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="number" id="priceMin" value="10" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="priceHint">מסנן מניות אגורה</span></div>
-            <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="number" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
-            <div class="field f-base f-liq"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="number" id="liqMin" value="20" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
-            <div class="field f-base"><label for="earnDays">חסום דוח בעוד (ימים)</label><div class="field-combo"><input type="number" id="earnDays" value="5" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="earnHint">מדלג על מניות עם דוח קרוב</span></div>
+            <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="text" inputmode="none" id="priceMin" value="10" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="priceHint">מסנן מניות אגורה</span></div>
+            <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="text" inputmode="none" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
+            <div class="field f-base f-liq"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="liqMin" value="20" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
+            <div class="field f-base"><label for="earnDays">חסום דוח בעוד (ימים)</label><div class="field-combo"><input type="text" inputmode="none" id="earnDays" value="5" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="earnHint">מדלג על מניות עם דוח קרוב</span></div>
             <div class="field f-commodities" style="grid-column:1 / -1">
               <label>סחורות (קבוע)</label>
               <div class="sector-lock-tags">
@@ -862,9 +860,9 @@ tbody tr:last-child td { border-bottom: none; }
         <div class="filter-section f-sepa">
           <h3 class="fund-head">פונדמנטלי</h3>
           <div class="fields" id="fundFields">
-            <div class="field"><label for="epsMin">EPS YoY מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="epsMin" value="25" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">רבעון מול שנה קודמת</span></div>
-            <div class="field"><label for="revMin">הכנסות YoY מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="revMin" value="20" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
-            <div class="field"><label for="roeMin">ROE מינ&#8217; (%)</label><div class="field-combo"><input type="number" id="roeMin" value="17" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">מינרוויני: 17%+</span></div>
+            <div class="field"><label for="epsMin">EPS YoY מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsMin" value="25" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">רבעון מול שנה קודמת</span></div>
+            <div class="field"><label for="revMin">הכנסות YoY מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="revMin" value="20" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field"><label for="roeMin">ROE מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="roeMin" value="17" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">מינרוויני: 17%+</span></div>
           </div>
           <div class="filter-toggles">
             <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
@@ -1479,7 +1477,9 @@ const $   = id => document.getElementById(id);
 // An empty input parses to NaN, and every threshold comparison against NaN is
 // false — so clearing one field silently rejected the entire universe while
 // validateInputs (which only tests < and >) reported everything fine.
-const num = id => { const v = parseFloat($(id)?.value); return Number.isFinite(v) ? v : 0; };
+// field-combo boxes show a formatted label ("+$300M"), not the raw threshold —
+// the real number lives in data-raw and is what every filter comparison reads.
+const num = id => { const el=$(id); const raw = el?.dataset.raw ?? el?.value; const v = parseFloat(raw); return Number.isFinite(v) ? v : 0; };
 const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
 const pct = v => v==null ? '—' : v.toFixed(1)+'%';
 const fmtB = v => {
@@ -1748,6 +1748,19 @@ const FIELD_PRESETS = {
   perfYMin:     [[10,'10%'],[20,'20%'],[30,'30% — קלאסי'],[50,'50%'],[75,'75%'],[100,'100%'],[200,'200%']],
   finvizVolMin: [[0.1,'100K+ — קלאסי'],[0.25,'250K+'],[0.5,'500K+'],[1,'1M+'],[2,'2M+']],
 };
+// The box shows a short label ("+$300M"), not the raw threshold ("0.3") — so
+// what's picked in the dropdown always matches what's printed in the field.
+function fieldDisplayLabel(id, raw){
+  const list=FIELD_PRESETS[id], n=parseFloat(raw);
+  if(!list || !Number.isFinite(n)) return String(raw);
+  const hit=list.find(([v])=>Math.abs(v-n)<1e-9);
+  return hit ? hit[1].split(' — ')[0] : String(raw);
+}
+function setFieldValue(el, raw){
+  if(!el) return;
+  el.dataset.raw=raw;
+  el.value=fieldDisplayLabel(el.id, raw);
+}
 let _fieldPanel=null, _fieldPanelInput=null;
 function closeFieldPicker(){
   if(_fieldPanel){ _fieldPanel.remove(); _fieldPanel=null; _fieldPanelInput=null; }
@@ -1765,8 +1778,9 @@ function openFieldPicker(input){
   closeFieldPicker();
   const panel=document.createElement('div');
   panel.className='field-picker-panel';
+  const curRaw=input.dataset.raw??input.value;
   panel.innerHTML=presets.map(([v,l])=>
-    '<button type="button" class="field-picker-item'+(String(v)===input.value?' active':'')+'" data-v="'+v+'">'+l+'</button>'
+    '<button type="button" class="field-picker-item'+(String(v)===curRaw?' active':'')+'" data-v="'+v+'">'+l+'</button>'
   ).join('');
   document.body.appendChild(panel);
   const rect=input.getBoundingClientRect();
@@ -1777,7 +1791,7 @@ function openFieldPicker(input){
   panel.addEventListener('mousedown', e=>{
     const btn=e.target.closest('.field-picker-item'); if(!btn) return;
     e.preventDefault();
-    input.value=btn.dataset.v;
+    setFieldValue(input, btn.dataset.v);
     input.dispatchEvent(new Event('input',{bubbles:true}));
     closeFieldPicker();
     input.blur();
@@ -1814,7 +1828,7 @@ function validateInputs(){
 const PRESET_NAMES = {classic:'קלאסי Minervini',aggressive:'אגרסיבי',conservative:'שמרני'};
 function applyPreset(key, btn){
   const p=PRESETS[key]; if(!p) return;
-  Object.entries(p).forEach(([k,v])=>{ const el=$(k); if(el) el.value=v; });
+  Object.entries(p).forEach(([k,v])=>{ setFieldValue($(k),v); });
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   updUnitHints();
@@ -1836,7 +1850,7 @@ function saveMyPreset(){
   if(!name) return;
   const all=_myPresets();
   const vals={_screener:activeScreener};
-  PRESET_FIELDS.forEach(k=>{ const el=$(k); if(el&&el.value!=='') vals[k]=el.value; });
+  PRESET_FIELDS.forEach(k=>{ const el=$(k); const raw=el?.dataset.raw; if(raw!=null&&raw!=='') vals[k]=raw; });
   ['useFund','requireProfit','requireEpsAccel'].forEach(k=>{ const el=$(k); if(el) vals[k]=el.checked; });
   all[name]=vals;
   _writeMyPresets(all);
@@ -1846,7 +1860,7 @@ function saveMyPreset(){
 function applyMyPreset(name, btn){
   const p=_myPresets()[name]; if(!p) return;
   if(p._screener && p._screener!==activeScreener) setScreener(p._screener, false);
-  PRESET_FIELDS.forEach(k=>{ const el=$(k); if(el && p[k]!=null) el.value=p[k]; });
+  PRESET_FIELDS.forEach(k=>{ if(p[k]!=null) setFieldValue($(k),p[k]); });
   ['useFund','requireProfit','requireEpsAccel'].forEach(k=>{ const el=$(k); if(el && typeof p[k]==='boolean') el.checked=p[k]; });
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
   btn?.classList.add('active');
@@ -1883,7 +1897,7 @@ function setScreener(key, applyDef=true){
   const th=$('techHead'); if(th) th.textContent=SCREENER_HEADS[key];
   document.querySelectorAll('.screener-btn').forEach(b=>b.classList.toggle('active', b.dataset.screener===key));
   if(applyDef){
-    Object.entries(SCREENER_DEFAULTS[key]||{}).forEach(([k,v])=>{ const el=$(k); if(el) el.value=v; });
+    Object.entries(SCREENER_DEFAULTS[key]||{}).forEach(([k,v])=>{ setFieldValue($(k),v); });
     if(key==='sepa') document.querySelectorAll('.preset-btn').forEach((b,i)=>b.classList.toggle('active', i===0));
     updUnitHints();
   }
@@ -2916,7 +2930,7 @@ function loadFilterPrefs(){
   try {
     const p=JSON.parse(localStorage.getItem('sepa_filters')||'null'); if(!p) return;
     if((p.v||0)<2){ if(p.fromLow==25) p.fromLow=30; if(p.mcMin!=null&&p.mcMin>=50) p.mcMin=p.mcMin/1000; p.v=2; try{ localStorage.setItem('sepa_filters', JSON.stringify(p)); }catch(e){} }
-    const set=(id,v)=>{ const el=$(id); if(el&&v!=null) el.value=v; };
+    const set=(id,v)=>{ if(v!=null) setFieldValue($(id),v); };
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
     set('priceMin',p.priceMin);
     set('mcMin',p.mcMin);
@@ -2933,6 +2947,10 @@ function loadFilterPrefs(){
   } catch(e){}
 }
 
+// Seed the formatted display ("+$300M") from each field's HTML-authored raw
+// value before anything else runs, so a field loadFilterPrefs doesn't touch
+// still shows a label instead of the bare threshold on first paint.
+Object.keys(FIELD_PRESETS).forEach(id=>{ const el=$(id); if(el) setFieldValue(el, el.value); });
 loadFilterPrefs();
 setScreener(activeScreener, false);
 
