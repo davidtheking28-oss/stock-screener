@@ -340,15 +340,18 @@ body {
    hint drops to its own row underneath, spanning both. */
 .field {
   display: grid;
-  grid-template-columns: 1fr auto;
+  /* Label + box are auto-sized so they cluster together; the 1fr spacer is
+     the LAST track, so in RTL it trails at the far (left) end instead of
+     splitting the pair apart — the row hugs its own right edge like text does. */
+  grid-template-columns: auto auto 1fr;
   grid-template-rows: auto auto;
   column-gap: 10px; row-gap: 2px;
 }
 .field label {
-  grid-column: 1; grid-row: 1; align-self: center; text-align: left;
+  grid-column: 1; grid-row: 1; align-self: center;
   font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.2px;
 }
-.field .field-combo { grid-column: 2; grid-row: 1; width: 86px; justify-self: end; }
+.field .field-combo { grid-column: 2; grid-row: 1; width: 86px; }
 .field .hint {
   grid-column: 1 / -1; grid-row: 2;
   font-size: 11px; color: var(--text3); line-height: 1.4;
@@ -764,7 +767,7 @@ tbody tr:last-child td { border-bottom: none; }
     <span id="breadthLabel"></span>
     <span class="breadth-spark" id="breadthSpark"></span>
   </div>
-  <div id="statBar"><span style="color:var(--text3)">8 תנאי Trend Template · RS Rating · EPS · הכנסות · ROE</span></div>
+  <div id="statBar"></div>
   <div class="topbar-end">
     <span id="scanTime"></span>
     <button class="btn-rescan" id="scanBtn" onclick="scan(true)" style="display:none">&#8635; סרוק שנית</button>
