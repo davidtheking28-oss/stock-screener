@@ -862,11 +862,17 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field"><label for="epsMin">EPS YoY מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsMin" value="25" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">רבעון מול שנה קודמת</span></div>
             <div class="field"><label for="revMin">הכנסות YoY מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="revMin" value="20" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field"><label for="roeMin">ROE מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="roeMin" value="17" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">מינרוויני: 17%+</span></div>
+            <div class="field"><label for="nmMin">שולי רווח נטו מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="nmMin" value="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">0 = כבוי, רק &quot;רווח חיובי&quot; למטה</span></div>
+            <div class="field"><label for="revQoqSepaMin">מכירות QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="revQoqSepaMin" value="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">רבעון מול הרבעון הקודם, 0 = כבוי</span></div>
+            <div class="field"><label for="epsQoqSepaMin">EPS QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsQoqSepaMin" value="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">קפיצה רבעונית — לרוב תלת-ספרתית ב-Superperformance</span></div>
+            <div class="field"><label for="epsFwdMin">תחזית EPS שנה הבאה מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsFwdMin" value="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">קונצנזוס שנה קדימה מול TTM, 0 = כבוי</span></div>
           </div>
           <div class="filter-toggles">
             <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
             <label class="toggle"><input type="checkbox" id="requireProfit" checked> שולי רווח חיוביים</label>
             <label class="toggle"><input type="checkbox" id="requireEpsAccel"> האצה ב-EPS (רבעון אחרון &ge; קודם)</label>
+            <label class="toggle"><input type="checkbox" id="requireRevAccel"> האצה במכירות (רבעון אחרון &ge; קודם)</label>
+            <label class="toggle"><input type="checkbox" id="requireMarginTrend"> שיפור שולי רווח (מול שנה קודמת)</label>
           </div>
         </div>
       </div>
@@ -982,7 +988,8 @@ const COLUMNS = [
   "earnings_release_next_date","Volatility.D","Volatility.M",
   "Perf.3M","Perf.6M",
   "EMA10","EMA20","Perf.W",
-  "average_volume_30d_calc","average_volume_90d_calc"
+  "average_volume_30d_calc","average_volume_90d_calc",
+  "earnings_per_share_diluted_ttm","earnings_per_share_forecast_next_fy","net_margin_fy"
 ];
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
@@ -1730,6 +1737,10 @@ const FIELD_PRESETS = {
   roeMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[17,'17% — מינרוויני'],[20,'20%'],[25,'25%'],[30,'30%'],[40,'40%']],
   epsQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15% — קלאסי'],[25,'25%'],[40,'40%'],[60,'60%'],[100,'100%']],
   revQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25% — קלאסי'],[40,'40%'],[60,'60%'],[100,'100%']],
+  nmMin: [[0,'כבוי'],[3,'3%'],[5,'5%'],[8,'8%'],[10,'10%'],[15,'15%'],[20,'20%']],
+  revQoqSepaMin: [[0,'כבוי'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25%'],[40,'40%'],[60,'60%'],[100,'100%']],
+  epsQoqSepaMin: [[0,'כבוי'],[10,'10%'],[25,'25%'],[50,'50%'],[75,'75%'],[100,'100% — תלת-ספרתי'],[150,'150%'],[200,'200%']],
+  epsFwdMin: [[0,'כבוי'],[10,'10%'],[15,'15%'],[25,'25% — מינרוויני'],[40,'40%'],[60,'60%']],
   adrMin:       [[2,'2%'],[3,'3% — ברירת מחדל'],[3.5,'3.5%'],[4,'4% — קולאמאגי מקורי'],[5,'5%'],[6,'6%'],[8,'8%']],
   move6Min:     [[20,'20% — ברירת מחדל'],[30,'30% — מקורי'],[50,'50% — מועדף'],[75,'75%'],[100,'100%'],[150,'150%']],
   move3Min:     [[10,'10% — ברירת מחדל'],[20,'20% — מקורי'],[30,'30%'],[50,'50%'],[75,'75%'],[100,'100%']],
@@ -1835,7 +1846,8 @@ function applyPreset(key, btn){
 const MY_PRESETS_KEY='sepa_my_presets_v1';
 const PRESET_FIELDS=['rsMin','fromHigh','fromLow','priceMin','mcMin','liqMin','earnDays','runMin',
   'epsMin','revMin','roeMin','epsQoqMin','revQoqMin','adrMin','move6Min','move3Min',
-  'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin','smaTrend50','smaTrend200'];
+  'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin','smaTrend50','smaTrend200',
+  'nmMin','revQoqSepaMin','epsQoqSepaMin','epsFwdMin'];
 function _myPresets(){ try{ return JSON.parse(localStorage.getItem(MY_PRESETS_KEY)||'{}')||{}; }catch(e){ return {}; } }
 function _writeMyPresets(o){ try{ localStorage.setItem(MY_PRESETS_KEY, JSON.stringify(o)); }catch(e){} }
 function saveMyPreset(){
@@ -1844,7 +1856,7 @@ function saveMyPreset(){
   const all=_myPresets();
   const vals={_screener:activeScreener};
   PRESET_FIELDS.forEach(k=>{ const el=$(k); const raw=el?.dataset.raw; if(raw!=null&&raw!=='') vals[k]=raw; });
-  ['useFund','requireProfit','requireEpsAccel'].forEach(k=>{ const el=$(k); if(el) vals[k]=el.checked; });
+  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend'].forEach(k=>{ const el=$(k); if(el) vals[k]=el.checked; });
   all[name]=vals;
   _writeMyPresets(all);
   renderMyPresets();
@@ -1854,7 +1866,7 @@ function applyMyPreset(name, btn){
   const p=_myPresets()[name]; if(!p) return;
   if(p._screener && p._screener!==activeScreener) setScreener(p._screener, false);
   PRESET_FIELDS.forEach(k=>{ if(p[k]!=null) setFieldValue($(k),p[k]); });
-  ['useFund','requireProfit','requireEpsAccel'].forEach(k=>{ const el=$(k); if(el && typeof p[k]==='boolean') el.checked=p[k]; });
+  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend'].forEach(k=>{ const el=$(k); if(el && typeof p[k]==='boolean') el.checked=p[k]; });
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
   btn?.classList.add('active');
   updUnitHints(); toggleFundFields(); saveFilterPrefs();
@@ -2131,7 +2143,11 @@ function applyFilters(universe, rsMap, opts={}){
   const runMin=num('runMin');
   const useFund=opts.skipFund?false:$('useFund').checked, reqProfit=opts.skipFund?false:$('requireProfit').checked;
   const reqEpsAccel=opts.skipFund?false:!!$('requireEpsAccel')?.checked;
+  const reqRevAccel=opts.skipFund?false:!!$('requireRevAccel')?.checked;
+  const reqMarginTrend=opts.skipFund?false:!!$('requireMarginTrend')?.checked;
   const epsMin=num('epsMin'), revMin=num('revMin'), roeMin=num('roeMin');
+  const nmMin=opts.skipFund?0:num('nmMin'), revQoqSepaMin=opts.skipFund?0:num('revQoqSepaMin'),
+        epsQoqSepaMin=opts.skipFund?0:num('epsQoqSepaMin'), epsFwdMin=opts.skipFund?0:num('epsFwdMin');
   const nowSec=Date.now()/1000;
   const out=[];
 
@@ -2167,7 +2183,11 @@ function applyFilters(universe, rsMap, opts={}){
           epsQoq=d[C['earnings_per_share_diluted_qoq_growth_fq']],
           rev=d[C.total_revenue_yoy_growth_fq],
           revQoq=d[C['total_revenue_qoq_growth_fq']],
-          roe=d[C.return_on_equity_fq], nm=d[C.net_margin];
+          roe=d[C.return_on_equity_fq], nm=d[C.net_margin], nmFy=d[C.net_margin_fy];
+    const epsTtm=d[C.earnings_per_share_diluted_ttm], epsFwdFy=d[C.earnings_per_share_forecast_next_fy];
+    // A negative or zero TTM base makes a % change meaningless (e.g. -$1 → $2 is
+    // a "300% drop" by the naive formula), so treat it as unknown rather than pass.
+    const epsFwdGrowth=(epsTtm!=null && epsTtm>0 && epsFwdFy!=null) ? (epsFwdFy/epsTtm-1)*100 : null;
 
     let pass=false, checks={};
     if(scr==='commodities'){
@@ -2233,7 +2253,13 @@ function applyFilters(universe, rsMap, opts={}){
       pass=[t1,t2,t3,t4,t5,t6,t7,t8].every(Boolean);
       if(pass && useFund && (eps==null||eps<epsMin||rev==null||rev<revMin||roe==null||roe<roeMin)) pass=false;
       if(pass && reqEpsAccel && !(epsQoq!=null && epsQoq>=0)) pass=false;
+      if(pass && reqRevAccel && !(revQoq!=null && revQoq>=0)) pass=false;
       if(pass && reqProfit && (nm==null||nm<=0)) pass=false;
+      if(pass && useFund && nmMin>0 && (nm==null||nm<nmMin)) pass=false;
+      if(pass && useFund && revQoqSepaMin>0 && (revQoq==null||revQoq<revQoqSepaMin)) pass=false;
+      if(pass && useFund && epsQoqSepaMin>0 && (epsQoq==null||epsQoq<epsQoqSepaMin)) pass=false;
+      if(pass && useFund && epsFwdMin>0 && (epsFwdGrowth==null||epsFwdGrowth<epsFwdMin)) pass=false;
+      if(pass && reqMarginTrend && !(nm!=null && nmFy!=null && nm>nmFy)) pass=false;
     }
     if(!pass) continue;
 
@@ -2247,7 +2273,7 @@ function applyFilters(universe, rsMap, opts={}){
       emaDist:Math.min(
         d[C.EMA10]!=null?Math.abs(close/d[C.EMA10]-1)*100:Infinity,
         d[C.EMA20]!=null?Math.abs(close/d[C.EMA20]-1)*100:Infinity),
-      eps, epsQoq, rev, revQoq, roe, nm, score:0, checks
+      eps, epsQoq, rev, revQoq, roe, nm, nmFy, epsFwdGrowth, score:0, checks
     });
   }
   return out;
@@ -2907,7 +2933,9 @@ function saveFilterPrefs(){
       emaDistMax:num('emaDistMax'),weekRangeMax:num('weekRangeMax'),volSharesMin:num('volSharesMin'),
       perfYMin:num('perfYMin'),finvizVolMin:num('finvizVolMin'),
       smaTrend50:num('smaTrend50'),smaTrend200:num('smaTrend200'),
-      useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,requireEpsAccel:$('requireEpsAccel')?.checked
+      nmMin:num('nmMin'),revQoqSepaMin:num('revQoqSepaMin'),epsQoqSepaMin:num('epsQoqSepaMin'),epsFwdMin:num('epsFwdMin'),
+      useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,requireEpsAccel:$('requireEpsAccel')?.checked,
+      requireRevAccel:$('requireRevAccel')?.checked,requireMarginTrend:$('requireMarginTrend')?.checked
     }));
   } catch(e){}
 }
@@ -2927,9 +2955,12 @@ function loadFilterPrefs(){
     set('emaDistMax',p.emaDistMax); set('weekRangeMax',p.weekRangeMax); set('volSharesMin',p.volSharesMin);
     set('perfYMin',p.perfYMin); set('finvizVolMin',p.finvizVolMin);
     set('smaTrend50',p.smaTrend50); set('smaTrend200',p.smaTrend200);
+    set('nmMin',p.nmMin); set('revQoqSepaMin',p.revQoqSepaMin); set('epsQoqSepaMin',p.epsQoqSepaMin); set('epsFwdMin',p.epsFwdMin);
     if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
     if($('requireProfit')&&p.requireProfit!=null) $('requireProfit').checked=p.requireProfit;
     if($('requireEpsAccel')&&p.requireEpsAccel!=null) $('requireEpsAccel').checked=p.requireEpsAccel;
+    if($('requireRevAccel')&&p.requireRevAccel!=null) $('requireRevAccel').checked=p.requireRevAccel;
+    if($('requireMarginTrend')&&p.requireMarginTrend!=null) $('requireMarginTrend').checked=p.requireMarginTrend;
     toggleFundFields();
   } catch(e){}
 }
