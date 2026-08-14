@@ -2943,7 +2943,13 @@ function saveFilterPrefs(){
 function loadFilterPrefs(){
   try {
     const p=JSON.parse(localStorage.getItem('sepa_filters')||'null'); if(!p) return;
-    if((p.v||0)<2){ if(p.fromLow==25) p.fromLow=30; if(p.mcMin!=null&&p.mcMin>=50) p.mcMin=p.mcMin/1000; p.v=2; try{ localStorage.setItem('sepa_filters', JSON.stringify(p)); }catch(e){} }
+    if((p.v||0)<2){ if(p.fromLow==25) p.fromLow=30; if(p.mcMin!=null&&p.mcMin>=50) p.mcMin=p.mcMin/1000; p.v=2; }
+    // v3: the Minervini spec review raised epsMin's default 25→50 and turned
+    // requireEpsAccel on by default. A saved blob still holding the OLD
+    // default for either is an untouched setting, not a deliberate choice —
+    // same rule the v2 migration above uses — so only those exact values move.
+    if((p.v||0)<3){ if(p.epsMin===25) p.epsMin=50; if(p.requireEpsAccel===false) p.requireEpsAccel=true; p.v=3; }
+    try{ localStorage.setItem('sepa_filters', JSON.stringify(p)); }catch(e){}
     const set=(id,v)=>{ if(v!=null) setFieldValue($(id),v); };
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
     set('priceMin',p.priceMin);
