@@ -859,20 +859,20 @@ tbody tr:last-child td { border-bottom: none; }
         <div class="filter-section f-sepa">
           <h3 class="fund-head">פונדמנטלי</h3>
           <div class="fields" id="fundFields">
-            <div class="field"><label for="epsMin">EPS YoY מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsMin" value="25" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">רבעון מול שנה קודמת</span></div>
-            <div class="field"><label for="revMin">הכנסות YoY מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="revMin" value="20" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field"><label for="epsMin">EPS YoY מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsMin" value="50" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">מינרוויני: מינימום 50%</span></div>
+            <div class="field"><label for="revMin">הכנסות YoY מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="revMin" value="20" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">מינרוויני: עדיפות 20%+, חזק 40%+</span></div>
             <div class="field"><label for="roeMin">ROE מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="roeMin" value="17" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">מינרוויני: 17%+</span></div>
-            <div class="field"><label for="nmMin">שולי רווח נטו מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="nmMin" value="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">0 = כבוי, רק &quot;רווח חיובי&quot; למטה</span></div>
+            <div class="field"><label for="nmMin">שולי רווח נטו מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="nmMin" value="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">0 = כבוי — אין סף מספרי במקור, רק &quot;רווח חיובי&quot; + מגמת שיפור למטה</span></div>
             <div class="field"><label for="revQoqSepaMin">מכירות QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="revQoqSepaMin" value="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">רבעון מול הרבעון הקודם, 0 = כבוי</span></div>
-            <div class="field"><label for="epsQoqSepaMin">EPS QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsQoqSepaMin" value="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">קפיצה רבעונית — לרוב תלת-ספרתית ב-Superperformance</span></div>
-            <div class="field"><label for="epsFwdMin">תחזית EPS שנה הבאה מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsFwdMin" value="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">קונצנזוס שנה קדימה מול TTM, 0 = כבוי</span></div>
+            <div class="field"><label for="epsQoqSepaMin">EPS QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsQoqSepaMin" value="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">0 = כבוי — מינרוויני מגדיר תלת-ספרתי כ&quot;עדיפות&quot;, לא כסף מחייב</span></div>
+            <div class="field"><label for="epsFwdMin">תחזית EPS שנה הבאה מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsFwdMin" value="25" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">מינרוויני: תחזית שנה נוכחית 25%+</span></div>
           </div>
           <div class="filter-toggles">
             <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
             <label class="toggle"><input type="checkbox" id="requireProfit" checked> שולי רווח חיוביים</label>
-            <label class="toggle"><input type="checkbox" id="requireEpsAccel"> האצה ב-EPS (רבעון אחרון &ge; קודם)</label>
-            <label class="toggle"><input type="checkbox" id="requireRevAccel"> האצה במכירות (רבעון אחרון &ge; קודם)</label>
-            <label class="toggle"><input type="checkbox" id="requireMarginTrend"> שיפור שולי רווח (מול שנה קודמת)</label>
+            <label class="toggle"><input type="checkbox" id="requireEpsAccel" checked> האצה ב-EPS (רבעון אחרון &ge; קודם)</label>
+            <label class="toggle"><input type="checkbox" id="requireRevAccel" checked> האצה במכירות (רבעון אחרון &ge; קודם)</label>
+            <label class="toggle"><input type="checkbox" id="requireMarginTrend" checked> שיפור שולי רווח (מול שנה קודמת)</label>
           </div>
         </div>
       </div>
@@ -994,7 +994,7 @@ const COLUMNS = [
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
 const PRESETS = {
-  classic:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5,epsMin:25,revMin:20,roeMin:17},
+  classic:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5,epsMin:50,revMin:20,roeMin:17,epsFwdMin:25},
   aggressive:   {rsMin:80,fromHigh:15,fromLow:30,priceMin:15,mcMin:10, liqMin:30,earnDays:7,epsMin:40,revMin:30,roeMin:20},
   conservative: {rsMin:60,fromHigh:35,fromLow:15,priceMin:5, mcMin:0.3,liqMin:10,earnDays:0,epsMin:10,revMin:10,roeMin:8},
 };
@@ -1732,7 +1732,7 @@ const FIELD_PRESETS = {
   mcMin:    [[0,'הכל'],[0.05,'$50M+'],[0.1,'$100M+'],[0.3,'$300M+'],[0.5,'$500M+'],[1,'$1B+'],[2,'$2B+ — קלאסי'],[5,'$5B+'],[10,'$10B+'],[50,'$50B+'],[200,'$200B+']],
   liqMin:   [[0,'ללא סינון'],[0.1,'$100K+'],[0.25,'$250K+'],[0.5,'$500K+'],[1,'$1M+'],[2,'$2M+'],[5,'$5M+'],[10,'$10M+'],[15,'$15M+'],[20,'$20M+ — קלאסי'],[30,'$30M+'],[50,'$50M+'],[100,'$100M+'],[200,'$200M+']],
   earnDays: [[0,'כבוי'],[2,'2 ימים'],[3,'3 ימים'],[5,'5 ימים — קלאסי'],[7,'7 ימים'],[10,'10 ימים'],[14,'14 ימים'],[21,'21 ימים']],
-  epsMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25% — קלאסי'],[40,'40%'],[60,'60%'],[100,'100%'],[150,'150%']],
+  epsMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25%'],[40,'40%'],[50,'50% — מינרוויני'],[60,'60%'],[100,'100%'],[150,'150%']],
   revMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[20,'20% — קלאסי'],[30,'30%'],[50,'50%'],[75,'75%']],
   roeMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[17,'17% — מינרוויני'],[20,'20%'],[25,'25%'],[30,'30%'],[40,'40%']],
   epsQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15% — קלאסי'],[25,'25%'],[40,'40%'],[60,'60%'],[100,'100%']],
