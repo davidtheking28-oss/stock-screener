@@ -2085,19 +2085,7 @@ async function scan(force=false){
 /* ════════════════════════════════════
    FETCH + RS
 ════════════════════════════════════ */
-async function fetchUniverse(){
-  const body={
-    columns:COLUMNS,
-    filter:[
-      {left:"type",operation:"equal",right:"stock"},
-      {left:"is_primary",operation:"equal",right:true},
-      {left:"close",operation:"egreater",right:2},
-      {left:"market_cap_basic",operation:"egreater",right:50000000}
-    ],
-    markets:["america"],
-    sort:{sortBy:"market_cap_basic",sortOrder:"desc"},
-    range:[0,8000]
-  };
+async function _scanQuery(body){
   if(HAS_SUPABASE){
     const res=await fetch(SUPABASE_URL+'/functions/v1/scan-universe',
       {method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},body:JSON.stringify(body),signal:AbortSignal.timeout(SCAN_TIMEOUT)});
@@ -2108,6 +2096,36 @@ async function fetchUniverse(){
     {method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body),signal:AbortSignal.timeout(SCAN_TIMEOUT)});
   if(!res.ok) throw new Error('TradingView '+res.status);
   return (await res.json()).data||[];
+}
+
+const _universeBody = (typeFilter, primaryOnly) => ({
+  columns:COLUMNS,
+  filter:[
+    typeFilter,
+    ...(primaryOnly ? [{left:"is_primary",operation:"equal",right:true}] : []),
+    {left:"close",operation:"egreater",right:2},
+    {left:"market_cap_basic",operation:"egreater",right:50000000}
+  ],
+  markets:["america"],
+  sort:{sortBy:"market_cap_basic",sortOrder:"desc"},
+  range:[0,8000]
+});
+
+// Two queries, not one. TradingView types ADRs as "dr", not "stock", so a
+// type=stock universe silently omitted every foreign name — TSM, ASML, NVO,
+// SAP, TM. They can't just be added to the type list either: an ADR's primary
+// listing is its home exchange, so is_primary is false for most of them and
+// the primaryOnly guard would drop them again. Dual-class US stocks still need
+// that guard (it's what keeps GOOG/GOOGL and BRK.A/BRK.B from both appearing),
+// hence the split. Merged on the TradingView symbol so an overlap can't
+// double-count.
+async function fetchUniverse(){
+  const [stocks, drs] = await Promise.all([
+    _scanQuery(_universeBody({left:"type",operation:"equal",right:"stock"}, true)),
+    _scanQuery(_universeBody({left:"type",operation:"equal",right:"dr"}, false)).catch(()=>[]),
+  ]);
+  const seen=new Set(stocks.map(r=>r.s));
+  return stocks.concat(drs.filter(r=>!seen.has(r.s)));
 }
 
 async function fetchCommodities(){
