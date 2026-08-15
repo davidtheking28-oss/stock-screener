@@ -2067,7 +2067,10 @@ async function scan(force=false){
       } else {
         const sparseMsg = !isCommodities && bPct<35 && allResults.length<20
           ? ' \xb7 <span style="color:var(--amber);font-weight:500">שוק חלש — מעט הזדמנויות SEPA</span>' : '';
-        $('statBar').innerHTML='<b>'+results.length+'</b> מניות עברו \xb7 מתוך <b>'+universe.length.toLocaleString()+'</b> שנסרקו'+sparseMsg;
+        _scanStatHtml='<b>'+results.length+'</b> מניות עברו \xb7 מתוך <b>'+universe.length.toLocaleString()+'</b> שנסרקו'+sparseMsg;
+        // On the watchlist tab this must not overwrite the watchlist summary.
+        if(view!=='watchlist') $('statBar').innerHTML=_scanStatHtml;
+        else syncStatBar();
       }
     };
 
@@ -2477,7 +2480,23 @@ function setView(v){
   const kh=$('kbdHint'); if(kh) kh.style.display=(v==='gallery')?'none':'';
   const cpw=$('colPickerWrap'); if(cpw) cpw.style.display=(v==='gallery')?'none':(allResults.length?'':'none');
   if(v==='watchlist' && watchlist.size>0) $('resultsPanel').style.display='block';
+  syncStatBar();
   render();
+}
+
+// The stat bar is a scan summary ("17 passed out of 5,505"), so on the מעקב tab
+// it described a different population than the rows underneath it. Keep the
+// scan text for the screener views and say what the watchlist actually shows.
+let _scanStatHtml='';
+function syncStatBar(){
+  const sb=$('statBar'); if(!sb) return;
+  if(view==='watchlist'){
+    if(_scanStatHtml===''&&sb.innerHTML) _scanStatHtml=sb.innerHTML;
+    const shown=visibleRows().length;
+    sb.innerHTML='<b>'+shown+'</b> מתוך <b>'+watchlist.size+'</b> במעקב \xb7 עוברות את ה-Trend Template';
+  } else if(_scanStatHtml){
+    sb.innerHTML=_scanStatHtml;
+  }
 }
 
 /* ════════════════════════════════════
