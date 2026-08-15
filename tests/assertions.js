@@ -47,9 +47,12 @@
   // ── applyFilters: SEPA trend template isolates each criterion ──
   {
     setScreener('sepa', true);
-    if ($('useFund')) $('useFund').checked = false;
-    if ($('requireProfit')) $('requireProfit').checked = false;
-    if ($('requireEpsAccel')) $('requireEpsAccel').checked = false;
+    // Isolate the eight Trend Template criteria — every fundamental gate off.
+    // Keep this list in sync when a toggle is added: requireRevAccel defaults
+    // ON, and leaving it on made this fixture (which carries no revenue data)
+    // fail with an empty result set.
+    ['useFund', 'requireProfit', 'requireEpsAccel', 'requireRevAccel', 'requireMarginTrend']
+      .forEach(id => { if ($(id)) $(id).checked = false; });
     const base = { close: 100, SMA50: 95, SMA150: 90, SMA200: 85, price_52_week_high: 115, price_52_week_low: 60,
       market_cap_basic: 5e9, average_volume_10d_calc: 1e6, volume: 1e6, 'Perf.Y': 50, 'Perf.3M': 20, 'Perf.6M': 30,
       earnings_release_next_date: 0, sector: 'Technology Services', description: 'x', exchange: 'NASDAQ', 'Volatility.D': 2, 'Volatility.M': 5 };
@@ -164,6 +167,73 @@
     // Misaligned timestamps must drop points, not silently shift the series.
     const shifted = Array.from({ length: 80 }, (_, i) => bar(i * 86400 + 1, 100));
     check('_rsLine: non-overlapping timestamps → null', _rsLine(strong, shifted) === null);
+  }
+
+  // ── Regressions fixed 2026-08-15. Each of these reached production. ──
+
+  // skipFund builds the watchlist's "passes the Trend Template" reference set.
+  // A price floor is not a Trend Template criterion, but priceMin stayed live
+  // under skipFund, so the verdict changed with whichever screener was last
+  // scanned (priceMin is 10 on sepa, 5 on qulla, 3 on finviz, 0 on growth).
+  {
+    setScreener('sepa', true);
+    const base = { close: 6, SMA50: 5.5, SMA150: 5, SMA200: 4.5, price_52_week_high: 7, price_52_week_low: 3,
+      market_cap_basic: 5e9, average_volume_10d_calc: 1e7, volume: 1e7, 'Perf.Y': 50, 'Perf.3M': 20, 'Perf.6M': 30,
+      earnings_release_next_date: 0, sector: 'Technology Services', description: 'x', exchange: 'NASDAQ' };
+    const uni = [mkStock('T:CHEAP', { ...base, name: 'CHEAP' })];
+    const rsMap = { 'T:CHEAP': 85 };
+    setFieldValue($('priceMin'), 10);           // a $6 stock is below the floor
+    const out = tickers(applyFilters(uni, rsMap, { skipFund: true }));
+    check('skipFund: priceMin must not gate the Trend Template set', eqSet(out, ['CHEAP']),
+      'a $6 stock passing all 8 criteria was dropped by a $10 price floor; got ' + JSON.stringify(out));
+    setScreener('sepa', true); // restore priceMin
+  }
+
+  // SORTS.mc returned undefined for rows with no market cap (they survive the
+  // filter whenever mcMin is 0). undefined compares 0 against everything, which
+  // makes the comparator non-transitive and jumbles the WHOLE list.
+  {
+    const f = SORTS.mc;
+    check('SORTS.mc: missing market cap sorts last, not everywhere',
+      typeof f({}) === 'number' && f({}) < f({ mc: 1 }),
+      'got ' + JSON.stringify(f({})));
+  }
+
+  // Volatility.D is one session's high/low range and runs about half the true
+  // ADR; it also sits near zero for the whole universe early in a session. The
+  // ADR column, the sort, the score and the journal stop-loss all read it.
+  {
+    const r = { close: 100, ADR: 4 };
+    const row = mkStock('T:ADR', { close: 100, ADR: 4, SMA50: 90, SMA150: 85, SMA200: 80,
+      price_52_week_high: 105, price_52_week_low: 50, market_cap_basic: 5e9,
+      average_volume_10d_calc: 1e7, volume: 1e7, 'Perf.Y': 50, 'Perf.3M': 20, 'Perf.6M': 30,
+      'Volatility.D': 2, earnings_release_next_date: 0, sector: 'Technology Services',
+      description: 'x', exchange: 'NASDAQ', name: 'ADRT' });
+    setScreener('sepa', true);
+    ['useFund', 'requireProfit', 'requireEpsAccel', 'requireRevAccel', 'requireMarginTrend']
+      .forEach(id => { if ($(id)) $(id).checked = false; });
+    const out = applyFilters([row], { 'T:ADR': 85 });
+    check('adrPct: derived from the real ADR column, not Volatility.D',
+      out.length === 1 && Math.abs(out[0].adrPct - 4) < 1e-9,
+      'ADR $4 on a $100 stock is 4%, Volatility.D would say 2%; got ' + JSON.stringify(out[0] && out[0].adrPct));
+  }
+
+  // The saved-prefs version was hardcoded to 2 on every write, so each load
+  // re-ran every migration's "only touch the old default" guard forever.
+  check('FILTERS_VERSION matches the highest migration', typeof FILTERS_VERSION === 'number' && FILTERS_VERSION >= 4,
+    'got ' + (typeof FILTERS_VERSION === 'undefined' ? 'undefined' : FILTERS_VERSION));
+
+  // The nightly Edge Function (supabase/functions/daily-scan) reimplements the
+  // SEPA gates and had silently drifted from these. Pin the client side so a
+  // change here is visible when diffing the two.
+  {
+    setScreener('sepa', true);
+    const vals = { epsMin: num('epsMin'), revMin: num('revMin'), roeMin: num('roeMin'),
+                   epsFwdMin: num('epsFwdMin'), fromLow: num('fromLow'), fromHigh: num('fromHigh'), rsMin: num('rsMin') };
+    check('SEPA defaults match the nightly job (update daily-scan together)',
+      vals.epsMin === 50 && vals.revMin === 20 && vals.roeMin === 17 && vals.epsFwdMin === 25
+        && vals.fromLow === 30 && vals.fromHigh === 25 && vals.rsMin === 70,
+      'got ' + JSON.stringify(vals));
   }
 
   setScreener('sepa', true); // restore

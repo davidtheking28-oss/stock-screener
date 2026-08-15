@@ -17,6 +17,33 @@ for the change rather than assuming push = live.
 
 ---
 
+## Tests
+`py tests/run-tests.py` — loads the page in headless Chromium and asserts against
+the **real in-page functions** (`applyFilters`, `computeRS`, `calcScore`, `SORTS`,
+`_vcp`, `_rsLine`, `_ma200Rising`, `_powerPlayOK`), so there are no copies to
+drift. Deterministic synthetic fixtures, no network. Setup once:
+`py -m pip install playwright && py -m playwright install chromium`.
+
+It is a required job in `.github/workflows/deploy.yml` — a red test blocks the
+Pages deploy.
+
+Run it after touching `applyFilters`, `computeRS`, `calcScore`, `SORTS`, the
+`FIELD_PRESETS`/`SCREENER_DEFAULTS` tables, or the prefs migration chain. **Every
+fix to filter or scoring logic belongs in `tests/assertions.js`, and the test must
+be shown to fail when the fix is reverted.**
+
+Two traps this suite has already caught:
+- **A new default-ON toggle breaks unrelated fixtures.** The SEPA Trend-Template
+  fixture disables every fundamental gate by name; adding `requireRevAccel`
+  (default on) without adding it to that list turned the result set empty.
+  Keep the disable list in that test in sync with the toggles in the HTML.
+- **`daily-scan` reimplements the SEPA gates in TypeScript** and had silently
+  drifted on five separate parameters. A test pins the client-side defaults so
+  the divergence is visible — when you change a SEPA default, change
+  `supabase/functions/daily-scan/index.ts` in the same commit.
+
+---
+
 ## ⚠️ Don't reintroduce these regressions (fixed 2026-08-11)
 
 - **`loadUserData()` must not unconditionally `render()`.** It runs on every
