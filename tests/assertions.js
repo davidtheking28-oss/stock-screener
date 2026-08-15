@@ -218,6 +218,24 @@
       'ADR $4 on a $100 stock is 4%, Volatility.D would say 2%; got ' + JSON.stringify(out[0] && out[0].adrPct));
   }
 
+  // Ranking on the raw array index gave tied stocks adjacent ratings, so two
+  // identical performers could straddle a threshold (69 vs 70) purely on the
+  // universe's incoming market-cap sort order.
+  {
+    const uni = [
+      mkStock('t:LOW',  { 'Perf.3M': 0,  'Perf.6M': 0,  'Perf.Y': 0 }),
+      mkStock('t:TIE1', { 'Perf.3M': 10, 'Perf.6M': 10, 'Perf.Y': 10 }),
+      mkStock('t:TIE2', { 'Perf.3M': 10, 'Perf.6M': 10, 'Perf.Y': 10 }),
+      mkStock('t:TIE3', { 'Perf.3M': 10, 'Perf.6M': 10, 'Perf.Y': 10 }),
+      mkStock('t:HIGH', { 'Perf.3M': 20, 'Perf.6M': 20, 'Perf.Y': 20 }),
+    ];
+    const m = computeRS(uni);
+    check('computeRS: equal performance → equal RS rating',
+      m['t:TIE1'] === m['t:TIE2'] && m['t:TIE2'] === m['t:TIE3'], JSON.stringify(m));
+    check('computeRS: ties still rank between the weaker and stronger names',
+      m['t:LOW'] < m['t:TIE1'] && m['t:TIE1'] < m['t:HIGH'], JSON.stringify(m));
+  }
+
   // The saved-prefs version was hardcoded to 2 on every write, so each load
   // re-ran every migration's "only touch the old default" guard forever.
   check('FILTERS_VERSION matches the highest migration', typeof FILTERS_VERSION === 'number' && FILTERS_VERSION >= 4,

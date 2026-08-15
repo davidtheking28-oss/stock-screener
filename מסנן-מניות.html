@@ -1507,7 +1507,13 @@ const fmtVol = v => {
   return v.toString();
 };
 const col = (key, html) => colVis[key] ? html : '';
+// esc() targets values interpolated into an inline onclick="…'VALUE'…", so it
+// escapes the JS string quote as well as the HTML ones. Don't use it for plain
+// markup — escHtml is the one for that.
 function esc(s){ return (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+// Full HTML-text/attribute escaping. & must go first or it double-escapes the
+// entities the later replacements introduce.
+function escHtml(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 const _toastQ=[]; let _toastBusy=false;
 function toast(msg, dur=2600){ _toastQ.push({msg,dur}); if(!_toastBusy) _toastNext(); }
 function _toastNext(){ if(!_toastQ.length){_toastBusy=false;return;} _toastBusy=true; const {msg,dur}=_toastQ.shift(); const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>{ t.classList.remove('show'); setTimeout(_toastNext,260); },dur); }
@@ -2179,7 +2185,18 @@ function computeRS(universe){
   const n=valid.length; const map={};
   // n<=1 means there's nothing to rank against — divide-by-zero (i/(n-1)) would
   // yield NaN; give the lone stock a neutral mid-scale rating instead.
-  valid.forEach((row,i)=>{ map[row.s]= n<=1 ? 50 : Math.max(1,Math.min(99,Math.round((i/(n-1))*98)+1)); });
+  const rate=i=> n<=1 ? 50 : Math.max(1,Math.min(99,Math.round((i/(n-1))*98)+1));
+  // Equal performance must get an equal rating. Ranking on the raw array index
+  // gave tied stocks adjacent ranks, so two identical performers could straddle
+  // a threshold (one RS 69, one RS 70) purely on the universe's incoming
+  // market-cap sort order. Assign every tie the midpoint of its run.
+  let i=0;
+  while(i<n){
+    let j=i; while(j+1<n && valid[j+1].p===valid[i].p) j++;
+    const r=rate((i+j)/2);
+    for(let k=i;k<=j;k++) map[valid[k].s]=r;
+    i=j+1;
+  }
   return map;
 }
 
@@ -2366,7 +2383,7 @@ function buildSectorFilter(){
   const wrap=$('sectorWrap'); if(!wrap) return;
   wrap.innerHTML='<select id="sectorFilter" class="filter-select" onchange="applySectorFilter();sortResults();render();renderSectorStrength();try{localStorage.setItem(\'sepa_sector\',this.value)}catch(e){}">'
     +'<option value="" '+(saved?'':'selected')+'>כל הסקטורים ('+allResults.length+')</option>'
-    +sectors.map(s=>'<option value="'+s+'" '+(saved===s?'selected':'')+'>'+s+' ('+allResults.filter(r=>r.sector===s).length+')</option>').join('')
+    +sectors.map(s=>'<option value="'+escHtml(s)+'" '+(saved===s?'selected':'')+'>'+escHtml(s)+' ('+allResults.filter(r=>r.sector===s).length+')</option>').join('')
     +'</select>';
   if(saved && sectors.includes(saved)){ applySectorFilter(); sortResults(); render(); }
   renderSectorStrength();
@@ -2620,7 +2637,7 @@ function renderTable(rows){
       +col('vol',    '<td>'+volEl+'</td>')
       +col('liq',    '<td><span class="mn">$'+fmtB(r.dollarVol)+'</span></td>')
       +col('mc',     '<td><span class="mn">'+fmtB(r.mc)+'</span></td>')
-      +col('sector', '<td><span class="sector-tag">'+r.sector.split(' ').slice(0,2).join(' ')+'</span></td>')
+      +col('sector', '<td><span class="sector-tag">'+escHtml(String(r.sector||'').split(' ').slice(0,2).join(' '))+'</span></td>')
       +'</tr>';
   });
 
@@ -2961,15 +2978,17 @@ async function loadDailyStatus(){
       perfBits.push(k.slice(1)+' ימים: <b class="'+(p.avg>=0?'pos':'neg')+'">'+(p.avg>=0?'+':'')+p.avg.toFixed(1)+'%</b> ('+p.n+' מניות)');
     });
     if(!ent.length && !ex.length && !perfBits.length) return;
-    const mark=t=>watchlist.has(t)?'<b style="color:var(--amber)">★'+t+'</b>':t;
+    // Tickers come from the screener_daily row rather than the live scan, so
+    // escape them like any other stored value before they reach innerHTML.
+    const mark=t=>watchlist.has(t)?'<b style="color:var(--amber)">★'+escHtml(t)+'</b>':escHtml(t);
     const fmt=a=>a.slice(0,12).map(mark).join(', ')+(a.length>12?' +'+(a.length-12):'');
-    const dateHe=scan_date.slice(5).split('-').reverse().join('/');
+    const dateHe=escHtml(String(scan_date).slice(5).split('-').reverse().join('/'));
     const el=$('dailyBanner');
     el.innerHTML='<span class="db-title">סריקת לילה '+dateHe+'</span>'
       +(ent.length?'<span><b style="color:var(--green)">נכנסו ('+ent.length+'):</b> <span class="db-list">'+fmt(ent)+'</span></span>':'')
       +(ex.length?'<span><b style="color:var(--red)">יצאו ('+ex.length+'):</b> <span class="db-list">'+fmt(ex)+'</span></span>':'')
       +(perfBits.length?'<span title="תשואה ממוצעת עד היום של המניות שנכנסו לסינון לפני X ימי מסחר"><b style="color:var(--accent2)">ביצועי כניסות עבר:</b> '+perfBits.join(' · ')+'</span>':'')
-      +'<button class="db-close" onclick="dismissDaily(\''+scan_date+'\')" aria-label="סגור">✕</button>';
+      +'<button class="db-close" onclick="dismissDaily(\''+esc(String(scan_date))+'\')" aria-label="סגור">✕</button>';
     el.style.display='flex';
   }catch(e){ console.error('[dailyStatus]', e); }
 }

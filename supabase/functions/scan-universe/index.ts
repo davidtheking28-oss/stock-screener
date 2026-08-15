@@ -16,7 +16,9 @@ const MEM_TTL = 5 * 60 * 1000;   // 5 min in-instance
 const DB_TTL = 5 * 60 * 1000;    // 5 min persistent freshness
 
 const _rate = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 12;
+// A scan now issues TWO queries (stocks, then ADRs — see fetchUniverse in the
+// client), so the old ceiling of 12 allowed only 6 scans/minute.
+const RATE_LIMIT = 24;
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
