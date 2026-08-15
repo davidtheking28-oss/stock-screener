@@ -872,7 +872,7 @@ tbody tr:last-child td { border-bottom: none; }
             <label class="toggle"><input type="checkbox" id="requireProfit" checked> שולי רווח חיוביים</label>
             <label class="toggle"><input type="checkbox" id="requireEpsAccel" checked> האצה ב-EPS (רבעון אחרון &ge; קודם)</label>
             <label class="toggle"><input type="checkbox" id="requireRevAccel" checked> האצה במכירות (רבעון אחרון &ge; קודם)</label>
-            <label class="toggle"><input type="checkbox" id="requireMarginTrend" checked> שיפור שולי רווח (מול שנה קודמת)</label>
+            <label class="toggle"><input type="checkbox" id="requireMarginTrend"> שיפור שולי רווח (מול שנה קודמת)</label>
           </div>
         </div>
       </div>
@@ -2957,6 +2957,10 @@ function loadFilterPrefs(){
     // default for either is an untouched setting, not a deliberate choice —
     // same rule the v2 migration above uses — so only those exact values move.
     if((p.v||0)<3){ if(p.epsMin===25) p.epsMin=50; if(p.requireEpsAccel===false) p.requireEpsAccel=true; p.v=3; }
+    // v4: margin-trend-required turned out too strict stacked on everything
+    // else (12→handful) — off by default now. Same only-migrate-the-old-
+    // default rule.
+    if((p.v||0)<4){ if(p.requireMarginTrend===true) p.requireMarginTrend=false; p.v=4; }
     try{ localStorage.setItem('sepa_filters', JSON.stringify(p)); }catch(e){}
     const set=(id,v)=>{ if(v!=null) setFieldValue($(id),v); };
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
