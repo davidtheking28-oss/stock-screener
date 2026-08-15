@@ -1726,7 +1726,7 @@ function updUnitHints(){
 const FIELD_PRESETS = {
   rsMin:    [[40,'40'],[50,'50 — סביר'],[60,'60'],[65,'65'],[70,'70 — קלאסי'],[75,'75'],[80,'80 — חזק'],[85,'85'],[90,'90 — מוביל שוק'],[95,'95 — עלית'],[99,'99']],
   fromHigh: [[5,'5% — צמוד לשיא'],[8,'8%'],[10,'10%'],[12,'12%'],[15,'15%'],[20,'20%'],[25,'25% — קלאסי'],[35,'35%'],[50,'50%'],[75,'75%']],
-  fromLow:  [[10,'10%'],[15,'15%'],[25,'25% — קלאסי'],[50,'50%'],[75,'75%'],[100,'100%'],[150,'150%'],[200,'200%']],
+  fromLow:  [[10,'10%'],[15,'15%'],[25,'25%'],[30,'30% — קלאסי מינרוויני'],[50,'50%'],[75,'75%'],[100,'100%'],[150,'150%'],[200,'200%']],
   runMin:   [[50,'50%'],[75,'75%'],[100,'100% — קלאסי'],[125,'125%'],[150,'150%'],[175,'175%'],[200,'200%'],[250,'250%']],
   priceMin: [[1,'$1+'],[2,'$2+'],[3,'$3+'],[5,'$5+'],[7,'$7+'],[10,'$10+ — קלאסי'],[15,'$15+'],[20,'$20+'],[30,'$30+'],[50,'$50+'],[100,'$100+']],
   mcMin:    [[0,'הכל'],[0.05,'$50M+'],[0.1,'$100M+'],[0.3,'$300M+'],[0.5,'$500M+'],[1,'$1B+'],[2,'$2B+ — קלאסי'],[5,'$5B+'],[10,'$10B+'],[50,'$50B+'],[200,'$200B+']],
@@ -2247,6 +2247,14 @@ function applyFilters(universe, rsMap, opts={}){
       pass=volOk&&trendOk&&perfOk;
     } else {
       const t1=close>s150&&close>s200, t2=s150>s200, t3=s50>s150&&s50>s200;
+      // Minervini's real criterion #3 is "SMA200 itself has been trending up for
+      // at least a month" — a slope, not a price return. TradingView's scanner
+      // only exposes SMA200 offset by 1-2 bars (verified live: SMA200[3] and up
+      // return null for every symbol), not the ~21 bars needed for a real
+      // month-back slope, and fetching per-symbol history for 4,000+ tickers on
+      // every scan isn't viable. Perf.6M>0 is a correlated but distinct proxy —
+      // a stock can be up over 6 months while its 200-day average is still flat
+      // or falling. Known gap, not an oversight.
       const t4=perf6!=null&&perf6>0;
       const t5=close>s50, t6=close>=lo*(1+flPct), t7=close>=hi*(1-fhPct), t8=rs>=rsMin;
       checks={t1,t2,t3,t4,t5,t6,t7,t8};
