@@ -989,7 +989,13 @@ const COLUMNS = [
   "Perf.3M","Perf.6M",
   "EMA10","EMA20","Perf.W",
   "average_volume_30d_calc","average_volume_90d_calc",
-  "earnings_per_share_diluted_ttm","earnings_per_share_forecast_next_fy","net_margin_fy"
+  "earnings_per_share_diluted_ttm","earnings_per_share_forecast_next_fy","net_margin_fy",
+  // Volatility.D is the CURRENT session's high/low range, not an average — it
+  // reads ~half the true ADR (AAPL 1.05% vs 2.08%) and sits near zero for the
+  // whole universe in the first minutes of a session, which starved the
+  // Qullamaggie gate intraday. This is TradingView's real average daily range,
+  // in price units; adrPct converts it to the percentage the UI shows.
+  "ADR"
 ];
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
@@ -1314,8 +1320,15 @@ async function _fetchBars1y(sym){
     const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?range=1y&symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON},signal:AbortSignal.timeout(SCAN_TIMEOUT)});
     if(!r.ok) return null;
     const j=await r.json(); const bars=Array.isArray(j.bars)?j.bars:[];
-    _valBars.set(sym,{bars,t:Date.now()});
-    try{ sessionStorage.setItem('ohlc1y_v2_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
+    // Only cache a real result. A 500/429 upstream still parses as JSON with no
+    // bars, and pinning that empty array for the full TTL (sessionStorage, so it
+    // survives reloads) left the symbol permanently unvalidated with blank
+    // VCP/RS-line columns for the rest of the session. Same guard the gallery
+    // OHLC path already uses.
+    if(bars.length){
+      _valBars.set(sym,{bars,t:Date.now()});
+      try{ sessionStorage.setItem('ohlc1y_v2_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
+    }
     return bars;
   }catch(e){ return null; }
 }
@@ -1537,7 +1550,9 @@ function sendToJournal(e, ticker){
   const r=results.find(x=>x.ticker===ticker) || allResults.find(x=>x.ticker===ticker);
   if(!r) return;
   // Stop below the base low when the pattern gives one, else an ADR-based stop.
-  const adr=r.volD??3;
+  // Must be the real ADR: Volatility.D is a single session and runs ~half, which
+  // placed every ADR-derived stop about twice as tight as intended.
+  const adr=r.adrPct??r.volD??3;
   const stop=(r.vcp&&r.vcp.pivot&&r.vcp.lastDepth!=null)
     ? +(r.close*(1-Math.min(r.vcp.lastDepth,adr*2.5)/100)).toFixed(2)
     : +(r.close*(1-adr*2/100)).toFixed(2);
@@ -1669,7 +1684,7 @@ function calcScore(r, scr='sepa'){
     const emaMax = num('emaDistMax'); const emaMaxUsed = Number.isNaN(emaMax) ? 3.5 : emaMax;
     const wkMax  = num('weekRangeMax'); const wkMaxUsed  = Number.isNaN(wkMax) ? 7 : wkMax;
     const moveS = Math.min(clamp(r.perf6??0,0,150)/150,1)*40;
-    const adrS  = Math.min(clamp(r.volD??0,0,8)/8,1)*20;
+    const adrS  = Math.min(clamp(r.adrPct??r.volD??0,0,8)/8,1)*20;
     const emaS  = (r.emaDist==null||!isFinite(r.emaDist))?0: emaMaxUsed>0 ? clamp(1-r.emaDist/emaMaxUsed,0,1)*20 : 20;
     const tightS= r.perfW==null?0: wkMaxUsed>0 ? clamp(1-Math.abs(r.perfW)/wkMaxUsed,0,1)*20 : 20;
     return Math.round(clamp(moveS+adrS+emaS+tightS,0,100));
@@ -2226,6 +2241,10 @@ function applyFilters(universe, rsMap, opts={}){
     if(earnGap>0 && earnIn!=null && earnIn>=0 && earnIn<=earnGap) continue;
     const fromHighPct=(close/hi-1)*100;
     const volD=d[C['Volatility.D']], volM=d[C['Volatility.M']];
+    // True average daily range as a percentage. Falls back to the single-day
+    // range only when TradingView has no ADR for the symbol.
+    const adrRaw=d[C.ADR];
+    const adrPct=(adrRaw!=null && close>0) ? adrRaw/close*100 : volD;
     const vr=(vol!=null&&avgVol)?vol/avgVol:null;
     const perfY=d[C['Perf.Y']], perf3=d[C['Perf.3M']], perf6=d[C['Perf.6M']];
     const eps=d[C.earnings_per_share_diluted_yoy_growth_fq],
@@ -2268,11 +2287,11 @@ function applyFilters(universe, rsMap, opts={}){
       const avg30=d[C.average_volume_30d_calc], avg90=d[C.average_volume_90d_calc];
       const sharesMin=num('volSharesMin')*1e6;
       const volOk=avg30!=null && avg30>=sharesMin && (avg90==null || avg90>=sharesMin);
-      // Volatility.D is one session's range, not the 20-day ADR this filter is
-      // named for, so a single quiet day dropped stocks whose real ADR is fine —
-      // and validateExact (which computes the true 20-bar ADR in _qullaExactOK)
-      // can only narrow the list, never rescue them. Coarse gate here, exact there.
-      const adrOk=volD==null || volD>=num('adrMin')*0.5;
+      // adrPct is now the real average daily range, so this no longer needs the
+      // ×0.5 slack that compensated for Volatility.D being a single session.
+      // Still a coarse gate — validateExact recomputes the true 20-bar ADR in
+      // _qullaExactOK and can only narrow the list, so keep a small margin.
+      const adrOk=adrPct==null || adrPct>=num('adrMin')*0.9;
       // SMA200 alignment enforced only when the stock is old enough to have one (keeps IPOs)
       const trendOk=close>s50 && (s200==null || (close>s200 && s50>s200));
       const move6Ok=perf6!=null && perf6>=num('move6Min');
@@ -2325,7 +2344,7 @@ function applyFilters(universe, rsMap, opts={}){
       close, rs, sector:d[C.sector]||'—', mc,
       vol, avgVol, dollarVol, earnIn,
       fromHighPct, fromLowPct:(close/lo-1)*100,
-      rangePos:hi>lo?(close-lo)/(hi-lo):0.5, perfY, perf3, perf6, volD, volM,
+      rangePos:hi>lo?(close-lo)/(hi-lo):0.5, perfY, perf3, perf6, volD, volM, adrPct,
       perfW:d[C['Perf.W']],
       emaDist:Math.min(
         d[C.EMA10]!=null?Math.abs(close/d[C.EMA10]-1)*100:Infinity,
@@ -2389,7 +2408,7 @@ function renderSectorStrength(){
    SORT & VIEW
 ════════════════════════════════════ */
 const SORTS={
-  ticker:r=>r.ticker, close:r=>r.close, rs:r=>r.rs, score:r=>r.score, adr:r=>r.volD??0,
+  ticker:r=>r.ticker, close:r=>r.close, rs:r=>r.rs, score:r=>r.score, adr:r=>r.adrPct??r.volD??0,
   // mc must default like the others: a row with mc undefined survives the
   // filter whenever mcMin is 0 (qulla/growth/"הכל"), and an undefined key
   // compares 0 against everything, which makes the comparator non-transitive
@@ -2516,7 +2535,7 @@ function renderTable(rows){
       const revS=sc-epsS;
       scTip='ציון צמיחה: '+sc+'/100\nEPS QoQ: '+epsS+'/50\nמכירות QoQ: '+revS+'/50';
     } else if(r.scoreKind==='qulla'){
-      scTip='ציון Qullamaggie: '+sc+'/100\nמהלך 6ח׳: '+pct(r.perf6)+'\nADR: '+pct(r.volD)+'\nמרחק מ-EMA10/20: '+(isFinite(r.emaDist)&&r.emaDist!=null?r.emaDist.toFixed(1)+'%':'—')+'\nשינוי שבועי: '+pct(r.perfW);
+      scTip='ציון Qullamaggie: '+sc+'/100\nמהלך 6ח׳: '+pct(r.perf6)+'\nADR: '+pct(r.adrPct??r.volD)+'\nמרחק מ-EMA10/20: '+(isFinite(r.emaDist)&&r.emaDist!=null?r.emaDist.toFixed(1)+'%':'—')+'\nשינוי שבועי: '+pct(r.perfW);
     } else if(r.scoreKind==='momentum'||r.scoreKind==='power'||r.scoreKind==='commodities'){
       const rsS=Math.round(clamp(r.rs,0,99)/99*50);
       const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*25);
@@ -2556,7 +2575,7 @@ function renderTable(rows){
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
-      +col('adr',    (()=>{const a=r.volD;const c=a==null?'var(--text3)':a>=5?'var(--green)':a>=3.5?'var(--amber)':'var(--text3)';return '<td><span class="mn" style="color:'+c+';font-weight:600">'+(a==null?'—':a.toFixed(1)+'%')+'</span></td>';})())
+      +col('adr',    (()=>{const a=r.adrPct??r.volD;const c=a==null?'var(--text3)':a>=5?'var(--green)':a>=3.5?'var(--amber)':'var(--text3)';return '<td><span class="mn" style="color:'+c+';font-weight:600">'+(a==null?'—':a.toFixed(1)+'%')+'</span></td>';})())
       +col('vcp',    (()=>{
           const v=r.vcp;
           if(!v||!v.contractions) return '<td><span class="mn" style="color:var(--text3)">—</span></td>';

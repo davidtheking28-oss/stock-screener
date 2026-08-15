@@ -12,10 +12,20 @@ const COLUMNS = [
   "total_revenue_yoy_growth_fq","return_on_equity_fq",
   "net_margin","sector","market_cap_basic",
   "average_volume_10d_calc","Perf.3M","Perf.6M",
+  "earnings_per_share_diluted_qoq_growth_fq","total_revenue_qoq_growth_fq",
+  "earnings_per_share_diluted_ttm","earnings_per_share_forecast_next_fy",
 ];
 const C: Record<string, number> = Object.fromEntries(COLUMNS.map((c, i) => [c, i]));
 
-const FILTERS = { rsMin: 70, fromHigh: 0.25, fromLow: 0.25, priceMin: 10, mcMin: 2e9, liqMin: 20e6, epsMin: 25, revMin: 20, roeMin: 17 };
+// Must mirror the client's SEPA defaults in מסנן-מניות.html. These had drifted:
+// fromLow was still 0.25 (client moved to 0.30), epsMin still 25 (client's v3
+// migration raised it to 50), and the EPS/revenue acceleration and forward-EPS
+// gates did not exist here at all — so the nightly "נכנסו/יצאו" list and the
+// app could legitimately disagree about the same day.
+const FILTERS = {
+  rsMin: 70, fromHigh: 0.25, fromLow: 0.30, priceMin: 10, mcMin: 2e9, liqMin: 20e6,
+  epsMin: 50, revMin: 20, roeMin: 17, epsFwdMin: 25,
+};
 
 type Row = { s: string; d: (number | string | null)[] };
 
@@ -29,12 +39,12 @@ async function sb(path: string, init: RequestInit = {}) {
   });
 }
 
-async function fetchUniverse(): Promise<Row[]> {
+async function scanQuery(typeFilter: Record<string, unknown>, primaryOnly: boolean): Promise<Row[]> {
   const body = {
     columns: COLUMNS,
     filter: [
-      { left: "type", operation: "equal", right: "stock" },
-      { left: "is_primary", operation: "equal", right: true },
+      typeFilter,
+      ...(primaryOnly ? [{ left: "is_primary", operation: "equal", right: true }] : []),
       { left: "close", operation: "egreater", right: 2 },
       { left: "market_cap_basic", operation: "egreater", right: 50000000 },
     ],
@@ -48,15 +58,37 @@ async function fetchUniverse(): Promise<Row[]> {
   return (await res.json()).data || [];
 }
 
+// Mirrors the client's two-query universe: ADRs are type "dr" and mostly
+// is_primary=false (their primary listing is the home exchange), so a single
+// type=stock+is_primary query silently omits TSM/ASML/NVO/SAP/TM and ~1300
+// others, while that guard still has to apply to US dual-class names.
+async function fetchUniverse(): Promise<Row[]> {
+  const [stocks, drs] = await Promise.all([
+    scanQuery({ left: "type", operation: "equal", right: "stock" }, true),
+    scanQuery({ left: "type", operation: "equal", right: "dr" }, false).catch(() => [] as Row[]),
+  ]);
+  const seen = new Set(stocks.map(r => r.s));
+  return stocks.concat(drs.filter(r => !seen.has(r.s)));
+}
+
 function computeRS(universe: Row[]): Record<string, number> {
+  // A missing period must not count as 0% — that punished short-history names
+  // (a stock up 120% in 3M with no 6M/Y history scored below one at 40/60/80).
+  // Weight only the periods that exist and renormalise. The client fixed this;
+  // this copy had not, so the two ranked the same universe differently.
   const raw = (d: Row['d']) => {
     const p3 = d[C['Perf.3M']] as number | null, p6 = d[C['Perf.6M']] as number | null, py = d[C['Perf.Y']] as number | null;
     if (p3 == null && p6 == null && py == null) return null;
-    return 0.4 * (p3 ?? 0) + 0.3 * (p6 ?? 0) + 0.3 * (py ?? 0);
+    let s = 0, w = 0;
+    if (p3 != null) { s += 0.4 * p3; w += 0.4; }
+    if (p6 != null) { s += 0.3 * p6; w += 0.3; }
+    if (py != null) { s += 0.3 * py; w += 0.3; }
+    return s / w;
   };
   const valid = universe.map(r => ({ s: r.s, p: raw(r.d) })).filter(r => r.p != null).sort((a, b) => (a.p as number) - (b.p as number));
   const n = valid.length; const map: Record<string, number> = {};
-  valid.forEach((row, i) => { map[row.s] = Math.max(1, Math.min(99, Math.round((i / (n - 1)) * 98) + 1)); });
+  // n <= 1 would make i/(n-1) divide by zero and yield NaN.
+  valid.forEach((row, i) => { map[row.s] = n <= 1 ? 50 : Math.max(1, Math.min(99, Math.round((i / (n - 1)) * 98) + 1)); });
   return map;
 }
 
@@ -76,18 +108,30 @@ function applyClassicSEPA(universe: Row[], rsMap: Record<string, number>) {
     const rev = d[C.total_revenue_yoy_growth_fq] as number | null;
     const roe = d[C.return_on_equity_fq] as number | null;
     const nm = d[C.net_margin] as number | null;
+    const epsQoq = d[C['earnings_per_share_diluted_qoq_growth_fq']] as number | null;
+    const revQoq = d[C['total_revenue_qoq_growth_fq']] as number | null;
+    const epsTtm = d[C['earnings_per_share_diluted_ttm']] as number | null;
+    const epsFwdFy = d[C['earnings_per_share_forecast_next_fy']] as number | null;
+    // A negative or zero TTM base makes the % meaningless (-$1 -> $2 is not a
+    // 300% drop), so treat it as unknown rather than passing.
+    const epsFwdGrowth = (epsTtm != null && epsTtm > 0 && epsFwdFy != null) ? (epsFwdFy / epsTtm - 1) * 100 : null;
     const pass = close > s150 && close > s200 && s150 > s200 && s50 > s150 && s50 > s200
       && (perf6 != null && perf6 > 0)
       && close > s50 && close >= lo * (1 + FILTERS.fromLow) && close >= hi * (1 - FILTERS.fromHigh)
       && rs >= FILTERS.rsMin
       && eps != null && eps >= FILTERS.epsMin && rev != null && rev >= FILTERS.revMin
-      && roe != null && roe >= FILTERS.roeMin && nm != null && nm > 0;
+      && roe != null && roe >= FILTERS.roeMin && nm != null && nm > 0
+      && epsQoq != null && epsQoq >= 0
+      && revQoq != null && revQoq >= 0
+      && epsFwdGrowth != null && epsFwdGrowth >= FILTERS.epsFwdMin;
     if (!pass) continue;
     const fromHighPct = (close / hi - 1) * 100;
     const rsS = Math.min(rs, 99) / 99 * 40;
     const epsS = Math.min(Math.max(eps, 0), 300) / 300 * 25;
     const revS = Math.min(Math.max(rev, 0), 200) / 200 * 20;
-    const hiS = Math.max(0, Math.min(1, 1 - Math.abs(fromHighPct) / 25)) * 15;
+    // Math.abs would penalise a stock trading ABOVE its 52-week high, which the
+    // client rewards — use the same one-sided distance it does.
+    const hiS = Math.max(0, Math.min(1, 1 - Math.max(0, -fromHighPct) / 25)) * 15;
     out.push({
       t: d[C.name] as string, sym: r.s, rs,
       sc: Math.round(rsS + epsS + revS + hiS),
