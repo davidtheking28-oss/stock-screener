@@ -2423,11 +2423,26 @@ const SORTS={
                   + (v.distToPivot==null?0:Math.max(-20,v.distToPivot)); },
   rsline:r=>r.rsLine?(r.rsLine.atHigh?0:r.rsLine.pctFromHigh):-1e9
 };
-function sortResults(){ const f=SORTS[sortKey]||SORTS.score; results.sort((a,b)=>(f(a)>f(b)?1:f(a)<f(b)?-1:0)*sortDir); }
+function sortRows(rows){ const f=SORTS[sortKey]||SORTS.score; return rows.sort((a,b)=>(f(a)>f(b)?1:f(a)<f(b)?-1:0)*sortDir); }
+function sortResults(){ sortRows(results); }
+
+// The single source of truth for "what is actually on screen right now" — the
+// count, the CSV export and the clipboard export all have to agree with the
+// rendered rows. They used to read `results` unconditionally, so on the מעקב
+// tab the header counted the screener output above the watchlist, and CSV
+// exported the screener list; with a search active every one of them ignored
+// the filter.
+function visibleRows(){
+  const base = view==='watchlist'
+    ? sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean))
+    : results;
+  if(!searchQuery) return base;
+  return base.filter(r=>(r.ticker||'').includes(searchQuery)||(r.name||'').toUpperCase().includes(searchQuery));
+}
 function setSort(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k;sortDir=-1;} sortResults(); render(); try{localStorage.setItem('sepa_sort',JSON.stringify({sortKey,sortDir}));}catch(e){} }
 
 function render(){
-  $('resCount').textContent='('+results.length+')';
+  $('resCount').textContent='('+visibleRows().length+')';
   if(view==='table')       renderTable();
   else if(view==='gallery') renderGallery();
   else                      renderWatchlist();
@@ -2721,7 +2736,9 @@ function renderWatchlist(){
     $('tableView').innerHTML=emptyHtml('נתונים טרם נטענו','סרוק את השוק תחילה כדי לראות נתוני מעקב');
     return;
   }
-  const wlRows=[...watchlist].map(t=>ttUniverse[t]).filter(Boolean);
+  // Sorted, so clicking a column header actually reorders the watchlist — it
+  // used to render in the Set's insertion order while the header arrow flipped.
+  const wlRows=sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean));
   if(!wlRows.length){
     $('tableView').innerHTML=emptyHtml('המניות במעקב לא עוברות את תנאי ה-Trend Template','בדוק את הפילטרים הטכניים או סרוק שנית');
     return;
@@ -2759,17 +2776,24 @@ function closeModal(){ $('modal').classList.remove('open'); $('modalChart').inne
    EXPORT
 ════════════════════════════════════ */
 function exportCSV(){
-  if(!results.length){ toast('אין תוצאות לייצוא'); return; }
+  // Export exactly what's on screen — this read `results` unconditionally, so
+  // on the מעקב tab it exported the screener list instead of the watchlist,
+  // and it ignored an active search everywhere.
+  const rows=visibleRows();
+  if(!rows.length){ toast('אין תוצאות לייצוא'); return; }
   const head=['Ticker','Name','Exchange','Price','Score','RS','Perf.Y%','Perf.3M%','Perf.6M%','From High%','Range%','EPS%','EPS QoQ%','Rev%','ROE%','Net Margin%','Volume','Avg Vol','Market Cap','Sector','VCP Contractions','VCP Last Depth%','VCP Vol DryUp','Pivot','Dist To Pivot%','RS Line At High','RS Line From High%'];
   const lines=[head.join(',')];
-  results.forEach(r=>lines.push([
-    r.ticker,'"'+(r.name||'').replace(/"/g,'')+'"',r.exch,
+  rows.forEach(r=>lines.push([
+    // Escape by doubling, per RFC 4180 — stripping quotes silently altered the
+    // company name. The leading apostrophe stops Excel executing a name that
+    // begins with =, +, - or @ as a formula.
+    r.ticker,'"'+String(r.name||'').replace(/^[=+\-@]/,"'$&").replace(/"/g,'""')+'"',r.exch,
     r.close.toFixed(2),r.score,r.rs,
     (r.perfY??'').toString(),(r.perf3??'').toString(),(r.perf6??'').toString(),
     r.fromHighPct.toFixed(1),(r.rangePos*100).toFixed(1),
     (r.eps??'').toString(),(r.epsQoq??'').toString(),
     (r.rev??'').toString(),(r.roe??'').toString(),(r.nm??'').toString(),
-    r.vol??'',r.avgVol??'',Math.round(r.mc||0),'"'+r.sector+'"',
+    r.vol??'',r.avgVol??'',Math.round(r.mc||0),'"'+String(r.sector||'').replace(/"/g,'""')+'"',
     r.vcp?.contractions??'', r.vcp?.lastDepth!=null?r.vcp.lastDepth.toFixed(1):'',
     r.vcp?.volDryUp==null?'':(r.vcp.volDryUp?'yes':'no'),
     r.vcp?.pivot!=null?r.vcp.pivot.toFixed(2):'',
@@ -2784,9 +2808,11 @@ function exportCSV(){
 }
 
 function exportTickers(){
+  // Watchlist entries with no ttUniverse row aren't rendered, but they're still
+  // the user's tickers — keep the fallback so copy doesn't silently drop them.
   const src = view==='watchlist'
     ? [...watchlist].map(t=>ttUniverse[t]?.sym||t)
-    : results.map(r=>r.sym);
+    : visibleRows().map(r=>r.sym);
   if(!src.length){ toast('אין מניות להעתקה'); return; }
   navigator.clipboard?.writeText(src.join(',')).then(()=>toast(src.length+' טיקרים הועתקו ✓ מוכן להדבקה ב-TradingView'));
 }
