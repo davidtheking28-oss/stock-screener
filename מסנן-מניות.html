@@ -2928,10 +2928,16 @@ function dismissDaily(d){
   $('dailyBanner').style.display='none';
 }
 
+// Bump alongside any new migration added in loadFilterPrefs — this used to be
+// hardcoded to 2, which meant every save re-stamped v:2 and every load re-ran
+// the "only migrate the old default" guards forever, silently clobbering a
+// deliberate value that happened to match a past default (e.g. epsMin=25 on
+// purpose, not left over).
+const FILTERS_VERSION = 4;
 function saveFilterPrefs(){
   try {
     localStorage.setItem('sepa_filters', JSON.stringify({
-      v:2,
+      v:FILTERS_VERSION,
       rsMin:num('rsMin'),fromHigh:num('fromHigh'),fromLow:num('fromLow'),
       priceMin:num('priceMin'),mcMin:num('mcMin'),
       liqMin:num('liqMin'),earnDays:num('earnDays'),runMin:num('runMin'),
