@@ -597,8 +597,14 @@ tbody tr:last-child td { border-bottom: none; }
 .empty-hint { font-size: 12px; }
 
 /* ── Scroll to top ── */
+/* Sits above the bottom-left corner, not in it. This page is embedded as an
+   iframe in the trading journal, whose accessibility button is fixed at
+   bottom:20px/left:20px in the PARENT document — so it paints over anything
+   here regardless of z-index, and it covered this button completely. An iframe
+   cannot see the parent's chrome, so the only reliable fix is to leave that
+   corner free. Standalone, the button simply floats a little higher. */
 .scroll-top-btn {
-  position: fixed; bottom: 24px; left: 24px; z-index: 90;
+  position: fixed; bottom: 88px; left: 24px; z-index: 90;
   width: 42px; height: 42px; border-radius: 50%;
   background: var(--bg2); border: 1px solid var(--border); color: var(--accent2);
   display: flex; align-items: center; justify-content: center;
