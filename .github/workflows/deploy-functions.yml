@@ -20,7 +20,11 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned, not "latest": resolving "latest" costs an unauthenticated
+          # GitHub releases API call from a shared runner IP, which fails the
+          # whole deploy with "rate limit exceeded" - hit twice on 2026-08-23,
+          # including on a re-run. Bump this deliberately.
+          version: 2.115.0
 
       - name: Deploy functions
         run: |
