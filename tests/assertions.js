@@ -24,8 +24,8 @@
     _ma200Rising(mk(Array.from({ length: 100 }, (_, i) => 100 + i))) === null);
 
   // ── _powerPlayOK ──
-  // The consolidation legs are >=15 bars: a Power Play is the run PLUS a 3-6
-  // week base, and a shorter tail now fails on duration rather than depth.
+  // The consolidation legs are >=10 bars: a Power Play is the run PLUS a base,
+  // and a shorter tail now fails on duration rather than depth.
   const good = [].concat(Array(10).fill(50), Array.from({ length: 25 }, (_, i) => 50 + 60 * (i / 24)), Array.from({ length: 18 }, (_, i) => 110 - 14 * (i / 17)));
   const slowBase = [].concat(Array.from({ length: 25 }, (_, i) => 48 + i * 0.05), Array.from({ length: 20 }, (_, i) => 50 + 60 * (i / 19)), Array.from({ length: 16 }, (_, i) => 110 - 12 * (i / 15)));
   const deep = [].concat(Array(10).fill(50), Array.from({ length: 25 }, (_, i) => 50 + 60 * (i / 24)), Array.from({ length: 15 }, (_, i) => 110 - 44 * (i / 14)));
@@ -39,6 +39,14 @@
   check('_powerPlayOK: deep (>25%) correction → false', _powerPlayOK(mk(deep), 100) === false);
   check('_powerPlayOK: only +60% (no doubling) → false', _powerPlayOK(mk(weak), 100) === false);
   check('_powerPlayOK: peaked days ago, no base yet → false', _powerPlayOK(mk(fresh), 100) === false);
+  // Minervini's own 3-week reading leaves ~1 name on a live universe, so the
+  // duration is a filter field. Both ends of it have to keep working.
+  check('_powerPlayOK: duration threshold is configurable', _powerPlayOK(mk(good), 100, 25) === false && _powerPlayOK(mk(fresh), 100, 0) === true);
+  {
+    setScreener('power', true);
+    check('Power Play default consolidation is 2 weeks', num('consolWeeks') === 2, 'got ' + num('consolWeeks'));
+    setScreener('sepa', true);
+  }
 
   // ── computeRS: monotonic in composite performance ──
   {

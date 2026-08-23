@@ -834,6 +834,7 @@ tbody tr:last-child td { border-bottom: none; }
             </div>
             <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="fromLow" value="30" min="0" max="500" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="runMin" value="100" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ריצה נפיצה תוך ~8 שבועות (OHLC)</span></div>
+            <div class="field f-power"><label for="consolWeeks">דשדוש מינ&#8217; (שבועות)</label><div class="field-combo"><input type="text" inputmode="none" id="consolWeeks" value="2" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">כמה זמן עבר מאז שיא הריצה — מינרוויני: 3-4 שבועות</span></div>
             <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="adrMin" value="3" min="0" step="0.5" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">תנודתיות יומית ממוצעת 20 יום</span></div>
             <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move6Min" value="30" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">זינוק קודם — עדיף 50%+</span></div>
             <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move3Min" value="20" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
@@ -1024,7 +1025,7 @@ const SCREENERS = {
 const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
-  power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100},
+  power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100,consolWeeks:2},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3,move6Min:30,move3Min:20,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
@@ -1413,7 +1414,7 @@ function _rsLine(bars, benchBars, lookback=60){
   if(!(max>0)) return null;
   return {atHigh: cur>=max*0.999, pctFromHigh:(cur/max-1)*100};
 }
-function _powerPlayOK(bars, runPct){
+function _powerPlayOK(bars, runPct, minConsolBars=10){
   if(!bars || bars.length<45) return null;
   const w=bars.slice(-55), need=1+runPct/100;
   let best=null;   // strongest ≤40-bar (≈8wk) 100%+ run culminating at bar j
@@ -1422,12 +1423,14 @@ function _powerPlayOK(bars, runPct){
     if(minL>0 && w[j].h/minL>=need && (!best || w[j].h>best.high)) best={iHigh:j, high:w[j].h};
   }
   if(!best) return false;
-  // Minervini's Power Play is the run *plus* a 3-6 week consolidation after it.
-  // Depth alone let a stock that peaked yesterday through: nothing had happened
-  // since the high, so the drawdown was ~0 and it looked maximally tight.
-  // 15 bars is the low end of that window; the run itself is capped at 40 bars
-  // above, so both still fit inside the 55-bar sample.
-  if(w.length-1-best.iHigh<15) return false;
+  // Minervini's Power Play is the run *plus* a consolidation after it. Depth
+  // alone let a stock that peaked yesterday through: nothing had happened since
+  // the high, so the drawdown was ~0 and it looked maximally tight. Measured
+  // live, 24 of the 25 names that passed on depth had 0-8 bars since their high.
+  // His own text says 3-4 weeks, which today leaves exactly one result — hence
+  // the threshold is a filter field (default 2 weeks) rather than hardcoded.
+  // The run is capped at 40 bars above, so both legs fit the 55-bar sample.
+  if(w.length-1-best.iHigh<minConsolBars) return false;
   let postLow=best.high; for(let i=best.iHigh;i<w.length;i++){ if(w[i].l<postLow) postLow=w[i].l; }
   return (best.high-postLow)/best.high*100<=25;   // tight consolidation ≤25%
 }
@@ -1452,6 +1455,7 @@ async function validateExact(list, scr, onProgress){
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   const adrMin=num('adrMin')||3, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
   const reqVcp=!!$('requireVCP')?.checked;
+  const consolBars=(num('consolWeeks')||2)*5;
   // One benchmark fetch for the whole pass — the RS line is price/SPY.
   const spy=await _fetchBars1y('SPY').catch(()=>null);
   async function worker(){
@@ -1479,7 +1483,7 @@ async function validateExact(list, scr, onProgress){
         } else if(scr==='qulla'){
           if(_qullaExactOK(bars, adrMin, emaDistMax, weekMax)===false) r._exactFail=true;
         } else {
-          if(bars){ if(_powerPlayOK(bars,runMin)===false) r._exactFail=true; }
+          if(bars){ if(_powerPlayOK(bars,runMin,consolBars)===false) r._exactFail=true; }
           else {
             const runOld=(r.perf3!=null&&r.perf3>=runMin)||(r.perf6!=null&&r.perf6>=runMin);
             const tight=r.volD!=null&&r.volM!=null&&r.volD<r.volM;
@@ -1835,6 +1839,7 @@ const FIELD_PRESETS = {
   revQoqSepaMin: [[0,'כבוי'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25%'],[40,'40%'],[60,'60%'],[100,'100%']],
   epsQoqSepaMin: [[0,'כבוי'],[10,'10%'],[25,'25%'],[50,'50%'],[75,'75%'],[100,'100% — תלת-ספרתי'],[150,'150%'],[200,'200%']],
   epsFwdMin: [[0,'כבוי'],[10,'10%'],[15,'15%'],[25,'25% — מינרוויני'],[40,'40%'],[60,'60%']],
+  consolWeeks:  [[0,'כבוי — כל ריצה'],[1,'שבוע'],[2,'2 שבועות — ברירת מחדל'],[3,'3 שבועות — מינרוויני'],[4,'4 שבועות'],[6,'6 שבועות']],
   adrMin:       [[2,'2%'],[3,'3% — ברירת מחדל'],[3.5,'3.5%'],[4,'4% — קולאמאגי מקורי'],[5,'5%'],[6,'6%'],[8,'8%']],
   move6Min:     [[20,'20% — רופף'],[30,'30% — ברירת מחדל'],[50,'50% — מועדף'],[75,'75%'],[100,'100%'],[150,'150%']],
   move3Min:     [[10,'10% — רופף'],[20,'20% — ברירת מחדל'],[30,'30%'],[50,'50%'],[75,'75%'],[100,'100%']],
@@ -1939,7 +1944,7 @@ function applyPreset(key, btn){
    numbers had nowhere to keep them. These store every field the screener
    currently shows, per screener, so switching back restores the whole setup. */
 const MY_PRESETS_KEY='sepa_my_presets_v1';
-const PRESET_FIELDS=['rsMin','fromHigh','fromLow','priceMin','mcMin','liqMin','earnDays','runMin',
+const PRESET_FIELDS=['rsMin','fromHigh','fromLow','priceMin','mcMin','liqMin','earnDays','runMin','consolWeeks',
   'epsMin','revMin','roeMin','epsQoqMin','revQoqMin','adrMin','move6Min','move3Min',
   'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin','smaTrend50','smaTrend200',
   'nmMin','revQoqSepaMin','epsQoqSepaMin','epsFwdMin'];
@@ -3154,7 +3159,7 @@ function saveFilterPrefs(){
       v:FILTERS_VERSION,
       rsMin:num('rsMin'),fromHigh:num('fromHigh'),fromLow:num('fromLow'),
       priceMin:num('priceMin'),mcMin:num('mcMin'),
-      liqMin:num('liqMin'),earnDays:num('earnDays'),runMin:num('runMin'),
+      liqMin:num('liqMin'),earnDays:num('earnDays'),runMin:num('runMin'),consolWeeks:num('consolWeeks'),
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
       epsQoqMin:num('epsQoqMin'),revQoqMin:num('revQoqMin'),
       adrMin:num('adrMin'),move6Min:num('move6Min'),move3Min:num('move3Min'),
@@ -3191,7 +3196,7 @@ function loadFilterPrefs(){
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
     set('priceMin',p.priceMin);
     set('mcMin',p.mcMin);
-    set('liqMin',p.liqMin); set('earnDays',p.earnDays); set('runMin',p.runMin);
+    set('liqMin',p.liqMin); set('earnDays',p.earnDays); set('runMin',p.runMin); set('consolWeeks',p.consolWeeks);
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     set('epsQoqMin',p.epsQoqMin); set('revQoqMin',p.revQoqMin);
     set('adrMin',p.adrMin); set('move6Min',p.move6Min); set('move3Min',p.move3Min);
