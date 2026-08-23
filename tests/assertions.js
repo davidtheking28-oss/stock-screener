@@ -275,7 +275,9 @@
   // term makes any weight change here fail until daily-scan is changed too.
   {
     setScreener('sepa', true);
-    const z = { rs: 0, eps: -100, rev: 0, fromHighPct: -25, perfY: 0 };
+    // eps:null, not -100: null is "nothing reported", which scores zero points
+    // AND takes no epsPenalty, so each term below is isolated cleanly.
+    const z = { rs: 0, eps: null, rev: 0, fromHighPct: -25, perfY: 0 };
     check('SEPA score: nothing scores 0', calcScore(z) === 0, 'got ' + calcScore(z));
     check('SEPA score: RS is worth 35', calcScore({ ...z, rs: 99 }) === 35, 'got ' + calcScore({ ...z, rs: 99 }));
     check('SEPA score: EPS YoY is worth 25', calcScore({ ...z, eps: 300 }) === 25, 'got ' + calcScore({ ...z, eps: 300 }));
@@ -302,7 +304,7 @@
       calcScore(real, 'growth') > calcScore(junk, 'growth'),
       calcScore(real, 'growth') + ' vs ' + calcScore(junk, 'growth'));
     // Each term pinned on its own, so dropping any one of them is visible.
-    const gz = { epsQoq: 0, revQoq: 0, rs: 0, perfY: 0, eps: -100 };
+    const gz = { epsQoq: 0, revQoq: 0, rs: 0, perfY: 0, eps: null };
     const g = o => calcScore({ ...gz, ...o }, 'growth');
     check('growth score: QoQ still carries the most weight', g({ epsQoq: 100, revQoq: 150 }) === 55, 'got ' + g({ epsQoq: 100, revQoq: 150 }));
     check('growth score: EPS QoQ is worth 30', g({ epsQoq: 100 }) === 30, 'got ' + g({ epsQoq: 100 }));
@@ -339,6 +341,53 @@
     const out = tickers(applyFilters(uni, { 'm:RISING': 85, 'm:FALLING': 85 }));
     check('criterion #3 falls back to Perf.6M when no bars are reachable',
       eqSet(out, ['RISING']), 'got ' + JSON.stringify(out));
+  }
+
+  // A zero-weight EPS term does not punish collapsing earnings, it only stops
+  // rewarding them — TWST held 5th place on the momentum screener with EPS YoY
+  // -268% because the non-EPS terms alone reach 80 of 100 there.
+  {
+    check('epsPenalty: healthy growth is untouched', epsPenalty(300) === 1 && epsPenalty(0) === 1);
+    check('epsPenalty: no reported EPS is unknown, not bad', epsPenalty(null) === 1 && epsPenalty(undefined) === 1);
+    check('epsPenalty: wiped-out earnings scale the score down', epsPenalty(-100) === 0.65, 'got ' + epsPenalty(-100));
+    check('epsPenalty: floors, so -268% is not worse than -100%', epsPenalty(-268) === 0.65, 'got ' + epsPenalty(-268));
+    check('epsPenalty: monotonic between', epsPenalty(-10) > epsPenalty(-50) && epsPenalty(-50) > epsPenalty(-90));
+    // The whole point: the penalty must outrank a strong technical profile.
+    const strongTech = { rs: 99, fromHighPct: 0, perf3: 150, perf6: 150, perfY: 300, rev: 0 };
+    check('momentum: collapsing EPS demotes a technically perfect name',
+      calcScore({ ...strongTech, eps: -268 }, 'momentum') < calcScore({ ...strongTech, eps: null }, 'momentum'),
+      calcScore({ ...strongTech, eps: -268 }, 'momentum') + ' vs ' + calcScore({ ...strongTech, eps: null }, 'momentum'));
+    // Commodities have no issuer, so scaling them all by one factor would just
+    // relabel a constant as a signal.
+    check('commodities are exempt from the EPS penalty',
+      calcScore({ rs: 99, fromHighPct: 0, perf3: 150, perf6: 0, perfY: 300, eps: -268 }, 'commodities')
+        === calcScore({ rs: 99, fromHighPct: 0, perf3: 150, perf6: 0, perfY: 300, eps: null }, 'commodities'));
+  }
+
+  // validateExact needs Supabase and a fetch per candidate, so its gates had no
+  // coverage at all. _sepaExactFail is the same decision as a pure function.
+  {
+    const rising = mk(Array.from({ length: 252 }, (_, i) => 100 + i * 0.4));
+    const falling = mk(Array.from({ length: 252 }, (_, i) => i < 212 ? 100 + i * 0.4 : 100 + 212 * 0.4 - (i - 212) * 3));
+    const short = mk(Array.from({ length: 100 }, (_, i) => 100 + i));
+    const okVcp = { contractions: 3, tighteningOK: true };
+    check('exact: rising SMA200 passes', _sepaExactFail({ perf6: 30 }, rising) === false);
+    check('exact: falling SMA200 fails', _sepaExactFail({ perf6: 30 }, falling) === true);
+    check('exact: too little history falls back to Perf.6M',
+      _sepaExactFail({ perf6: 30 }, short) === false && _sepaExactFail({ perf6: -6 }, short) === true);
+    check('exact: no bars at all still falls back to Perf.6M',
+      _sepaExactFail({ perf6: 30 }, null) === false && _sepaExactFail({ perf6: -6 }, null) === true);
+    check('exact: VCP gate is off unless asked for',
+      _sepaExactFail({ perf6: 30 }, rising) === false
+      && _sepaExactFail({ perf6: 30 }, rising, { reqVcp: true }) === true
+      && _sepaExactFail({ perf6: 30, vcp: okVcp }, rising, { reqVcp: true }) === false);
+    check('exact: VCP gate needs 2+ contractions AND tightening',
+      _sepaExactFail({ perf6: 30, vcp: { contractions: 1, tighteningOK: true } }, rising, { reqVcp: true }) === true
+      && _sepaExactFail({ perf6: 30, vcp: { contractions: 3, tighteningOK: false } }, rising, { reqVcp: true }) === true);
+    check('exact: RS-line gate is off unless asked for',
+      _sepaExactFail({ perf6: 30 }, rising, { reqRsLine: true }) === true
+      && _sepaExactFail({ perf6: 30, rsLine: { atHigh: true } }, rising, { reqRsLine: true }) === false
+      && _sepaExactFail({ perf6: 30, rsLine: { atHigh: false } }, rising, { reqRsLine: true }) === true);
   }
 
   setScreener('sepa', true); // restore

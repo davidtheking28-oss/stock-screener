@@ -881,6 +881,7 @@ tbody tr:last-child td { border-bottom: none; }
             <label class="toggle"><input type="checkbox" id="requireRevAccel" checked> האצה במכירות (רבעון אחרון &ge; קודם)</label>
             <label class="toggle"><input type="checkbox" id="requireMarginTrend"> שיפור שולי רווח (מול שנה קודמת)</label>
             <label class="toggle"><input type="checkbox" id="requireVCP"> בסיס VCP (2+ התכווצויות מתהדקות)</label>
+            <label class="toggle"><input type="checkbox" id="requireRSLine"> קו RS בשיא חדש (מול S&amp;P 500)</label>
           </div>
         </div>
       </div>
@@ -1450,11 +1451,29 @@ function _qullaExactOK(bars, adrMin, emaDistMax, weekMax){
   if(wk<-weekMax || wk>weekMax) return false;
   return true;
 }
+// Pulled out of validateExact so the suite can reach it. That function needs
+// Supabase and a network round-trip per candidate, so every gate it applied was
+// uncovered — a mutation deleting the VCP gate did not turn a single test red.
+// Returns true when the row must be dropped.
+function _sepaExactFail(r, bars, opts={}){
+  // applyFilters no longer applies the Perf.6M proxy for criterion #3, so this
+  // is the only place it is enforced. null means "not enough history / no bars"
+  // — fall back to the proxy there rather than letting the criterion vanish.
+  const rising = bars ? _ma200Rising(bars) : null;
+  if(rising===false) return true;
+  if(rising===null && !(r.perf6!=null && r.perf6>0)) return true;
+  // Minervini enters on a VCP base, not on the Trend Template alone.
+  if(opts.reqVcp && !(r.vcp && r.vcp.contractions>=2 && r.vcp.tighteningOK)) return true;
+  // The RS line making a new high before price clears its own pivot is the
+  // strongest tell in a base for both Minervini and IBD.
+  if(opts.reqRsLine && !(r.rsLine && r.rsLine.atHigh)) return true;
+  return false;
+}
 async function validateExact(list, scr, onProgress){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   const adrMin=num('adrMin')||3, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
-  const reqVcp=!!$('requireVCP')?.checked;
+  const reqVcp=!!$('requireVCP')?.checked, reqRsLine=!!$('requireRSLine')?.checked;
   const consolBars=(num('consolWeeks')||2)*5;
   // One benchmark fetch for the whole pass — the RS line is price/SPY.
   const spy=await _fetchBars1y('SPY').catch(()=>null);
@@ -1468,18 +1487,7 @@ async function validateExact(list, scr, onProgress){
         // rather than filtering it.
         if(bars){ r.vcp=_vcp(bars); r.rsLine=_rsLine(bars, spy); }
         if(scr==='sepa'){
-          // applyFilters no longer applies the Perf.6M proxy for criterion #3,
-          // so this is the only place it is enforced. null means "not enough
-          // history / no bars" — fall back to the proxy there rather than
-          // letting the criterion silently disappear for those names.
-          const rising = bars ? _ma200Rising(bars) : null;
-          if(rising===false) r._exactFail=true;
-          else if(rising===null && !(r.perf6!=null && r.perf6>0)) r._exactFail=true;
-          // Minervini enters on a VCP base, not on the Trend Template alone.
-          // Off by default: it is a genuine setup filter, not a screen-wide
-          // criterion, and turning it on unconditionally would cut the list to
-          // a handful on most days.
-          if(reqVcp && !(r.vcp && r.vcp.contractions>=2 && r.vcp.tighteningOK)) r._exactFail=true;
+          if(_sepaExactFail(r, bars, {reqVcp, reqRsLine})) r._exactFail=true;
         } else if(scr==='qulla'){
           if(_qullaExactOK(bars, adrMin, emaDistMax, weekMax)===false) r._exactFail=true;
         } else {
@@ -1716,7 +1724,20 @@ window.addEventListener('resize', ()=>{ $('colPickerPanel')?.classList.remove('o
 // growing ones on perfY/RS alone. -100% (earnings wiped out) now floors true
 // zero; growth up to the existing +300% cap still scores proportionally more.
 function epsScore(eps, weight){ return clamp(((eps??-100)+100)/400,0,1)*weight; }
+// A zero-weight EPS term only fails to *reward* collapsing earnings — it does
+// not punish them. Measured live: TWST ranked 5th on the momentum screener with
+// EPS YoY of -268%, because RS 35 + distance-from-high 15 + the two performance
+// terms 30 already reach 80 of 100 without EPS contributing anything. Scaling
+// the whole score is what actually demotes it. null (nothing reported) is
+// unknown, not bad, so it is never penalised.
+function epsPenalty(eps){ return eps==null ? 1 : clamp(1-0.35*clamp(-eps,0,100)/100, 0.65, 1); }
 function calcScore(r, scr='sepa'){
+  // Commodities have no issuer and no EPS — scaling every row by the same
+  // factor would just relabel a constant as a ranking signal.
+  const raw=_calcScoreRaw(r, scr);
+  return scr==='commodities' ? raw : Math.round(raw*epsPenalty(r.eps));
+}
+function _calcScoreRaw(r, scr='sepa'){
   if(scr==='growth'){
     // Scoring on the two QoQ gates alone ranked one good sequential quarter
     // above everything else: BATRA (RS 62, year +23%, EPS YoY -140%) came out
@@ -1956,7 +1977,7 @@ function saveMyPreset(){
   const all=_myPresets();
   const vals={_screener:activeScreener};
   PRESET_FIELDS.forEach(k=>{ const el=$(k); const raw=el?.dataset.raw; if(raw!=null&&raw!=='') vals[k]=raw; });
-  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend','requireVCP'].forEach(k=>{ const el=$(k); if(el) vals[k]=el.checked; });
+  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend','requireVCP','requireRSLine'].forEach(k=>{ const el=$(k); if(el) vals[k]=el.checked; });
   all[name]=vals;
   _writeMyPresets(all);
   renderMyPresets();
@@ -1966,7 +1987,7 @@ function applyMyPreset(name, btn){
   const p=_myPresets()[name]; if(!p) return;
   if(p._screener && p._screener!==activeScreener) setScreener(p._screener, false);
   PRESET_FIELDS.forEach(k=>{ if(p[k]!=null) setFieldValue($(k),p[k]); });
-  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend','requireVCP'].forEach(k=>{ const el=$(k); if(el && typeof p[k]==='boolean') el.checked=p[k]; });
+  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend','requireVCP','requireRSLine'].forEach(k=>{ const el=$(k); if(el && typeof p[k]==='boolean') el.checked=p[k]; });
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
   btn?.classList.add('active');
   updUnitHints(); toggleFundFields(); saveFilterPrefs();
@@ -3169,7 +3190,7 @@ function saveFilterPrefs(){
       nmMin:num('nmMin'),revQoqSepaMin:num('revQoqSepaMin'),epsQoqSepaMin:num('epsQoqSepaMin'),epsFwdMin:num('epsFwdMin'),
       useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,requireEpsAccel:$('requireEpsAccel')?.checked,
       requireRevAccel:$('requireRevAccel')?.checked,requireMarginTrend:$('requireMarginTrend')?.checked,
-      requireVCP:$('requireVCP')?.checked
+      requireVCP:$('requireVCP')?.checked,requireRSLine:$('requireRSLine')?.checked
     }));
   } catch(e){}
 }
@@ -3210,6 +3231,7 @@ function loadFilterPrefs(){
     if($('requireRevAccel')&&p.requireRevAccel!=null) $('requireRevAccel').checked=p.requireRevAccel;
     if($('requireMarginTrend')&&p.requireMarginTrend!=null) $('requireMarginTrend').checked=p.requireMarginTrend;
     if($('requireVCP')&&p.requireVCP!=null) $('requireVCP').checked=p.requireVCP;
+    if($('requireRSLine')&&p.requireRSLine!=null) $('requireRSLine').checked=p.requireRSLine;
     toggleFundFields();
   } catch(e){}
 }

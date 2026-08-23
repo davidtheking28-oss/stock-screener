@@ -154,7 +154,11 @@ function applyClassicSEPA(universe: Row[], rsMap: Record<string, number>) {
     const perfYS = Math.min(Math.max(perfY ?? 0, 0), 300) / 300 * 10;
     out.push({
       t: d[C.name] as string, sym: r.s, rs,
-      sc: Math.round(rsS + epsS + revS + hiS + perfYS),
+      // Mirrors the client's epsPenalty: a zero-weight EPS term stops rewarding
+      // collapsing earnings but never demotes them, and the non-EPS terms alone
+      // reach 75 of 100 here. null is unknown, not bad.
+      sc: Math.round((rsS + epsS + revS + hiS + perfYS)
+        * (eps == null ? 1 : Math.min(Math.max(1 - 0.35 * Math.min(Math.max(-eps, 0), 100) / 100, 0.65), 1))),
       c: close, sec: (d[C.sector] as string) || '—',
     });
   }
