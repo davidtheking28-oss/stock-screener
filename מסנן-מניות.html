@@ -1688,6 +1688,13 @@ function calcScore(r, scr='sepa'){
     const revS=Math.min(Math.max(r.revQoq??0,0),150)/150*50;
     return Math.round(clamp(epsS+revS,0,100));
   }
+  // Fundamentals (eps/rev/roe/nm) are fetched for every screener, not only
+  // SEPA — visible proof is the "EPS YoY" stat on every gallery card — so a
+  // ranking that ignores them anywhere is leaving data on the table, not
+  // avoiding a fetch it doesn't have. Each branch below folds in an epsS term
+  // carved out of its existing weights rather than added on top, so scores
+  // stay 0-100 and a stock's rank still reflects that screener's own thesis
+  // first, fundamentals second.
   if(scr==='qulla'){
     // `||` would treat an explicit 0 (a valid, if extreme, "must be exact" filter
     // value the user can type) as unset and silently swap in the default —
@@ -1695,19 +1702,31 @@ function calcScore(r, scr='sepa'){
     // threshold in applyFilters to get here, so emaDist/perfW is ~0 too.
     const emaMax = num('emaDistMax'); const emaMaxUsed = Number.isNaN(emaMax) ? 3.5 : emaMax;
     const wkMax  = num('weekRangeMax'); const wkMaxUsed  = Number.isNaN(wkMax) ? 7 : wkMax;
-    const moveS = Math.min(clamp(r.perf6??0,0,150)/150,1)*40;
-    const adrS  = Math.min(clamp(r.adrPct??r.volD??0,0,8)/8,1)*20;
-    const emaS  = (r.emaDist==null||!isFinite(r.emaDist))?0: emaMaxUsed>0 ? clamp(1-r.emaDist/emaMaxUsed,0,1)*20 : 20;
-    const tightS= r.perfW==null?0: wkMaxUsed>0 ? clamp(1-Math.abs(r.perfW)/wkMaxUsed,0,1)*20 : 20;
-    return Math.round(clamp(moveS+adrS+emaS+tightS,0,100));
+    const moveS = Math.min(clamp(r.perf6??0,0,150)/150,1)*35;
+    const adrS  = Math.min(clamp(r.adrPct??r.volD??0,0,8)/8,1)*15;
+    const emaS  = (r.emaDist==null||!isFinite(r.emaDist))?0: emaMaxUsed>0 ? clamp(1-r.emaDist/emaMaxUsed,0,1)*15 : 15;
+    const tightS= r.perfW==null?0: wkMaxUsed>0 ? clamp(1-Math.abs(r.perfW)/wkMaxUsed,0,1)*15 : 15;
+    const epsS  = Math.min(clamp(r.eps??0,0,300)/300,1)*20;
+    return Math.round(clamp(moveS+adrS+emaS+tightS+epsS,0,100));
   }
   if(scr==='finviz'){
-    const hiS   = clamp(1-Math.max(0,-r.fromHighPct)/25,0,1)*50;
-    const perfS = Math.min(clamp(r.perfY??0,0,300)/300,1)*30;
+    const hiS   = clamp(1-Math.max(0,-r.fromHighPct)/25,0,1)*35;
+    const perfS = Math.min(clamp(r.perfY??0,0,300)/300,1)*25;
     const rsS   = clamp(r.rs,0,99)/99*20;
-    return Math.round(clamp(hiS+perfS+rsS,0,100));
+    const epsS  = Math.min(clamp(r.eps??0,0,300)/300,1)*20;
+    return Math.round(clamp(hiS+perfS+rsS+epsS,0,100));
   }
-  if(scr==='momentum'||scr==='power'||scr==='commodities'){
+  if(scr==='momentum'||scr==='power'){
+    const rsS   = clamp(r.rs,0,99)/99*40;
+    const hiS   = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*20;
+    const pf    = Math.max(r.perf3??0,(r.perf6??0)/2);
+    const perfS = Math.min(clamp(pf,0,150)/150,1)*20;
+    const epsS  = Math.min(clamp(r.eps??0,0,300)/300,1)*20;
+    return Math.round(clamp(rsS+hiS+perfS+epsS,0,100));
+  }
+  if(scr==='commodities'){
+    // No issuer, no EPS — folding fundamentals in here would just zero every
+    // row by the same amount and relabel that as a ranking signal.
     const rsS   = clamp(r.rs,0,99)/99*50;
     const hiS   = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*25;
     const pf    = Math.max(r.perf3??0,(r.perf6??0)/2);
