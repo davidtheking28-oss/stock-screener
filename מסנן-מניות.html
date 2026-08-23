@@ -1710,12 +1710,16 @@ function calcScore(r, scr='sepa'){
     // threshold in applyFilters to get here, so emaDist/perfW is ~0 too.
     const emaMax = num('emaDistMax'); const emaMaxUsed = Number.isNaN(emaMax) ? 3.5 : emaMax;
     const wkMax  = num('weekRangeMax'); const wkMaxUsed  = Number.isNaN(wkMax) ? 7 : wkMax;
-    const moveS = Math.min(clamp(r.perf6??0,0,150)/150,1)*35;
-    const adrS  = Math.min(clamp(r.adrPct??r.volD??0,0,8)/8,1)*15;
+    const moveS = Math.min(clamp(r.perf6??0,0,150)/150,1)*30;
+    const adrS  = Math.min(clamp(r.adrPct??r.volD??0,0,8)/8,1)*10;
     const emaS  = (r.emaDist==null||!isFinite(r.emaDist))?0: emaMaxUsed>0 ? clamp(1-r.emaDist/emaMaxUsed,0,1)*15 : 15;
-    const tightS= r.perfW==null?0: wkMaxUsed>0 ? clamp(1-Math.abs(r.perfW)/wkMaxUsed,0,1)*15 : 15;
-    const epsS  = epsScore(r.eps, 20);
-    return Math.round(clamp(moveS+adrS+emaS+tightS+epsS,0,100));
+    const tightS= r.perfW==null?0: wkMaxUsed>0 ? clamp(1-Math.abs(r.perfW)/wkMaxUsed,0,1)*10 : 10;
+    const epsS  = epsScore(r.eps, 15);
+    // ביצ׳ שנה, added for consistency with every other screener — perf6 above
+    // is still the dominant "breakout" signal, this just stops a strong
+    // full-year run from being invisible to Qullamaggie's own score.
+    const perfYS= Math.min(clamp(r.perfY??0,0,300)/300,1)*20;
+    return Math.round(clamp(moveS+adrS+emaS+tightS+epsS+perfYS,0,100));
   }
   if(scr==='finviz'){
     const hiS   = clamp(1-Math.max(0,-r.fromHighPct)/25,0,1)*30;
