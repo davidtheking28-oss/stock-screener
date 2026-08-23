@@ -1717,27 +1717,32 @@ function calcScore(r, scr='sepa'){
     return Math.round(clamp(hiS+perfS+rsS+epsS,0,100));
   }
   if(scr==='momentum'||scr==='power'){
-    const rsS   = clamp(r.rs,0,99)/99*40;
-    const hiS   = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*20;
+    const rsS   = clamp(r.rs,0,99)/99*35;
+    const hiS   = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15;
     const pf    = Math.max(r.perf3??0,(r.perf6??0)/2);
-    const perfS = Math.min(clamp(pf,0,150)/150,1)*20;
-    const epsS  = Math.min(clamp(r.eps??0,0,300)/300,1)*20;
-    return Math.round(clamp(rsS+hiS+perfS+epsS,0,100));
+    const perfS = Math.min(clamp(pf,0,150)/150,1)*15;
+    const epsS  = Math.min(clamp(r.eps??0,0,300)/300,1)*15;
+    // ביצ׳ שנה — the year-performance stat on every card, distinct from the
+    // 3/6-month breakout window pf already scores above.
+    const perfYS= Math.min(clamp(r.perfY??0,0,300)/300,1)*20;
+    return Math.round(clamp(rsS+hiS+perfS+epsS+perfYS,0,100));
   }
   if(scr==='commodities'){
     // No issuer, no EPS — folding fundamentals in here would just zero every
     // row by the same amount and relabel that as a ranking signal.
-    const rsS   = clamp(r.rs,0,99)/99*50;
-    const hiS   = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*25;
+    const rsS   = clamp(r.rs,0,99)/99*40;
+    const hiS   = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*20;
     const pf    = Math.max(r.perf3??0,(r.perf6??0)/2);
-    const perfS = Math.min(clamp(pf,0,150)/150,1)*25;
-    return Math.round(clamp(rsS+hiS+perfS,0,100));
+    const perfS = Math.min(clamp(pf,0,150)/150,1)*20;
+    const perfYS= Math.min(clamp(r.perfY??0,0,300)/300,1)*20;
+    return Math.round(clamp(rsS+hiS+perfS+perfYS,0,100));
   }
-  const rsS  = clamp(r.rs,0,99)/99*40;
-  const epsS = Math.min(clamp(r.eps??0,0,300)/300,1)*25;
-  const revS = Math.min(clamp(r.rev??0,0,200)/200,1)*20;
+  const rsS  = clamp(r.rs,0,99)/99*35;
+  const epsS = Math.min(clamp(r.eps??0,0,300)/300,1)*20;
+  const revS = Math.min(clamp(r.rev??0,0,200)/200,1)*15;
   const hiS  = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15;
-  return Math.round(clamp(rsS+epsS+revS+hiS,0,100));
+  const perfYS = Math.min(clamp(r.perfY??0,0,300)/300,1)*15;
+  return Math.round(clamp(rsS+epsS+revS+hiS+perfYS,0,100));
 }
 function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var(--text3)'; }
 function scoreBorder(s)  { return s>=80?'rgba(46,204,113,0.28)':s>=60?'rgba(245,185,74,0.28)':'rgba(117,137,168,0.22)'; }
