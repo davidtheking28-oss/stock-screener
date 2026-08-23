@@ -1682,6 +1682,14 @@ window.addEventListener('resize', ()=>{ $('colPickerPanel')?.classList.remove('o
 /* ════════════════════════════════════
    SEPA SCORE  (0-100)
 ════════════════════════════════════ */
+// clamp(eps,0,300) floored every non-positive value — a wiped-out -268% YoY
+// scored the exact same 0 as flat 0% growth, so nothing in the score
+// distinguished a collapsing company from a stagnant one, and cards with
+// runaway price action but cratering earnings (verified live: IMMX, FBRX,
+// TXG, TWST all top-ranked with EPS YoY of -2% to -270%) beat out genuinely
+// growing ones on perfY/RS alone. -100% (earnings wiped out) now floors true
+// zero; growth up to the existing +300% cap still scores proportionally more.
+function epsScore(eps, weight){ return clamp(((eps??-100)+100)/400,0,1)*weight; }
 function calcScore(r, scr='sepa'){
   if(scr==='growth'){
     const epsS=Math.min(Math.max(r.epsQoq??0,0),100)/100*50;
@@ -1706,14 +1714,14 @@ function calcScore(r, scr='sepa'){
     const adrS  = Math.min(clamp(r.adrPct??r.volD??0,0,8)/8,1)*15;
     const emaS  = (r.emaDist==null||!isFinite(r.emaDist))?0: emaMaxUsed>0 ? clamp(1-r.emaDist/emaMaxUsed,0,1)*15 : 15;
     const tightS= r.perfW==null?0: wkMaxUsed>0 ? clamp(1-Math.abs(r.perfW)/wkMaxUsed,0,1)*15 : 15;
-    const epsS  = Math.min(clamp(r.eps??0,0,300)/300,1)*20;
+    const epsS  = epsScore(r.eps, 20);
     return Math.round(clamp(moveS+adrS+emaS+tightS+epsS,0,100));
   }
   if(scr==='finviz'){
-    const hiS   = clamp(1-Math.max(0,-r.fromHighPct)/25,0,1)*35;
-    const perfS = Math.min(clamp(r.perfY??0,0,300)/300,1)*25;
+    const hiS   = clamp(1-Math.max(0,-r.fromHighPct)/25,0,1)*30;
+    const perfS = Math.min(clamp(r.perfY??0,0,300)/300,1)*20;
     const rsS   = clamp(r.rs,0,99)/99*20;
-    const epsS  = Math.min(clamp(r.eps??0,0,300)/300,1)*20;
+    const epsS  = epsScore(r.eps, 30);
     return Math.round(clamp(hiS+perfS+rsS+epsS,0,100));
   }
   if(scr==='momentum'||scr==='power'){
@@ -1721,10 +1729,10 @@ function calcScore(r, scr='sepa'){
     const hiS   = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15;
     const pf    = Math.max(r.perf3??0,(r.perf6??0)/2);
     const perfS = Math.min(clamp(pf,0,150)/150,1)*15;
-    const epsS  = Math.min(clamp(r.eps??0,0,300)/300,1)*15;
+    const epsS  = epsScore(r.eps, 20);
     // ביצ׳ שנה — the year-performance stat on every card, distinct from the
     // 3/6-month breakout window pf already scores above.
-    const perfYS= Math.min(clamp(r.perfY??0,0,300)/300,1)*20;
+    const perfYS= Math.min(clamp(r.perfY??0,0,300)/300,1)*15;
     return Math.round(clamp(rsS+hiS+perfS+epsS+perfYS,0,100));
   }
   if(scr==='commodities'){
@@ -1738,10 +1746,10 @@ function calcScore(r, scr='sepa'){
     return Math.round(clamp(rsS+hiS+perfS+perfYS,0,100));
   }
   const rsS  = clamp(r.rs,0,99)/99*35;
-  const epsS = Math.min(clamp(r.eps??0,0,300)/300,1)*20;
+  const epsS = epsScore(r.eps, 25);
   const revS = Math.min(clamp(r.rev??0,0,200)/200,1)*15;
   const hiS  = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15;
-  const perfYS = Math.min(clamp(r.perfY??0,0,300)/300,1)*15;
+  const perfYS = Math.min(clamp(r.perfY??0,0,300)/300,1)*10;
   return Math.round(clamp(rsS+epsS+revS+hiS+perfYS,0,100));
 }
 function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var(--text3)'; }
