@@ -14,6 +14,7 @@ const COLUMNS = [
   "average_volume_10d_calc","Perf.3M","Perf.6M",
   "earnings_per_share_diluted_qoq_growth_fq","total_revenue_qoq_growth_fq",
   "earnings_per_share_diluted_ttm","earnings_per_share_forecast_next_fy",
+  "earnings_release_next_date",
 ];
 const C: Record<string, number> = Object.fromEntries(COLUMNS.map((c, i) => [c, i]));
 
@@ -24,7 +25,7 @@ const C: Record<string, number> = Object.fromEntries(COLUMNS.map((c, i) => [c, i
 // app could legitimately disagree about the same day.
 const FILTERS = {
   rsMin: 70, fromHigh: 0.25, fromLow: 0.30, priceMin: 10, mcMin: 2e9, liqMin: 20e6,
-  epsMin: 50, revMin: 20, roeMin: 17, epsFwdMin: 25,
+  epsMin: 50, revMin: 20, roeMin: 17, epsFwdMin: 25, earnDays: 5,
 };
 
 type Row = { s: string; d: (number | string | null)[] };
@@ -103,6 +104,17 @@ function applyClassicSEPA(universe: Row[], rsMap: Record<string, number>) {
     const avgVol = d[C.average_volume_10d_calc] as number | null;
     if (avgVol == null || close * avgVol < FILTERS.liqMin) continue;
     const rs = rsMap[r.s] ?? 0;
+    // The client drops a name whose earnings land inside the next earnDays;
+    // this job had no such gate, so the nightly list kept recommending stocks
+    // the app itself would not show.
+    const earnTs = d[C['earnings_release_next_date']] as number | null;
+    if (earnTs != null && earnTs > 0) {
+      const earnIn = Math.round((earnTs - Date.now() / 1000) / 86400);
+      if (earnIn >= 0 && earnIn <= FILTERS.earnDays) continue;
+    }
+    // Criterion #3 stays on the Perf.6M proxy here on purpose: the client can
+    // fall back to the real SMA200 slope (_ma200Rising) because it fetches OHLC
+    // per candidate, and this bulk job has no bars to measure a slope from.
     const perf6 = d[C['Perf.6M']] as number | null;
     const eps = d[C.earnings_per_share_diluted_yoy_growth_fq] as number | null;
     const rev = d[C.total_revenue_yoy_growth_fq] as number | null;
@@ -126,15 +138,23 @@ function applyClassicSEPA(universe: Row[], rsMap: Record<string, number>) {
       && epsFwdGrowth != null && epsFwdGrowth >= FILTERS.epsFwdMin;
     if (!pass) continue;
     const fromHighPct = (close / hi - 1) * 100;
-    const rsS = Math.min(rs, 99) / 99 * 40;
-    const epsS = Math.min(Math.max(eps, 0), 300) / 300 * 25;
-    const revS = Math.min(Math.max(rev, 0), 200) / 200 * 20;
+    const perfY = d[C['Perf.Y']] as number | null;
+    // Weights must mirror the client's calcScore('sepa'). They had drifted:
+    // 40/25/20/15 here vs 35/25/15/15 + a 10-point Perf.Y term there, so the
+    // nightly email ranked the same day's results differently from the app.
+    const rsS = Math.min(rs, 99) / 99 * 35;
+    // Same epsScore the client uses. Clamping at 0 made a wiped-out -268% YoY
+    // score identically to flat 0% growth, so nothing separated a collapsing
+    // company from a stagnant one.
+    const epsS = Math.min(Math.max(((eps ?? -100) + 100) / 400, 0), 1) * 25;
+    const revS = Math.min(Math.max(rev, 0), 200) / 200 * 15;
     // Math.abs would penalise a stock trading ABOVE its 52-week high, which the
     // client rewards — use the same one-sided distance it does.
     const hiS = Math.max(0, Math.min(1, 1 - Math.max(0, -fromHighPct) / 25)) * 15;
+    const perfYS = Math.min(Math.max(perfY ?? 0, 0), 300) / 300 * 10;
     out.push({
       t: d[C.name] as string, sym: r.s, rs,
-      sc: Math.round(rsS + epsS + revS + hiS),
+      sc: Math.round(rsS + epsS + revS + hiS + perfYS),
       c: close, sec: (d[C.sector] as string) || '—',
     });
   }

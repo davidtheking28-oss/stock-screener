@@ -24,14 +24,21 @@
     _ma200Rising(mk(Array.from({ length: 100 }, (_, i) => 100 + i))) === null);
 
   // ── _powerPlayOK ──
-  const good = [].concat(Array(20).fill(50), Array.from({ length: 30 }, (_, i) => 50 + 60 * (i / 29)), Array.from({ length: 10 }, (_, i) => 110 - 8 * (i / 9)));
-  const slowBase = [].concat(Array.from({ length: 30 }, (_, i) => 48 + i * 0.05), Array.from({ length: 20 }, (_, i) => 50 + 60 * (i / 19)), Array.from({ length: 8 }, (_, i) => 110 - 6 * (i / 7)));
+  // The consolidation legs are >=15 bars: a Power Play is the run PLUS a 3-6
+  // week base, and a shorter tail now fails on duration rather than depth.
+  const good = [].concat(Array(10).fill(50), Array.from({ length: 25 }, (_, i) => 50 + 60 * (i / 24)), Array.from({ length: 18 }, (_, i) => 110 - 14 * (i / 17)));
+  const slowBase = [].concat(Array.from({ length: 25 }, (_, i) => 48 + i * 0.05), Array.from({ length: 20 }, (_, i) => 50 + 60 * (i / 19)), Array.from({ length: 16 }, (_, i) => 110 - 12 * (i / 15)));
   const deep = [].concat(Array(10).fill(50), Array.from({ length: 25 }, (_, i) => 50 + 60 * (i / 24)), Array.from({ length: 15 }, (_, i) => 110 - 44 * (i / 14)));
   const weak = [].concat(Array(20).fill(50), Array.from({ length: 30 }, (_, i) => 50 + 30 * (i / 29)), Array.from({ length: 8 }, (_, i) => 80 - 2 * (i / 7)));
+  // Doubled and still going — nothing has consolidated yet. Depth alone reads
+  // this as maximally tight (~0% off the high), which is exactly the hole the
+  // duration guard closes.
+  const fresh = [].concat(Array(15).fill(50), Array.from({ length: 30 }, (_, i) => 50 + 60 * (i / 29)), Array(3).fill(109));
   check('_powerPlayOK: 100%+ run + tight consolidation → true', _powerPlayOK(mk(good), 100) === true);
   check('_powerPlayOK: explosive move off a long base → true', _powerPlayOK(mk(slowBase), 100) === true);
   check('_powerPlayOK: deep (>25%) correction → false', _powerPlayOK(mk(deep), 100) === false);
   check('_powerPlayOK: only +60% (no doubling) → false', _powerPlayOK(mk(weak), 100) === false);
+  check('_powerPlayOK: peaked days ago, no base yet → false', _powerPlayOK(mk(fresh), 100) === false);
 
   // ── computeRS: monotonic in composite performance ──
   {
@@ -51,7 +58,7 @@
     // Keep this list in sync when a toggle is added: requireRevAccel defaults
     // ON, and leaving it on made this fixture (which carries no revenue data)
     // fail with an empty result set.
-    ['useFund', 'requireProfit', 'requireEpsAccel', 'requireRevAccel', 'requireMarginTrend']
+    ['useFund', 'requireProfit', 'requireEpsAccel', 'requireRevAccel', 'requireMarginTrend', 'requireVCP']
       .forEach(id => { if ($(id)) $(id).checked = false; });
     const base = { close: 100, SMA50: 95, SMA150: 90, SMA200: 85, price_52_week_high: 115, price_52_week_low: 60,
       market_cap_basic: 5e9, average_volume_10d_calc: 1e6, volume: 1e6, 'Perf.Y': 50, 'Perf.3M': 20, 'Perf.6M': 30,
@@ -238,7 +245,7 @@
 
   // The saved-prefs version was hardcoded to 2 on every write, so each load
   // re-ran every migration's "only touch the old default" guard forever.
-  check('FILTERS_VERSION matches the highest migration', typeof FILTERS_VERSION === 'number' && FILTERS_VERSION >= 4,
+  check('FILTERS_VERSION matches the highest migration', typeof FILTERS_VERSION === 'number' && FILTERS_VERSION >= 5,
     'got ' + (typeof FILTERS_VERSION === 'undefined' ? 'undefined' : FILTERS_VERSION));
 
   // The nightly Edge Function (supabase/functions/daily-scan) reimplements the
@@ -252,6 +259,78 @@
       vals.epsMin === 50 && vals.revMin === 20 && vals.roeMin === 17 && vals.epsFwdMin === 25
         && vals.fromLow === 30 && vals.fromHigh === 25 && vals.rsMin === 70,
       'got ' + JSON.stringify(vals));
+  }
+
+  // The nightly job also reimplements calcScore, and *that* half was never
+  // pinned — it stayed on 40/25/20/15 with a clamp(eps,0,300) floor long after
+  // the client moved to 35/25/15/15 + Perf.Y and to epsScore. Isolating each
+  // term makes any weight change here fail until daily-scan is changed too.
+  {
+    setScreener('sepa', true);
+    const z = { rs: 0, eps: -100, rev: 0, fromHighPct: -25, perfY: 0 };
+    check('SEPA score: nothing scores 0', calcScore(z) === 0, 'got ' + calcScore(z));
+    check('SEPA score: RS is worth 35', calcScore({ ...z, rs: 99 }) === 35, 'got ' + calcScore({ ...z, rs: 99 }));
+    check('SEPA score: EPS YoY is worth 25', calcScore({ ...z, eps: 300 }) === 25, 'got ' + calcScore({ ...z, eps: 300 }));
+    check('SEPA score: revenue YoY is worth 15', calcScore({ ...z, rev: 200 }) === 15, 'got ' + calcScore({ ...z, rev: 200 }));
+    check('SEPA score: distance from high is worth 15', calcScore({ ...z, fromHighPct: 0 }) === 15, 'got ' + calcScore({ ...z, fromHighPct: 0 }));
+    check('SEPA score: yearly performance is worth 10', calcScore({ ...z, perfY: 300 }) === 10, 'got ' + calcScore({ ...z, perfY: 300 }));
+    // Flat 0% growth and wiped-out earnings used to score identically; epsScore
+    // floors true zero at -100%, so a collapsing company must score strictly
+    // lower than a stagnant one.
+    check('SEPA score: collapsing EPS scores below flat EPS',
+      calcScore({ ...z, eps: -80 }) < calcScore({ ...z, eps: 0 }),
+      calcScore({ ...z, eps: -80 }) + ' vs ' + calcScore({ ...z, eps: 0 }));
+  }
+
+  // The fundamental screener was the one calcScore branch the ranking fix never
+  // reached: it scored on epsQoq/revQoq alone, so a single good sequential
+  // quarter outranked everything. Live proof was BATRA (RS 62, year +23%, EPS
+  // YoY -140%) placing first and MU (RS 98, +726%, +1372%) third.
+  {
+    const q = { epsQoq: 20, revQoq: 30 };
+    const junk = { ...q, rs: 62, perfY: 23, eps: -140 };
+    const real = { ...q, rs: 98, perfY: 726, eps: 1372 };
+    check('growth score: same QoQ, stronger stock and YoY wins',
+      calcScore(real, 'growth') > calcScore(junk, 'growth'),
+      calcScore(real, 'growth') + ' vs ' + calcScore(junk, 'growth'));
+    // Each term pinned on its own, so dropping any one of them is visible.
+    const gz = { epsQoq: 0, revQoq: 0, rs: 0, perfY: 0, eps: -100 };
+    const g = o => calcScore({ ...gz, ...o }, 'growth');
+    check('growth score: QoQ still carries the most weight', g({ epsQoq: 100, revQoq: 150 }) === 55, 'got ' + g({ epsQoq: 100, revQoq: 150 }));
+    check('growth score: EPS QoQ is worth 30', g({ epsQoq: 100 }) === 30, 'got ' + g({ epsQoq: 100 }));
+    check('growth score: revenue QoQ is worth 25', g({ revQoq: 150 }) === 25, 'got ' + g({ revQoq: 150 }));
+    check('growth score: RS is worth 15', g({ rs: 99 }) === 15, 'got ' + g({ rs: 99 }));
+    check('growth score: yearly performance is worth 15', g({ perfY: 300 }) === 15, 'got ' + g({ perfY: 300 }));
+    check('growth score: EPS YoY is worth 15', g({ eps: 300 }) === 15, 'got ' + g({ eps: 300 }));
+  }
+
+  // Qullamaggie screens the market's biggest gainers, not any stock that moved.
+  {
+    setScreener('qulla', true);
+    const m = { move3Min: num('move3Min'), move6Min: num('move6Min'), adrMin: num('adrMin') };
+    check('Qullamaggie defaults require a real prior move',
+      m.move3Min === 20 && m.move6Min === 30 && m.adrMin === 3, 'got ' + JSON.stringify(m));
+  }
+
+  // Criterion #3 (SMA200 rising). validateExact runs the real slope check via
+  // _ma200Rising when bars are reachable; applyFilters keeps the Perf.6M proxy
+  // only for the no-Supabase / skipFund paths. The test page has no anon key,
+  // so HAS_SUPABASE is false here and this exercises exactly that fallback —
+  // the branch that must not silently drop the criterion.
+  {
+    setScreener('sepa', true);
+    ['useFund', 'requireProfit', 'requireEpsAccel', 'requireRevAccel', 'requireMarginTrend', 'requireVCP']
+      .forEach(id => { if ($(id)) $(id).checked = false; });
+    const base = { close: 100, SMA50: 95, SMA150: 90, SMA200: 85, price_52_week_high: 115, price_52_week_low: 60,
+      market_cap_basic: 5e9, average_volume_10d_calc: 1e6, volume: 1e6, 'Perf.Y': 50, 'Perf.3M': 20,
+      earnings_release_next_date: 0, sector: 'Technology Services', description: 'x', exchange: 'NASDAQ' };
+    const uni = [
+      mkStock('m:RISING', { ...base, name: 'RISING', 'Perf.6M': 30 }),
+      mkStock('m:FALLING', { ...base, name: 'FALLING', 'Perf.6M': -6 }),
+    ];
+    const out = tickers(applyFilters(uni, { 'm:RISING': 85, 'm:FALLING': 85 }));
+    check('criterion #3 falls back to Perf.6M when no bars are reachable',
+      eqSet(out, ['RISING']), 'got ' + JSON.stringify(out));
   }
 
   setScreener('sepa', true); // restore

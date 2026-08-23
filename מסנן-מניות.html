@@ -835,8 +835,8 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="fromLow" value="30" min="0" max="500" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="runMin" value="100" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ריצה נפיצה תוך ~8 שבועות (OHLC)</span></div>
             <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="adrMin" value="3" min="0" step="0.5" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">תנודתיות יומית ממוצעת 20 יום</span></div>
-            <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move6Min" value="20" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">זינוק קודם — עדיף 50%+</span></div>
-            <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move3Min" value="10" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move6Min" value="30" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">זינוק קודם — עדיף 50%+</span></div>
+            <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move3Min" value="20" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="emaDistMax">מרחק מ-EMA10/20 מקס&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="emaDistMax" value="3.5" min="0" step="0.5" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">&#8220;surfing&#8221; הממוצעים 10/20</span></div>
             <div class="field f-qulla"><label for="weekRangeMax">דשדוש 5 ימים מקס&#8217; (&#177;%)</label><div class="field-combo"><input type="text" inputmode="none" id="weekRangeMax" value="7" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">שינוי שבועי בטווח צר</span></div>
             <div class="field f-qulla"><label for="volSharesMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="volSharesMin" value="0.5" min="0" step="0.1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ממוצע 30/90 יום</span></div>
@@ -879,6 +879,7 @@ tbody tr:last-child td { border-bottom: none; }
             <label class="toggle"><input type="checkbox" id="requireEpsAccel" checked> האצה ב-EPS (רבעון אחרון &ge; קודם)</label>
             <label class="toggle"><input type="checkbox" id="requireRevAccel" checked> האצה במכירות (רבעון אחרון &ge; קודם)</label>
             <label class="toggle"><input type="checkbox" id="requireMarginTrend"> שיפור שולי רווח (מול שנה קודמת)</label>
+            <label class="toggle"><input type="checkbox" id="requireVCP"> בסיס VCP (2+ התכווצויות מתהדקות)</label>
           </div>
         </div>
       </div>
@@ -1024,13 +1025,16 @@ const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100},
-  qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3,move6Min:20,move3Min:10,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
+  qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3,move6Min:30,move3Min:20,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
   commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
 };
 const COMMODITY_TICKERS = ['GLD','SLV','COPX','WEAT','CORN','UNG','PALL','PPLT','UGA','USO','CANE','URA'];
-const GROWTH_SECTORS = ['Technology Services','Electronic Technology','Consumer Durables','Consumer Non-Durables','Consumer Services','Retail Trade','Communications','Energy Minerals'];
+// Health Technology (biotech/pharma) is where a large share of the market's
+// fastest quarterly growers actually sit; leaving it out excluded them from the
+// one screener whose entire thesis is growth.
+const GROWTH_SECTORS = ['Technology Services','Electronic Technology','Consumer Durables','Consumer Non-Durables','Consumer Services','Retail Trade','Communications','Energy Minerals','Health Technology'];
 let activeScreener = localStorage.getItem('sepa_screener') || 'sepa';
 
 const COL_DEFS = [
@@ -1418,6 +1422,12 @@ function _powerPlayOK(bars, runPct){
     if(minL>0 && w[j].h/minL>=need && (!best || w[j].h>best.high)) best={iHigh:j, high:w[j].h};
   }
   if(!best) return false;
+  // Minervini's Power Play is the run *plus* a 3-6 week consolidation after it.
+  // Depth alone let a stock that peaked yesterday through: nothing had happened
+  // since the high, so the drawdown was ~0 and it looked maximally tight.
+  // 15 bars is the low end of that window; the run itself is capped at 40 bars
+  // above, so both still fit inside the 55-bar sample.
+  if(w.length-1-best.iHigh<15) return false;
   let postLow=best.high; for(let i=best.iHigh;i<w.length;i++){ if(w[i].l<postLow) postLow=w[i].l; }
   return (best.high-postLow)/best.high*100<=25;   // tight consolidation ≤25%
 }
@@ -1441,6 +1451,7 @@ async function validateExact(list, scr, onProgress){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   const adrMin=num('adrMin')||3, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
+  const reqVcp=!!$('requireVCP')?.checked;
   // One benchmark fetch for the whole pass — the RS line is price/SPY.
   const spy=await _fetchBars1y('SPY').catch(()=>null);
   async function worker(){
@@ -1453,7 +1464,18 @@ async function validateExact(list, scr, onProgress){
         // rather than filtering it.
         if(bars){ r.vcp=_vcp(bars); r.rsLine=_rsLine(bars, spy); }
         if(scr==='sepa'){
-          if(bars && _ma200Rising(bars)===false) r._exactFail=true;
+          // applyFilters no longer applies the Perf.6M proxy for criterion #3,
+          // so this is the only place it is enforced. null means "not enough
+          // history / no bars" — fall back to the proxy there rather than
+          // letting the criterion silently disappear for those names.
+          const rising = bars ? _ma200Rising(bars) : null;
+          if(rising===false) r._exactFail=true;
+          else if(rising===null && !(r.perf6!=null && r.perf6>0)) r._exactFail=true;
+          // Minervini enters on a VCP base, not on the Trend Template alone.
+          // Off by default: it is a genuine setup filter, not a screen-wide
+          // criterion, and turning it on unconditionally would cut the list to
+          // a handful on most days.
+          if(reqVcp && !(r.vcp && r.vcp.contractions>=2 && r.vcp.tighteningOK)) r._exactFail=true;
         } else if(scr==='qulla'){
           if(_qullaExactOK(bars, adrMin, emaDistMax, weekMax)===false) r._exactFail=true;
         } else {
@@ -1692,9 +1714,18 @@ window.addEventListener('resize', ()=>{ $('colPickerPanel')?.classList.remove('o
 function epsScore(eps, weight){ return clamp(((eps??-100)+100)/400,0,1)*weight; }
 function calcScore(r, scr='sepa'){
   if(scr==='growth'){
-    const epsS=Math.min(Math.max(r.epsQoq??0,0),100)/100*50;
-    const revS=Math.min(Math.max(r.revQoq??0,0),150)/150*50;
-    return Math.round(clamp(epsS+revS,0,100));
+    // Scoring on the two QoQ gates alone ranked one good sequential quarter
+    // above everything else: BATRA (RS 62, year +23%, EPS YoY -140%) came out
+    // first and MU (RS 98, year +726%, EPS YoY +1372%) third. QoQ is still the
+    // screener's thesis and keeps the largest weight, but a company whose
+    // year-over-year earnings are collapsing while the stock goes nowhere can
+    // no longer top the list on one quarter's bounce.
+    const epsS=Math.min(Math.max(r.epsQoq??0,0),100)/100*30;
+    const revS=Math.min(Math.max(r.revQoq??0,0),150)/150*25;
+    const rsS =clamp(r.rs,0,99)/99*15;
+    const perfYS=Math.min(clamp(r.perfY??0,0,300)/300,1)*15;
+    const epsYoyS=epsScore(r.eps,15);
+    return Math.round(clamp(epsS+revS+rsS+perfYS+epsYoyS,0,100));
   }
   // Fundamentals (eps/rev/roe/nm) are fetched for every screener, not only
   // SEPA — visible proof is the "EPS YoY" stat on every gallery card — so a
@@ -1805,8 +1836,8 @@ const FIELD_PRESETS = {
   epsQoqSepaMin: [[0,'כבוי'],[10,'10%'],[25,'25%'],[50,'50%'],[75,'75%'],[100,'100% — תלת-ספרתי'],[150,'150%'],[200,'200%']],
   epsFwdMin: [[0,'כבוי'],[10,'10%'],[15,'15%'],[25,'25% — מינרוויני'],[40,'40%'],[60,'60%']],
   adrMin:       [[2,'2%'],[3,'3% — ברירת מחדל'],[3.5,'3.5%'],[4,'4% — קולאמאגי מקורי'],[5,'5%'],[6,'6%'],[8,'8%']],
-  move6Min:     [[20,'20% — ברירת מחדל'],[30,'30% — מקורי'],[50,'50% — מועדף'],[75,'75%'],[100,'100%'],[150,'150%']],
-  move3Min:     [[10,'10% — ברירת מחדל'],[20,'20% — מקורי'],[30,'30%'],[50,'50%'],[75,'75%'],[100,'100%']],
+  move6Min:     [[20,'20% — רופף'],[30,'30% — ברירת מחדל'],[50,'50% — מועדף'],[75,'75%'],[100,'100%'],[150,'150%']],
+  move3Min:     [[10,'10% — רופף'],[20,'20% — ברירת מחדל'],[30,'30%'],[50,'50%'],[75,'75%'],[100,'100%']],
   emaDistMax:   [[1,'1% — צמוד מאוד'],[1.5,'1.5%'],[2,'2%'],[2.5,'2.5% — הדוק'],[3.5,'3.5% — ברירת מחדל'],[5,'5%']],
   weekRangeMax: [[3,'±3% — הדוק מאוד'],[5,'±5% — הדוק'],[7,'±7% — ברירת מחדל'],[10,'±10%']],
   volSharesMin: [[0.1,'100K+'],[0.25,'250K+'],[0.5,'500K+ — קלאסי'],[1,'1M+'],[2,'2M+'],[5,'5M+']],
@@ -1920,7 +1951,7 @@ function saveMyPreset(){
   const all=_myPresets();
   const vals={_screener:activeScreener};
   PRESET_FIELDS.forEach(k=>{ const el=$(k); const raw=el?.dataset.raw; if(raw!=null&&raw!=='') vals[k]=raw; });
-  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend'].forEach(k=>{ const el=$(k); if(el) vals[k]=el.checked; });
+  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend','requireVCP'].forEach(k=>{ const el=$(k); if(el) vals[k]=el.checked; });
   all[name]=vals;
   _writeMyPresets(all);
   renderMyPresets();
@@ -1930,7 +1961,7 @@ function applyMyPreset(name, btn){
   const p=_myPresets()[name]; if(!p) return;
   if(p._screener && p._screener!==activeScreener) setScreener(p._screener, false);
   PRESET_FIELDS.forEach(k=>{ if(p[k]!=null) setFieldValue($(k),p[k]); });
-  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend'].forEach(k=>{ const el=$(k); if(el && typeof p[k]==='boolean') el.checked=p[k]; });
+  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend','requireVCP'].forEach(k=>{ const el=$(k); if(el && typeof p[k]==='boolean') el.checked=p[k]; });
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
   btn?.classList.add('active');
   updUnitHints(); toggleFundFields(); saveFilterPrefs();
@@ -2380,12 +2411,15 @@ function applyFilters(universe, rsMap, opts={}){
       // Minervini's real criterion #3 is "SMA200 itself has been trending up for
       // at least a month" — a slope, not a price return. TradingView's scanner
       // only exposes SMA200 offset by 1-2 bars (verified live: SMA200[3] and up
-      // return null for every symbol), not the ~21 bars needed for a real
-      // month-back slope, and fetching per-symbol history for 4,000+ tickers on
-      // every scan isn't viable. Perf.6M>0 is a correlated but distinct proxy —
-      // a stock can be up over 6 months while its 200-day average is still flat
-      // or falling. Known gap, not an oversight.
-      const t4=perf6!=null&&perf6>0;
+      // return null for every symbol), so this pass can't measure the slope.
+      // Perf.6M>0 was standing in for it, but it is a *different* test in both
+      // directions: validateExact now runs the real slope check (_ma200Rising)
+      // over OHLC bars right after this, and the proxy was rejecting stocks with
+      // a genuinely rising 200-day before that check ever saw them. Keep the
+      // proxy only where the exact check will not run — no Supabase (no bars to
+      // fetch) or the skipFund pass, which builds ttUniverse synchronously and
+      // would otherwise drop criterion #3 entirely.
+      const t4=(HAS_SUPABASE&&!opts.skipFund)?true:(perf6!=null&&perf6>0);
       const t5=close>s50, t6=close>=lo*(1+flPct), t7=close>=hi*(1-fhPct), t8=rs>=rsMin;
       checks={t1,t2,t3,t4,t5,t6,t7,t8};
       pass=[t1,t2,t3,t4,t5,t6,t7,t8].every(Boolean);
@@ -3113,7 +3147,7 @@ function dismissDaily(d){
 // the "only migrate the old default" guards forever, silently clobbering a
 // deliberate value that happened to match a past default (e.g. epsMin=25 on
 // purpose, not left over).
-const FILTERS_VERSION = 4;
+const FILTERS_VERSION = 5;
 function saveFilterPrefs(){
   try {
     localStorage.setItem('sepa_filters', JSON.stringify({
@@ -3129,7 +3163,8 @@ function saveFilterPrefs(){
       smaTrend50:num('smaTrend50'),smaTrend200:num('smaTrend200'),
       nmMin:num('nmMin'),revQoqSepaMin:num('revQoqSepaMin'),epsQoqSepaMin:num('epsQoqSepaMin'),epsFwdMin:num('epsFwdMin'),
       useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,requireEpsAccel:$('requireEpsAccel')?.checked,
-      requireRevAccel:$('requireRevAccel')?.checked,requireMarginTrend:$('requireMarginTrend')?.checked
+      requireRevAccel:$('requireRevAccel')?.checked,requireMarginTrend:$('requireMarginTrend')?.checked,
+      requireVCP:$('requireVCP')?.checked
     }));
   } catch(e){}
 }
@@ -3147,6 +3182,10 @@ function loadFilterPrefs(){
     // else (12→handful) — off by default now. Same only-migrate-the-old-
     // default rule.
     if((p.v||0)<4){ if(p.requireMarginTrend===true) p.requireMarginTrend=false; p.v=4; }
+    // v5: the Qullamaggie thresholds were well below his own screen — he looks
+    // for names that already made a big move (30%+), not any move at all. Same
+    // only-migrate-the-old-default rule: 20/10 move, leave anything else alone.
+    if((p.v||0)<5){ if(p.move6Min===20) p.move6Min=30; if(p.move3Min===10) p.move3Min=20; p.v=5; }
     try{ localStorage.setItem('sepa_filters', JSON.stringify(p)); }catch(e){}
     const set=(id,v)=>{ if(v!=null) setFieldValue($(id),v); };
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
@@ -3165,6 +3204,7 @@ function loadFilterPrefs(){
     if($('requireEpsAccel')&&p.requireEpsAccel!=null) $('requireEpsAccel').checked=p.requireEpsAccel;
     if($('requireRevAccel')&&p.requireRevAccel!=null) $('requireRevAccel').checked=p.requireRevAccel;
     if($('requireMarginTrend')&&p.requireMarginTrend!=null) $('requireMarginTrend').checked=p.requireMarginTrend;
+    if($('requireVCP')&&p.requireVCP!=null) $('requireVCP').checked=p.requireVCP;
     toggleFundFields();
   } catch(e){}
 }
