@@ -482,14 +482,25 @@
       _vcpExactFail({ perf6: 30, vcp: _vcp(rising) }, falling) === true);
     // volDryUp is null when volume is unknown; the toggle must not pass that off
     // as a confirmed dry-up.
+    // Clean synthetic legs on purpose: the OHLC fixture's own tail is not
+    // monotonic under the default 3-leg window, so reusing it here would fail
+    // on the sequence rule and never reach the dry-up branch at all.
+    const dryBase = { contractions: 3, depths: [12, 8, 4], lastDepth: 4, tighteningOK: true, pivot: 100, distToPivot: -2 };
     check('vcp: the dry-up toggle requires a definite yes',
-      _vcpExactFail({ perf6: 30, vcp: { ...vGood, volDryUp: null } }, rising, { reqDryUp: true }) === true
-      && _vcpExactFail({ perf6: 30, vcp: { ...vGood, volDryUp: false } }, rising, { reqDryUp: true }) === true
-      && _vcpExactFail({ perf6: 30, vcp: { ...vGood, volDryUp: true } }, rising, { reqDryUp: true }) === false);
+      _vcpExactFail({ perf6: 30, vcp: { ...dryBase, volDryUp: null } }, rising, { reqDryUp: true }) === true
+      && _vcpExactFail({ perf6: 30, vcp: { ...dryBase, volDryUp: false } }, rising, { reqDryUp: true }) === true
+      && _vcpExactFail({ perf6: 30, vcp: { ...dryBase, volDryUp: true } }, rising, { reqDryUp: true }) === false);
+    // The shipped default is 3 legs, not 2 — measured live, 2 returns 129 names
+    // whose sequences are mostly noise (NTRA: 9.17, 9.34, 9.15, 6.45) against
+    // 45 clean ones at 3.
+    check('vcp: the default contraction window is 3 legs',
+      _vcpExactFail({ perf6: 30, vcp: { ...dryBase, depths: [4, 8, 9, 4], contractions: 4, volDryUp: true } }, rising) === true
+      && _vcpExactFail({ perf6: 30, vcp: { ...dryBase, depths: [4, 8, 9, 4], contractions: 4, volDryUp: true } }, rising, { minC: 2 }) === false
+      && _vcpExactFail({ perf6: 30, vcp: { ...dryBase, volDryUp: true } }, rising) === false);
 
     setScreener('vcp', true);
     check('vcp screener is registered with its own defaults',
-      activeScreener === 'vcp' && num('vcpContractions') === 2 && num('vcpDepthMax') === 12 && num('pivotBelow') === 10,
+      activeScreener === 'vcp' && num('vcpContractions') === 3 && num('vcpDepthMax') === 12 && num('pivotBelow') === 10,
       activeScreener + '/' + num('vcpContractions') + '/' + num('vcpDepthMax') + '/' + num('pivotBelow'));
     // The score is what orders the results, and every term of it reads r.vcp.
     // Scoring before validateExact annotates the row is the bug this pins.

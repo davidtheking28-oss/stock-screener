@@ -842,7 +842,7 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="fromLow" value="30" min="0" max="500" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="runMin" value="100" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ריצה נפיצה תוך ~8 שבועות (OHLC)</span></div>
             <div class="field f-power"><label for="consolWeeks">דשדוש מינ&#8217; (שבועות)</label><div class="field-combo"><input type="text" inputmode="none" id="consolWeeks" value="2" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">כמה זמן עבר מאז שיא הריצה — מינרוויני: 3-4 שבועות</span></div>
-            <div class="field f-vcp"><label for="vcpContractions">התכווצויות מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="vcpContractions" value="2" min="1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">כמה נסיגות בבסיס — כל אחת רדודה מקודמתה</span></div>
+            <div class="field f-vcp"><label for="vcpContractions">התכווצויות מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="vcpContractions" value="3" min="1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">כמה נסיגות בבסיס — כל אחת רדודה מקודמתה. 2 = רופף (נמדד חי: 129 תוצאות מול 45 ב-3)</span></div>
             <div class="field f-vcp"><label for="vcpDepthMax">עומק ההתכווצות האחרונה מקס&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="vcpDepthMax" value="12" min="1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">כמה הדוק הבסיס ממש לפני הפריצה</span></div>
             <div class="field f-vcp"><label for="pivotBelow">מרחק מתחת ל-Pivot מקס&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="pivotBelow" value="10" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">עד כמה רחוק מנקודת הפריצה עדיין נחשב &#8220;לפני&#8221;</span></div>
             <div class="field f-vcp" style="grid-column:1 / -1">
@@ -1043,7 +1043,7 @@ const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100,consolWeeks:2},
-  vcp:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:2,vcpDepthMax:12,pivotBelow:10},
+  vcp:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3,move6Min:30,move3Min:20,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
@@ -1505,7 +1505,7 @@ function _vcpExactFail(r, bars, opts={}){
   if(_ma200Rising(bars)===false) return true;
   const v=r.vcp;
   if(!v) return true;
-  const minC = opts.minC ?? 2;
+  const minC = opts.minC ?? 3;
   if(v.contractions < minC) return true;
   // Each pullback shallower than the one before it — the contraction itself,
   // and the one thing the pattern is named for. Checked across the last minC
@@ -1935,7 +1935,7 @@ const FIELD_PRESETS = {
   epsQoqSepaMin: [[0,'כבוי'],[10,'10%'],[25,'25%'],[50,'50%'],[75,'75%'],[100,'100% — תלת-ספרתי'],[150,'150%'],[200,'200%']],
   epsFwdMin: [[0,'כבוי'],[10,'10%'],[15,'15%'],[25,'25% — מינרוויני'],[40,'40%'],[60,'60%']],
   consolWeeks:  [[0,'כבוי — כל ריצה'],[1,'שבוע'],[2,'2 שבועות — ברירת מחדל'],[3,'3 שבועות — מינרוויני'],[4,'4 שבועות'],[6,'6 שבועות']],
-  vcpContractions: [[2,'2 — מינימום'],[3,'3 — קלאסי מינרוויני'],[4,'4'],[5,'5']],
+  vcpContractions: [[2,'2 — רופף, הרבה רעש'],[3,'3 — ברירת מחדל'],[4,'4 — מינרוויני קלאסי'],[5,'5']],
   vcpDepthMax:  [[5,'5% — הדוק מאוד'],[8,'8% — הדוק'],[10,'10%'],[12,'12% — ברירת מחדל'],[15,'15%'],[20,'20% — רופף']],
   pivotBelow:   [[3,'3% — ממש על הפריצה'],[5,'5%'],[8,'8%'],[10,'10% — ברירת מחדל'],[15,'15%'],[25,'25% — כל הבסיס']],
   adrMin:       [[2,'2%'],[3,'3% — ברירת מחדל'],[3.5,'3.5%'],[4,'4% — קולאמאגי מקורי'],[5,'5%'],[6,'6%'],[8,'8%']],
