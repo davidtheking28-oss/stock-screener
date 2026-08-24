@@ -344,7 +344,7 @@
   }
 
   // A zero-weight EPS term does not punish collapsing earnings, it only stops
-  // rewarding them — TWST held 5th place on the momentum screener with EPS YoY
+  // rewarding them — TWST held 5th place on the breakout screener with EPS YoY
   // -268% because the non-EPS terms alone reach 80 of 100 there.
   {
     check('epsPenalty: healthy growth is untouched', epsPenalty(300) === 1 && epsPenalty(0) === 1);
@@ -354,9 +354,21 @@
     check('epsPenalty: monotonic between', epsPenalty(-10) > epsPenalty(-50) && epsPenalty(-50) > epsPenalty(-90));
     // The whole point: the penalty must outrank a strong technical profile.
     const strongTech = { rs: 99, fromHighPct: 0, perf3: 150, perf6: 150, perfY: 300, rev: 0 };
-    check('momentum: collapsing EPS demotes a technically perfect name',
-      calcScore({ ...strongTech, eps: -268 }, 'momentum') < calcScore({ ...strongTech, eps: null }, 'momentum'),
-      calcScore({ ...strongTech, eps: -268 }, 'momentum') + ' vs ' + calcScore({ ...strongTech, eps: null }, 'momentum'));
+    // Was pinned on the breakout screener until it was removed; 'power' is the
+    // same score branch, so the coverage moves rather than disappearing.
+    check('power: collapsing EPS demotes a technically perfect name',
+      calcScore({ ...strongTech, eps: -268 }, 'power') < calcScore({ ...strongTech, eps: null }, 'power'),
+      calcScore({ ...strongTech, eps: -268 }, 'power') + ' vs ' + calcScore({ ...strongTech, eps: null }, 'power'));
+    check('the removed breakout screener is gone from the registry',
+      SCREENERS.momentum === undefined && SCREENER_DEFAULTS.momentum === undefined
+      && !document.querySelector('[data-screener="momentum"]'));
+    // Anyone whose last session ended on the removed screener has that key in
+    // localStorage. Without the fallback setScreener early-returns and the
+    // panel boots with no panel-* class at all — every screener's fields
+    // visible at once.
+    check('a stored screener key that no longer exists falls back to sepa',
+      _validScreener('momentum') === 'sepa' && _validScreener('') === 'sepa'
+      && _validScreener('qulla') === 'qulla' && _validScreener('vcp') === 'vcp');
     // Commodities have no issuer, so scaling them all by one factor would just
     // relabel a constant as a signal.
     check('commodities are exempt from the EPS penalty',

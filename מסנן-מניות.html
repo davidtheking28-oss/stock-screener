@@ -225,15 +225,15 @@ body {
   background: var(--accent-solid); border-color: var(--accent-solid);
   color: var(--on-accent);
 }
-#filterPanel.panel-momentum .f-sepa, #filterPanel.panel-power .f-sepa, #filterPanel.panel-growth .f-sepa, #filterPanel.panel-commodities .f-sepa, #filterPanel.panel-qulla .f-sepa, #filterPanel.panel-finviz .f-sepa { display: none; }
-#filterPanel.panel-sepa .f-power, #filterPanel.panel-momentum .f-power, #filterPanel.panel-growth .f-power, #filterPanel.panel-commodities .f-power, #filterPanel.panel-qulla .f-power, #filterPanel.panel-finviz .f-power { display: none; }
+#filterPanel.panel-power .f-sepa, #filterPanel.panel-growth .f-sepa, #filterPanel.panel-commodities .f-sepa, #filterPanel.panel-qulla .f-sepa, #filterPanel.panel-finviz .f-sepa { display: none; }
+#filterPanel.panel-sepa .f-power, #filterPanel.panel-growth .f-power, #filterPanel.panel-commodities .f-power, #filterPanel.panel-qulla .f-power, #filterPanel.panel-finviz .f-power { display: none; }
 #filterPanel.panel-growth .f-tech, #filterPanel.panel-commodities .f-tech, #filterPanel.panel-qulla .f-tech, #filterPanel.panel-finviz .f-tech { display: none; }
-#filterPanel.panel-sepa .f-growth, #filterPanel.panel-momentum .f-growth, #filterPanel.panel-power .f-growth, #filterPanel.panel-commodities .f-growth, #filterPanel.panel-qulla .f-growth, #filterPanel.panel-finviz .f-growth { display: none; }
+#filterPanel.panel-sepa .f-growth, #filterPanel.panel-power .f-growth, #filterPanel.panel-commodities .f-growth, #filterPanel.panel-qulla .f-growth, #filterPanel.panel-finviz .f-growth { display: none; }
 #filterPanel.panel-commodities .f-base { display: none; }
 #filterPanel.panel-finviz .f-liq { display: none; }
-#filterPanel.panel-sepa .f-commodities, #filterPanel.panel-momentum .f-commodities, #filterPanel.panel-power .f-commodities, #filterPanel.panel-growth .f-commodities, #filterPanel.panel-qulla .f-commodities, #filterPanel.panel-finviz .f-commodities { display: none; }
-#filterPanel.panel-sepa .f-qulla, #filterPanel.panel-momentum .f-qulla, #filterPanel.panel-power .f-qulla, #filterPanel.panel-growth .f-qulla, #filterPanel.panel-commodities .f-qulla, #filterPanel.panel-finviz .f-qulla { display: none; }
-#filterPanel.panel-sepa .f-finviz, #filterPanel.panel-momentum .f-finviz, #filterPanel.panel-power .f-finviz, #filterPanel.panel-growth .f-finviz, #filterPanel.panel-commodities .f-finviz, #filterPanel.panel-qulla .f-finviz { display: none; }
+#filterPanel.panel-sepa .f-commodities, #filterPanel.panel-power .f-commodities, #filterPanel.panel-growth .f-commodities, #filterPanel.panel-qulla .f-commodities, #filterPanel.panel-finviz .f-commodities { display: none; }
+#filterPanel.panel-sepa .f-qulla, #filterPanel.panel-power .f-qulla, #filterPanel.panel-growth .f-qulla, #filterPanel.panel-commodities .f-qulla, #filterPanel.panel-finviz .f-qulla { display: none; }
+#filterPanel.panel-sepa .f-finviz, #filterPanel.panel-power .f-finviz, #filterPanel.panel-growth .f-finviz, #filterPanel.panel-commodities .f-finviz, #filterPanel.panel-qulla .f-finviz { display: none; }
 /* The rules above enumerate every panel by name, so a new screener would be
    invisible in all of them until it is appended to each line. These two are
    written the other way round — negated — so the VCP fields hide everywhere
@@ -804,7 +804,6 @@ tbody tr:last-child td { border-bottom: none; }
       <div class="screeners">
         <span class="preset-label">מסנן:</span>
         <button class="screener-btn active" data-screener="sepa" onclick="setScreener('sepa')">Minervini SEPA</button>
-        <button class="screener-btn" data-screener="momentum" onclick="setScreener('momentum')">פריצת שיא</button>
         <button class="screener-btn" data-screener="power" onclick="setScreener('power')">Power Play</button>
         <button class="screener-btn" data-screener="vcp" onclick="setScreener('vcp')">VCP / פריצה</button>
         <button class="screener-btn" data-screener="qulla" onclick="setScreener('qulla')">Qullamaggie</button>
@@ -1031,7 +1030,6 @@ const PRESETS = {
 
 const SCREENERS = {
   sepa:     {name:'Minervini SEPA',      sub:'Trend Template + SEPA',  fund:true,  presets:true},
-  momentum: {name:'פריצת שיא',           sub:'פריצת שיא 52ש׳ · מומנטום', fund:false, presets:false},
   power:    {name:'Power Play',           sub:'ריצה נפיצה + דשדוש הדוק', fund:false, presets:false},
   vcp:      {name:'VCP / פריצה',        sub:'בסיס VCP מתהדק + מחיר צמוד לנקודת הפריצה', fund:false, presets:false},
   qulla:    {name:'Qullamaggie',          sub:'Breakout — מהלך גדול + דשדוש צמוד ל-EMA', fund:false, presets:false},
@@ -1041,7 +1039,6 @@ const SCREENERS = {
 };
 const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
-  momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100,consolWeeks:2},
   vcp:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3,move6Min:30,move3Min:20,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
@@ -1054,7 +1051,11 @@ const COMMODITY_TICKERS = ['GLD','SLV','COPX','WEAT','CORN','UNG','PALL','PPLT',
 // fastest quarterly growers actually sit; leaving it out excluded them from the
 // one screener whose entire thesis is growth.
 const GROWTH_SECTORS = ['Technology Services','Electronic Technology','Consumer Durables','Consumer Non-Durables','Consumer Services','Retail Trade','Communications','Energy Minerals','Health Technology'];
-let activeScreener = localStorage.getItem('sepa_screener') || 'sepa';
+// A stored key that no longer exists (the removed 'momentum' screener) would
+// make setScreener early-return, leaving the panel with no panel-* class and
+// every screener-specific field visible at once.
+function _validScreener(key){ return SCREENERS[key] ? key : 'sepa'; }
+let activeScreener = _validScreener(localStorage.getItem('sepa_screener') || 'sepa');
 
 const COL_DEFS = [
   {key:'price',  label:'מחיר',       defaultOn:true},
@@ -1785,9 +1786,10 @@ window.addEventListener('resize', ()=>{ $('colPickerPanel')?.classList.remove('o
 // zero; growth up to the existing +300% cap still scores proportionally more.
 function epsScore(eps, weight){ return clamp(((eps??-100)+100)/400,0,1)*weight; }
 // A zero-weight EPS term only fails to *reward* collapsing earnings — it does
-// not punish them. Measured live: TWST ranked 5th on the momentum screener with
-// EPS YoY of -268%, because RS 35 + distance-from-high 15 + the two performance
-// terms 30 already reach 80 of 100 without EPS contributing anything. Scaling
+// not punish them. Measured live on the since-removed breakout screener, which
+// shared Power Play's score branch: TWST ranked 5th with EPS YoY of -268%,
+// because RS 35 + distance-from-high 15 + the two performance terms 30 already
+// reach 80 of 100 without EPS contributing anything. Scaling
 // the whole score is what actually demotes it. null (nothing reported) is
 // unknown, not bad, so it is never penalised.
 function epsPenalty(eps){ return eps==null ? 1 : clamp(1-0.35*clamp(-eps,0,100)/100, 0.65, 1); }
@@ -1858,7 +1860,7 @@ function _calcScoreRaw(r, scr='sepa'){
     const epsS  = epsScore(r.eps, 30);
     return Math.round(clamp(hiS+perfS+rsS+epsS,0,100));
   }
-  if(scr==='momentum'||scr==='power'){
+  if(scr==='power'){
     const rsS   = clamp(r.rs,0,99)/99*35;
     const hiS   = clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15;
     const pf    = Math.max(r.perf3??0,(r.perf6??0)/2);
@@ -2088,7 +2090,7 @@ function renderMyPresets(){
   ).join('');
 }
 
-const SCREENER_HEADS = {sepa:'טכני — Trend Template', momentum:'טכני — מומנטום', power:'טכני — Power Play', vcp:'טכני — בסיס VCP', qulla:'טכני — Qullamaggie Breakout', finviz:'טכני — מומנטום שנתי', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
+const SCREENER_HEADS = {sepa:'טכני — Trend Template', power:'טכני — Power Play', vcp:'טכני — בסיס VCP', qulla:'טכני — Qullamaggie Breakout', finviz:'טכני — מומנטום שנתי', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
 function setScreener(key, applyDef=true){
   if(!SCREENERS[key]) return;
   activeScreener=key;
@@ -2426,12 +2428,11 @@ function applyFilters(universe, rsMap, opts={}){
     // 150/200-day history yet) from screeners that never look at S150/S200
     // in the first place. Qullamaggie needs S50 only; commodities and growth
     // read no SMA at all (fixed ticker list / sector+earnings only); power
-    // needs S50 only; momentum and the yearly-momentum screener need S50+S200
-    // (no S150); SEPA (the default) and VCP both read S150, so they take the
-    // full set.
+    // needs S50 only; the yearly-momentum screener needs S50+S200 (no S150);
+    // SEPA (the default) and VCP both read S150, so they take the full set.
     if(scr==='qulla'||scr==='power'){ if([close,s50,hi,lo].some(v=>v==null)) continue; }
     else if(scr==='commodities'||scr==='growth'){ if([close,hi,lo].some(v=>v==null)) continue; }
-    else if(scr==='momentum'||scr==='finviz'){ if([close,s50,s200,hi,lo].some(v=>v==null)) continue; }
+    else if(scr==='finviz'){ if([close,s50,s200,hi,lo].some(v=>v==null)) continue; }
     else if([close,s50,s150,s200,hi,lo].some(v=>v==null)) continue;
     if(close<priceMin||mc<mcMin) continue;
     const avgVol=d[C.average_volume_10d_calc], vol=d[C.volume];
@@ -2470,13 +2471,6 @@ function applyFilters(universe, rsMap, opts={}){
       const revOk=revQoq!=null && revQoq>=revQoqMin;
       checks={sectorOk,epsOk,revOk};
       pass=sectorOk&&epsOk&&revOk;
-    } else if(scr==='momentum'){
-      const up=close>s50 && s50>s200 && close>s200;
-      const near=close>=hi*(1-fhPct);
-      const strong=rs>=rsMin;
-      const perfPos=perfY!=null && perfY>0;
-      checks={up,near,strong,perfPos};
-      pass=up&&near&&strong&&perfPos;
     } else if(scr==='power'){
       const run=(perf3!=null && perf3>=runMin*0.4) || (perf6!=null && perf6>=runMin*0.4);
       const near=fromHighPct>=-num('fromHigh');
@@ -2785,7 +2779,7 @@ function renderTable(rows){
       scTip='ציון צמיחה: '+sc+'/100\nEPS QoQ: '+epsS+'/50\nמכירות QoQ: '+revS+'/50';
     } else if(r.scoreKind==='qulla'){
       scTip='ציון Qullamaggie: '+sc+'/100\nמהלך 6ח׳: '+pct(r.perf6)+'\nADR: '+pct(r.adrPct??r.volD)+'\nמרחק מ-EMA10/20: '+(isFinite(r.emaDist)&&r.emaDist!=null?r.emaDist.toFixed(1)+'%':'—')+'\nשינוי שבועי: '+pct(r.perfW);
-    } else if(r.scoreKind==='momentum'||r.scoreKind==='power'||r.scoreKind==='commodities'){
+    } else if(r.scoreKind==='power'||r.scoreKind==='commodities'){
       const rsS=Math.round(clamp(r.rs,0,99)/99*50);
       const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*25);
       const perfS=sc-rsS-hiS;
