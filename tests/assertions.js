@@ -535,6 +535,77 @@
         < calcScore(mkRow({ contractions: 3, lastDepth: 4, distToPivot: -1, volDryUp: true }), 'vcp'));
   }
 
+  // ── data-integrity gates (audited against Nasdaq's official history) ──
+  {
+    const steady = mk(Array.from({ length: 200 }, (_, i) => 50 + i * 0.2));
+    check('_barsSane: a normal series passes', _barsSane(steady) === true);
+    // A real split in an unadjusted feed, or a 40% news gap: ONE jump, never
+    // reverting. Must be kept — AMD gapped 23.7% in this universe legitimately.
+    const oneJump = mk([...Array.from({ length: 100 }, (_, i) => 100 + i * 0.1),
+                        ...Array.from({ length: 100 }, (_, i) => 55 + i * 0.05)]);
+    check('_barsSane: a single one-way jump is kept (real split / news gap)',
+      _barsSane(oneJump) === true);
+    // The real MNST shape: Yahoo returned these exact closes while Nasdaq's
+    // official history showed 46.78 / 48.87 / 46.775 on the doubled days.
+    const mnst = mk([97.50, 47.72, 47.23, 47.83, 93.56, 93.49, 95.33, 97.74, 97.23, 97.65, 48.19, 93.55, 94.18]);
+    check('_barsSane: a series that flips price scale is rejected',
+      _barsSane(mnst) === false);
+    check('_barsSane: too little history is not judged', _barsSane([{ c: 1 }]) === true);
+
+    // Qullamaggie's prior-move gates, the ones the coarse pass gets wrong.
+    // 130 bars so the 6M window (127) is measurable, 3M (64) too.
+    // n=130, so the 6M lookback lands on index 3 (n-127) and the 3M one on
+    // index 66 (n-64). Those two indices carry the anchor prices; getting the
+    // boundaries off by one silently tests nothing.
+    const move = (pct6, pct3) => {
+      const n6 = 130, final = 100 * (1 + pct6 / 100), mid = final / (1 + pct3 / 100);
+      const out = [];
+      for (let i = 0; i < n6; i++) {
+        const px = i <= 3 ? 100 : i <= 66 ? mid : final;
+        out.push({ t: i * 86400, o: px, h: px * 1.02, l: px * 0.98, c: px, v: 1000 });
+      }
+      return out;
+    };
+    // ADR ~4%, sitting on its EMAs, flat week — so only the move gates decide.
+    const g = (b, m3, m6) => _qullaExactOK(b, 0, 100, 100, m3, m6);
+    // Each case clears the gate it is not testing, so a failure names the one
+    // criterion that actually broke.
+    check('qulla: a 6-month move below the threshold now fails',
+      g(move(20, 25), 20, 30) === false, 'CRCT-shaped: real +20.5% against a 30% gate');
+    check('qulla: a 6-month move above the threshold passes',
+      g(move(45, 25), 20, 30) === true);
+    check('qulla: the 3-month move is checked too',
+      g(move(60, 5), 20, 30) === false && g(move(60, 25), 20, 30) === true);
+    check('qulla: the move gates are skipped when they are switched off',
+      g(move(2, 1), 0, 0) === true);
+    // Same rule the rest of _qullaExactOK follows: not enough history is
+    // unknown, not failing.
+    const shortHist = move(2, 1).slice(-40);
+    check('qulla: too little history does not fail the 6M gate',
+      _qullaExactOK(shortHist, 0, 100, 100, 0, 30) === true);
+
+    // The coarse ADR slack. TradingView's column runs as low as 0.751x the
+    // true 20-bar ADR, so a 0.9 gate rejects names that do qualify.
+    setScreener('qulla', true);
+    const src = applyFilters.toString();
+    check('qulla: the coarse ADR gate allows for the column understating by 25%',
+      src.includes("num('adrMin')*0.75"), 'slack must be 0.75, not 0.9');
+    setScreener('sepa', true);
+
+    // validateExact needs Supabase and a fetch per candidate, so the suite
+    // cannot run it. Both gates below were verified by mutation to be
+    // otherwise uncovered: deleting either left every test green. Shape
+    // assertions are the weakest kind, so they are deliberately narrow —
+    // each names the one expression that must survive a refactor.
+    const vsrc = validateExact.toString();
+    check('validateExact drops a row whose bar series flips price scale',
+      /if\(\s*raw\s*&&\s*!bars\s*\)\s*r\._exactFail\s*=\s*true/.test(vsrc),
+      'computing _barsSane is not enough — the row must actually be dropped');
+    check('validateExact passes the move thresholds into _qullaExactOK',
+      /_qullaExactOK\([^)]*move3Min[^)]*move6Min[^)]*\)/.test(vsrc),
+      'without these the 3M/6M gates silently never run');
+  }
+
   setScreener('sepa', true); // restore
   return R;
 })()

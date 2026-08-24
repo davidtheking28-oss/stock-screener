@@ -1461,7 +1461,30 @@ function _powerPlayOK(bars, runPct, minConsolBars=10){
 }
 // Exact Qullamaggie checks from daily bars: ADR%20, distance to EMA10/20, 5-day change.
 // Returns false only on a definite fail; null (keep) when there isn't enough history.
-function _qullaExactOK(bars, adrMin, emaDistMax, weekMax){
+// Yahoo (the ohlc function's upstream) applies a split adjustment to SOME bars
+// of a symbol and not others. Verified against Nasdaq's own historical API for
+// MNST, which really did split 2:1 in July 2026: 21/07 and 31/07 came back
+// correct ($47.23, $48.19) while 23/07 and 03/08 came back at exactly 2.00x
+// ($93.56 vs the official $46.78, $93.55 vs $46.775) — volume halved on the
+// same days. Yahoo also reports `splits: {}` for the symbol, so there is no
+// event to key off.
+//
+// A genuine split in an unadjusted feed is ONE jump that never reverts, and a
+// real session can gap 35%+ on news — so a single large move is kept. A series
+// that crosses back and forth is positive evidence of bad data, and every
+// OHLC-derived measure (VCP legs, ADR, EMA distance, the SMA200 slope, a Power
+// Play run) is meaningless on it.
+function _barsSane(bars){
+  if(!bars || bars.length<3) return true;   // nothing to judge
+  let jumps=0;
+  for(let i=1;i<bars.length;i++){
+    const a=bars[i-1].c, b=bars[i].c;
+    if(!a||!b) continue;
+    if(Math.abs(b/a-1)>=0.35 && ++jumps>=2) return false;
+  }
+  return true;
+}
+function _qullaExactOK(bars, adrMin, emaDistMax, weekMax, move3Min, move6Min){
   if(!bars || bars.length<25) return null;
   const n=bars.length, c=bars.map(b=>b.c);
   let adr=0; for(let i=n-20;i<n;i++){ if(!bars[i].l) return null; adr+=(bars[i].h/bars[i].l-1)*100; }
@@ -1473,6 +1496,15 @@ function _qullaExactOK(bars, adrMin, emaDistMax, weekMax){
   if(dist>emaDistMax) return false;
   const wk=(close/c[n-6]-1)*100;
   if(wk<-weekMax || wk>weekMax) return false;
+  // The prior-move gates used to be the only Qullamaggie criteria never
+  // re-measured here, and they are the ones the coarse pass gets wrong:
+  // TradingView's Perf.6M column was checked against Nasdaq's official closes
+  // and can be off by 10 points (CRCT: column 30.3%, real 20.5%; SIBN: column
+  // 30.3%, real 26.8%). Both names passed a 30% gate they do not meet.
+  // Skipped when the history is too short to measure — a young IPO is unknown,
+  // not failing, which is the same rule the rest of this function follows.
+  if(move6Min>0 && n>=127 && (close/c[n-127]-1)*100 < move6Min) return false;
+  if(move3Min>0 && n>=64  && (close/c[n-64]-1)*100  < move3Min) return false;
   return true;
 }
 // Pulled out of validateExact so the suite can reach it. That function needs
@@ -1530,6 +1562,7 @@ async function validateExact(list, scr, onProgress){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   const adrMin=num('adrMin')||3, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
+  const move3Min=num('move3Min')||0, move6Min=num('move6Min')||0;
   const reqVcp=!!$('requireVCP')?.checked, reqRsLine=!!$('requireRSLine')?.checked;
   const vcpOpts={minC:num('vcpContractions')||2, maxDepth:num('vcpDepthMax')||12,
                  maxBelow:num('pivotBelow')||10, reqDryUp:!!$('vcpDryUp')?.checked};
@@ -1540,17 +1573,24 @@ async function validateExact(list, scr, onProgress){
     while(idx<list.length){
       const r=list[idx++];
       try{
-        const bars=await _fetchBars1y(r.ticker);
+        const raw=await _fetchBars1y(r.ticker);
+        // A series that flips price scale is not the same as a missing one:
+        // "no bars" is a fetch that failed and the screeners fall back, while
+        // this is positive evidence the numbers are wrong. Nothing can be
+        // verified against it, so the row is dropped outright.
+        const bars=(raw && !_barsSane(raw)) ? null : raw;
+        if(raw && !bars) r._exactFail=true;
         // Bars are already in hand for every screener that gets here, so the
         // base shape and the RS line come for free — they annotate the row
         // rather than filtering it.
-        if(bars){ r.vcp=_vcp(bars); r.rsLine=_rsLine(bars, spy); }
-        if(scr==='sepa'){
+        else if(bars){ r.vcp=_vcp(bars); r.rsLine=_rsLine(bars, spy); }
+        if(r._exactFail){ /* corrupt series — already dropped */ }
+        else if(scr==='sepa'){
           if(_sepaExactFail(r, bars, {reqVcp, reqRsLine})) r._exactFail=true;
         } else if(scr==='vcp'){
           if(_vcpExactFail(r, bars, vcpOpts)) r._exactFail=true;
         } else if(scr==='qulla'){
-          if(_qullaExactOK(bars, adrMin, emaDistMax, weekMax)===false) r._exactFail=true;
+          if(_qullaExactOK(bars, adrMin, emaDistMax, weekMax, move3Min, move6Min)===false) r._exactFail=true;
         } else {
           if(bars){ if(_powerPlayOK(bars,runMin,consolBars)===false) r._exactFail=true; }
           else {
@@ -2499,8 +2539,14 @@ function applyFilters(universe, rsMap, opts={}){
       // adrPct is now the real average daily range, so this no longer needs the
       // ×0.5 slack that compensated for Volatility.D being a single session.
       // Still a coarse gate — validateExact recomputes the true 20-bar ADR in
-      // _qullaExactOK and can only narrow the list, so keep a small margin.
-      const adrOk=adrPct==null || adrPct>=num('adrMin')*0.9;
+      // _qullaExactOK and can only narrow the list, so keep a margin.
+      //
+      // 0.75, not 0.9: TradingView's ADR column understates the true 20-bar
+      // average daily range, measured against Nasdaq's own high/low history —
+      // median ratio 0.901 but a tail down to 0.751 (MSFT column 1.84 vs real
+      // 2.45). At 0.9 the gate silently rejected names that do qualify (BA
+      // real 3.00, HCA real 3.07, both against a 3% threshold).
+      const adrOk=adrPct==null || adrPct>=num('adrMin')*0.75;
       // SMA200 alignment enforced only when the stock is old enough to have one (keeps IPOs)
       const trendOk=close>s50 && (s200==null || (close>s200 && s50>s200));
       const move6Ok=perf6!=null && perf6>=num('move6Min');
