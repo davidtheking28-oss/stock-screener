@@ -390,6 +390,105 @@
       && _sepaExactFail({ perf6: 30, rsLine: { atHigh: false } }, rising, { reqRsLine: true }) === true);
   }
 
+  // ── VCP screener ──
+  // _vcp is the shared base detector (it also feeds the SEPA toggle and the VCP
+  // column); _vcpExactFail is the screener's own gate on top of it, and unlike
+  // the toggle it is mandatory — every assertion here is about a row being
+  // DROPPED, which is the direction a regression would silently reverse.
+  {
+    // Three pullbacks, each shallower than the last, on falling volume, ending
+    // just under the pivot: the textbook pattern.
+    const base = (depths, tail) => {
+      const b = [];
+      let px = 60;
+      for (let i = 0; i < 200; i++) b.push({ t: i * 86400, o: px, h: px * 1.005, l: px * 0.995, c: px, v: 3000, _px: px = px + 0.2 });
+      // px is now ~100 and the SMA200 is rising. Lay the base on top of it.
+      let hi = px;
+      depths.forEach((d, k) => {
+        const lo = hi * (1 - d / 100);
+        for (let i = 0; i < 6; i++) b.push({ t: (200 + k * 12 + i) * 86400, o: hi, h: hi, l: hi - (hi - lo) * (i / 5), c: hi - (hi - lo) * (i / 5), v: 3000 - k * 700 });
+        for (let i = 0; i < 6; i++) b.push({ t: (200 + k * 12 + 6 + i) * 86400, o: lo, h: lo + (hi - lo) * (i / 5), l: lo, c: lo + (hi - lo) * (i / 5), v: 3000 - k * 700 });
+      });
+      const last = b[b.length - 1];
+      b.push({ t: last.t + 86400, o: last.c, h: hi * tail, l: hi * tail * 0.99, c: hi * tail, v: 900 });
+      return b;
+    };
+    const rising = base([12, 8, 4], 0.985);
+    const vGood = _vcp(rising);
+    check('_vcp: tightening base is detected', vGood && vGood.contractions >= 2 && vGood.tighteningOK === true,
+      JSON.stringify(vGood));
+
+    const row = b => ({ perf6: 30, vcp: _vcp(b) });
+    check('vcp: a tightening base just under the pivot passes',
+      _vcpExactFail(row(rising), rising, { minC: 2, maxDepth: 12, maxBelow: 10, reqDryUp: false }) === false,
+      JSON.stringify(_vcp(rising)));
+    // Widening instead of contracting — the single thing the pattern is named for.
+    const widening = base([4, 8, 12], 0.985);
+    check('vcp: a WIDENING base is dropped',
+      _vcpExactFail(row(widening), widening, { minC: 2, maxDepth: 20, maxBelow: 10, reqDryUp: false }) === true);
+    // Already broken out and extended — Minervini enters AT the pivot.
+    const extended = base([12, 8, 4], 1.08);
+    check('vcp: price already extended above the pivot is dropped',
+      _vcpExactFail(row(extended), extended, { minC: 2, maxDepth: 12, maxBelow: 10, reqDryUp: false }) === true,
+      JSON.stringify(_vcp(extended).distToPivot));
+    // Sitting at the low of the last contraction rather than at its top — a
+    // valid, still-tightening base that is simply not actionable yet. Driven
+    // off a synthetic _vcp result on purpose: a fixture deep enough to move
+    // distToPivot also makes the last leg the DEEPEST one, which trips
+    // tighteningOK first and would leave the pivot gate never exercised.
+    const deepInBase = { contractions: 3, lastDepth: 12, tighteningOK: true, volDryUp: true, pivot: 100, distToPivot: -12 };
+    check('vcp: still far below the pivot is dropped',
+      _vcpExactFail({ perf6: 30, vcp: deepInBase }, rising, { minC: 2, maxDepth: 12, maxBelow: 10, reqDryUp: false }) === true);
+    check('vcp: the pivot distance is a configurable field, not a constant',
+      _vcpExactFail({ perf6: 30, vcp: deepInBase }, rising, { minC: 2, maxDepth: 12, maxBelow: 25, reqDryUp: false }) === false);
+    // Last contraction still 12% deep — a base, but not a tight one.
+    const loose = base([25, 18, 12], 0.985);
+    check('vcp: last contraction deeper than the max is dropped',
+      _vcpExactFail(row(loose), loose, { minC: 2, maxDepth: 8, maxBelow: 10, reqDryUp: false }) === true);
+    // Pinned on the boundary rather than a literal, so this keeps testing the
+    // gate itself if the fixture's contraction count ever shifts.
+    check('vcp: the minimum contraction count is honoured at the boundary',
+      _vcpExactFail(row(rising), rising, { minC: vGood.contractions, maxDepth: 12, maxBelow: 10, reqDryUp: false }) === false
+      && _vcpExactFail(row(rising), rising, { minC: vGood.contractions + 1, maxDepth: 12, maxBelow: 10, reqDryUp: false }) === true);
+    // No bars = the base was never measured. This screener has nothing to fall
+    // back on, so it must drop the row rather than pass it through unchecked.
+    check('vcp: no OHLC bars drops the row (no Perf.6M fallback)',
+      _vcpExactFail({ perf6: 300 }, null) === true);
+    const falling = mk(Array.from({ length: 252 }, (_, i) => i < 212 ? 100 + i * 0.4 : 100 + 212 * 0.4 - (i - 212) * 3));
+    check('vcp: a falling SMA200 drops the row',
+      _vcpExactFail({ perf6: 30, vcp: _vcp(rising) }, falling) === true);
+    // volDryUp is null when volume is unknown; the toggle must not pass that off
+    // as a confirmed dry-up.
+    check('vcp: the dry-up toggle requires a definite yes',
+      _vcpExactFail({ perf6: 30, vcp: { ...vGood, volDryUp: null } }, rising, { reqDryUp: true }) === true
+      && _vcpExactFail({ perf6: 30, vcp: { ...vGood, volDryUp: false } }, rising, { reqDryUp: true }) === true
+      && _vcpExactFail({ perf6: 30, vcp: { ...vGood, volDryUp: true } }, rising, { reqDryUp: true }) === false);
+
+    setScreener('vcp', true);
+    check('vcp screener is registered with its own defaults',
+      activeScreener === 'vcp' && num('vcpContractions') === 2 && num('vcpDepthMax') === 12 && num('pivotBelow') === 10,
+      activeScreener + '/' + num('vcpContractions') + '/' + num('vcpDepthMax') + '/' + num('pivotBelow'));
+    // The score is what orders the results, and every term of it reads r.vcp.
+    // Scoring before validateExact annotates the row is the bug this pins.
+    const mkRow = v => ({ rs: 80, eps: 20, vcp: v });
+    // Pinned one term at a time, across its full range. A combined
+    // "tighter AND nearer ranks higher" comparison passes with either term
+    // zeroed out — verified by mutation, it survived both.
+    const vAt = (d, p) => mkRow({ contractions: 3, lastDepth: d, distToPivot: p, volDryUp: true });
+    check('vcp score: base tightness is worth 25',
+      calcScore(vAt(0, -1), 'vcp') - calcScore(vAt(15, -1), 'vcp') === 25,
+      calcScore(vAt(0, -1), 'vcp') + ' vs ' + calcScore(vAt(15, -1), 'vcp'));
+    check('vcp score: proximity to the pivot is worth 25',
+      calcScore(vAt(4, 0), 'vcp') - calcScore(vAt(4, -10), 'vcp') === 25,
+      calcScore(vAt(4, 0), 'vcp') + ' vs ' + calcScore(vAt(4, -10), 'vcp'));
+    check('vcp score: a confirmed volume dry-up is worth points',
+      calcScore(mkRow({ contractions: 3, lastDepth: 4, distToPivot: -1, volDryUp: true }), 'vcp')
+        > calcScore(mkRow({ contractions: 3, lastDepth: 4, distToPivot: -1, volDryUp: false }), 'vcp'));
+    check('vcp score: an unannotated row does not outrank a real base',
+      calcScore(mkRow(null), 'vcp')
+        < calcScore(mkRow({ contractions: 3, lastDepth: 4, distToPivot: -1, volDryUp: true }), 'vcp'));
+  }
+
   setScreener('sepa', true); // restore
   return R;
 })()

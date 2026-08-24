@@ -234,6 +234,12 @@ body {
 #filterPanel.panel-sepa .f-commodities, #filterPanel.panel-momentum .f-commodities, #filterPanel.panel-power .f-commodities, #filterPanel.panel-growth .f-commodities, #filterPanel.panel-qulla .f-commodities, #filterPanel.panel-finviz .f-commodities { display: none; }
 #filterPanel.panel-sepa .f-qulla, #filterPanel.panel-momentum .f-qulla, #filterPanel.panel-power .f-qulla, #filterPanel.panel-growth .f-qulla, #filterPanel.panel-commodities .f-qulla, #filterPanel.panel-finviz .f-qulla { display: none; }
 #filterPanel.panel-sepa .f-finviz, #filterPanel.panel-momentum .f-finviz, #filterPanel.panel-power .f-finviz, #filterPanel.panel-growth .f-finviz, #filterPanel.panel-commodities .f-finviz, #filterPanel.panel-qulla .f-finviz { display: none; }
+/* The rules above enumerate every panel by name, so a new screener would be
+   invisible in all of them until it is appended to each line. These two are
+   written the other way round — negated — so the VCP fields hide everywhere
+   except their own panel without touching seven existing selectors. */
+#filterPanel:not(.panel-vcp) .f-vcp { display: none; }
+#filterPanel.panel-vcp .f-sepa, #filterPanel.panel-vcp .f-power, #filterPanel.panel-vcp .f-growth, #filterPanel.panel-vcp .f-commodities, #filterPanel.panel-vcp .f-qulla, #filterPanel.panel-vcp .f-finviz { display: none; }
 .filter-sections.single { grid-template-columns: 1fr; }
 .preset-btn {
   height: var(--ctl-h); padding: 0 13px; border-radius: var(--r2);
@@ -800,6 +806,7 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="screener-btn active" data-screener="sepa" onclick="setScreener('sepa')">Minervini SEPA</button>
         <button class="screener-btn" data-screener="momentum" onclick="setScreener('momentum')">פריצת שיא</button>
         <button class="screener-btn" data-screener="power" onclick="setScreener('power')">Power Play</button>
+        <button class="screener-btn" data-screener="vcp" onclick="setScreener('vcp')">VCP / פריצה</button>
         <button class="screener-btn" data-screener="qulla" onclick="setScreener('qulla')">Qullamaggie</button>
         <button class="screener-btn" data-screener="finviz" onclick="setScreener('finviz')">מומנטום שנתי</button>
         <button class="screener-btn" data-screener="growth" onclick="setScreener('growth')">מסנן פונדמנטלי</button>
@@ -835,6 +842,14 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="fromLow" value="30" min="0" max="500" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">% מעל שפל 52ש&#8217;</span></div>
             <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="runMin" value="100" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ריצה נפיצה תוך ~8 שבועות (OHLC)</span></div>
             <div class="field f-power"><label for="consolWeeks">דשדוש מינ&#8217; (שבועות)</label><div class="field-combo"><input type="text" inputmode="none" id="consolWeeks" value="2" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">כמה זמן עבר מאז שיא הריצה — מינרוויני: 3-4 שבועות</span></div>
+            <div class="field f-vcp"><label for="vcpContractions">התכווצויות מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="vcpContractions" value="2" min="1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">כמה נסיגות בבסיס — כל אחת רדודה מקודמתה</span></div>
+            <div class="field f-vcp"><label for="vcpDepthMax">עומק ההתכווצות האחרונה מקס&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="vcpDepthMax" value="12" min="1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">כמה הדוק הבסיס ממש לפני הפריצה</span></div>
+            <div class="field f-vcp"><label for="pivotBelow">מרחק מתחת ל-Pivot מקס&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="pivotBelow" value="10" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">עד כמה רחוק מנקודת הפריצה עדיין נחשב &#8220;לפני&#8221;</span></div>
+            <div class="field f-vcp" style="grid-column:1 / -1">
+              <div class="filter-toggles">
+                <label class="toggle"><input type="checkbox" id="vcpDryUp" checked> נפח מתייבש בהתכווצות האחרונה</label>
+              </div>
+            </div>
             <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="adrMin" value="3" min="0" step="0.5" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">תנודתיות יומית ממוצעת 20 יום</span></div>
             <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move6Min" value="30" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">זינוק קודם — עדיף 50%+</span></div>
             <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move3Min" value="20" min="0" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
@@ -1018,6 +1033,7 @@ const SCREENERS = {
   sepa:     {name:'Minervini SEPA',      sub:'Trend Template + SEPA',  fund:true,  presets:true},
   momentum: {name:'פריצת שיא',           sub:'פריצת שיא 52ש׳ · מומנטום', fund:false, presets:false},
   power:    {name:'Power Play',           sub:'ריצה נפיצה + דשדוש הדוק', fund:false, presets:false},
+  vcp:      {name:'VCP / פריצה',        sub:'בסיס VCP מתהדק + מחיר צמוד לנקודת הפריצה', fund:false, presets:false},
   qulla:    {name:'Qullamaggie',          sub:'Breakout — מהלך גדול + דשדוש צמוד ל-EMA', fund:false, presets:false},
   finviz:   {name:'מומנטום שנתי',         sub:'שנה +30% · מעל SMA50/200 · קרוב לשיא', fund:false, presets:false},
   growth:   {name:'מסנן פונדמנטלי',      sub:'סקטורים נבחרים + צמיחה רבעונית', fund:false, presets:false},
@@ -1027,6 +1043,7 @@ const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   momentum: {rsMin:80,fromHigh:10,fromLow:0, priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100,consolWeeks:2},
+  vcp:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:2,vcpDepthMax:12,pivotBelow:10},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3,move6Min:30,move3Min:20,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
@@ -1469,11 +1486,39 @@ function _sepaExactFail(r, bars, opts={}){
   if(opts.reqRsLine && !(r.rsLine && r.rsLine.atHigh)) return true;
   return false;
 }
+// The VCP screener's whole thesis is the base itself, so unlike the SEPA
+// toggle of the same name this is a hard gate, not an optional narrowing.
+// Returns true when the row must be dropped.
+//
+// No bars means no base can be measured, and there is nothing cheap to fall
+// back on the way _sepaExactFail falls back to Perf.6M — a "VCP candidate" that
+// was never checked for a VCP is exactly the row this screener must not show.
+// So a failed OHLC fetch drops the name rather than passing it through.
+function _vcpExactFail(r, bars, opts={}){
+  if(!bars) return true;
+  if(_ma200Rising(bars)===false) return true;
+  const v=r.vcp;
+  if(!v) return true;
+  if(v.contractions < (opts.minC ?? 2)) return true;
+  // Each pullback shallower than the one before it — the contraction itself.
+  if(!v.tighteningOK) return true;
+  if(v.lastDepth==null || v.lastDepth > (opts.maxDepth ?? 12)) return true;
+  if(opts.reqDryUp && v.volDryUp!==true) return true;
+  if(v.distToPivot==null) return true;
+  // Above the pivot is a breakout that already happened; Minervini's entry is
+  // at the pivot, and more than ~2% extended is chasing. The allowance below it
+  // is the user's (how early in the base to start watching).
+  if(v.distToPivot > 2) return true;
+  if(v.distToPivot < -(opts.maxBelow ?? 10)) return true;
+  return false;
+}
 async function validateExact(list, scr, onProgress){
-  if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla')||!HAS_SUPABASE||!list.length) return list;
+  if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   const adrMin=num('adrMin')||3, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
   const reqVcp=!!$('requireVCP')?.checked, reqRsLine=!!$('requireRSLine')?.checked;
+  const vcpOpts={minC:num('vcpContractions')||2, maxDepth:num('vcpDepthMax')||12,
+                 maxBelow:num('pivotBelow')||10, reqDryUp:!!$('vcpDryUp')?.checked};
   const consolBars=(num('consolWeeks')||2)*5;
   // One benchmark fetch for the whole pass — the RS line is price/SPY.
   const spy=await _fetchBars1y('SPY').catch(()=>null);
@@ -1488,6 +1533,8 @@ async function validateExact(list, scr, onProgress){
         if(bars){ r.vcp=_vcp(bars); r.rsLine=_rsLine(bars, spy); }
         if(scr==='sepa'){
           if(_sepaExactFail(r, bars, {reqVcp, reqRsLine})) r._exactFail=true;
+        } else if(scr==='vcp'){
+          if(_vcpExactFail(r, bars, vcpOpts)) r._exactFail=true;
         } else if(scr==='qulla'){
           if(_qullaExactOK(bars, adrMin, emaDistMax, weekMax)===false) r._exactFail=true;
         } else {
@@ -1777,6 +1824,20 @@ function _calcScoreRaw(r, scr='sepa'){
     const perfYS= Math.min(clamp(r.perfY??0,0,300)/300,1)*20;
     return Math.round(clamp(moveS+adrS+emaS+tightS+epsS+perfYS,0,100));
   }
+  if(scr==='vcp'){
+    // Ranked on actionability, not on strength: every row here already passed
+    // the base gate, so what separates them is how tight the last contraction
+    // is and how close price sits to the pivot. r.vcp is filled by
+    // validateExact, so scan() rescores this screener after that pass.
+    const v=r.vcp;
+    const tightS = v?.lastDepth==null?0:clamp(1-v.lastDepth/15,0,1)*25;
+    const pivotS = v?.distToPivot==null?0:clamp(1-Math.abs(v.distToPivot)/10,0,1)*25;
+    const contS  = clamp(((v?.contractions||0)-1)/3,0,1)*10;
+    const dryS   = v?.volDryUp===true?10:0;
+    const rsS    = clamp(r.rs,0,99)/99*20;
+    const epsS   = epsScore(r.eps,10);
+    return Math.round(clamp(tightS+pivotS+contS+dryS+rsS+epsS,0,100));
+  }
   if(scr==='finviz'){
     const hiS   = clamp(1-Math.max(0,-r.fromHighPct)/25,0,1)*30;
     const perfS = Math.min(clamp(r.perfY??0,0,300)/300,1)*20;
@@ -1861,6 +1922,9 @@ const FIELD_PRESETS = {
   epsQoqSepaMin: [[0,'כבוי'],[10,'10%'],[25,'25%'],[50,'50%'],[75,'75%'],[100,'100% — תלת-ספרתי'],[150,'150%'],[200,'200%']],
   epsFwdMin: [[0,'כבוי'],[10,'10%'],[15,'15%'],[25,'25% — מינרוויני'],[40,'40%'],[60,'60%']],
   consolWeeks:  [[0,'כבוי — כל ריצה'],[1,'שבוע'],[2,'2 שבועות — ברירת מחדל'],[3,'3 שבועות — מינרוויני'],[4,'4 שבועות'],[6,'6 שבועות']],
+  vcpContractions: [[2,'2 — מינימום'],[3,'3 — קלאסי מינרוויני'],[4,'4'],[5,'5']],
+  vcpDepthMax:  [[5,'5% — הדוק מאוד'],[8,'8% — הדוק'],[10,'10%'],[12,'12% — ברירת מחדל'],[15,'15%'],[20,'20% — רופף']],
+  pivotBelow:   [[3,'3% — ממש על הפריצה'],[5,'5%'],[8,'8%'],[10,'10% — ברירת מחדל'],[15,'15%'],[25,'25% — כל הבסיס']],
   adrMin:       [[2,'2%'],[3,'3% — ברירת מחדל'],[3.5,'3.5%'],[4,'4% — קולאמאגי מקורי'],[5,'5%'],[6,'6%'],[8,'8%']],
   move6Min:     [[20,'20% — רופף'],[30,'30% — ברירת מחדל'],[50,'50% — מועדף'],[75,'75%'],[100,'100%'],[150,'150%']],
   move3Min:     [[10,'10% — רופף'],[20,'20% — ברירת מחדל'],[30,'30%'],[50,'50%'],[75,'75%'],[100,'100%']],
@@ -1966,6 +2030,7 @@ function applyPreset(key, btn){
    currently shows, per screener, so switching back restores the whole setup. */
 const MY_PRESETS_KEY='sepa_my_presets_v1';
 const PRESET_FIELDS=['rsMin','fromHigh','fromLow','priceMin','mcMin','liqMin','earnDays','runMin','consolWeeks',
+  'vcpContractions','vcpDepthMax','pivotBelow',
   'epsMin','revMin','roeMin','epsQoqMin','revQoqMin','adrMin','move6Min','move3Min',
   'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin','smaTrend50','smaTrend200',
   'nmMin','revQoqSepaMin','epsQoqSepaMin','epsFwdMin'];
@@ -1977,7 +2042,7 @@ function saveMyPreset(){
   const all=_myPresets();
   const vals={_screener:activeScreener};
   PRESET_FIELDS.forEach(k=>{ const el=$(k); const raw=el?.dataset.raw; if(raw!=null&&raw!=='') vals[k]=raw; });
-  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend','requireVCP','requireRSLine'].forEach(k=>{ const el=$(k); if(el) vals[k]=el.checked; });
+  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend','requireVCP','requireRSLine','vcpDryUp'].forEach(k=>{ const el=$(k); if(el) vals[k]=el.checked; });
   all[name]=vals;
   _writeMyPresets(all);
   renderMyPresets();
@@ -1987,7 +2052,7 @@ function applyMyPreset(name, btn){
   const p=_myPresets()[name]; if(!p) return;
   if(p._screener && p._screener!==activeScreener) setScreener(p._screener, false);
   PRESET_FIELDS.forEach(k=>{ if(p[k]!=null) setFieldValue($(k),p[k]); });
-  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend','requireVCP','requireRSLine'].forEach(k=>{ const el=$(k); if(el && typeof p[k]==='boolean') el.checked=p[k]; });
+  ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend','requireVCP','requireRSLine','vcpDryUp'].forEach(k=>{ const el=$(k); if(el && typeof p[k]==='boolean') el.checked=p[k]; });
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
   btn?.classList.add('active');
   updUnitHints(); toggleFundFields(); saveFilterPrefs();
@@ -2010,7 +2075,7 @@ function renderMyPresets(){
   ).join('');
 }
 
-const SCREENER_HEADS = {sepa:'טכני — Trend Template', momentum:'טכני — מומנטום', power:'טכני — Power Play', qulla:'טכני — Qullamaggie Breakout', finviz:'טכני — מומנטום שנתי', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
+const SCREENER_HEADS = {sepa:'טכני — Trend Template', momentum:'טכני — מומנטום', power:'טכני — Power Play', vcp:'טכני — בסיס VCP', qulla:'טכני — Qullamaggie Breakout', finviz:'טכני — מומנטום שנתי', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
 function setScreener(key, applyDef=true){
   if(!SCREENERS[key]) return;
   activeScreener=key;
@@ -2140,7 +2205,7 @@ async function scan(force=false){
 
     allResults = applyFilters(universe, rsMap);
     allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
-    const needsExact = activeScreener==='sepa' || activeScreener==='power' || activeScreener==='qulla';
+    const needsExact = activeScreener==='sepa' || activeScreener==='power' || activeScreener==='qulla' || activeScreener==='vcp';
 
     if(!isCommodities){
       ttUniverse = {};
@@ -2181,7 +2246,12 @@ async function scan(force=false){
     if(needsExact){
       validateExact(allResults, activeScreener).then(v=>{
         if(myToken!==_scanToken) return;   // superseded by a newer scan
-        allResults = v; saveResultsCache(); finalize(false);
+        allResults = v;
+        // Every term of the VCP score reads r.vcp, which only exists after the
+        // pass above annotated the row — scoring before it leaves the whole
+        // screener ranked on RS and EPS alone.
+        if(activeScreener==='vcp') allResults.forEach(x=>{ x.score=calcScore(x,'vcp'); });
+        saveResultsCache(); finalize(false);
         checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken && newToday.size){ saveResultsCache(); render(); } });
         toast('נמצאו '+results.length+' מניות');
       }).catch(()=>{ if(myToken===_scanToken) finalize(false); });
@@ -2344,8 +2414,8 @@ function applyFilters(universe, rsMap, opts={}){
     // in the first place. Qullamaggie needs S50 only; commodities and growth
     // read no SMA at all (fixed ticker list / sector+earnings only); power
     // needs S50 only; momentum and the yearly-momentum screener need S50+S200
-    // (no S150); SEPA (the default) is the one screener that actually checks
-    // S150, so it alone needs the full set.
+    // (no S150); SEPA (the default) and VCP both read S150, so they take the
+    // full set.
     if(scr==='qulla'||scr==='power'){ if([close,s50,hi,lo].some(v=>v==null)) continue; }
     else if(scr==='commodities'||scr==='growth'){ if([close,hi,lo].some(v=>v==null)) continue; }
     else if(scr==='momentum'||scr==='finviz'){ if([close,s50,s200,hi,lo].some(v=>v==null)) continue; }
@@ -2401,6 +2471,19 @@ function applyFilters(universe, rsMap, opts={}){
       const strong=rs>=rsMin;
       checks={run,near,up,strong};
       pass=run&&near&&up&&strong;
+    } else if(scr==='vcp'){
+      // A VCP only forms inside a stage-2 uptrend, so the coarse pass is the
+      // Trend Template's alignment — the base itself is measured from OHLC bars
+      // in _vcpExactFail. close>s50 is deliberately NOT required: the last
+      // contraction of a real VCP routinely undercuts the 50-day for a few days
+      // right before the pivot, which is the tightest and most actionable point
+      // in the pattern.
+      const trend=close>s150 && close>s200 && s150>s200 && s50>s200;
+      const near=fromHighPct>=-num('fromHigh');
+      const above=close>=lo*(1+flPct);
+      const strong=rs>=rsMin;
+      checks={trend,near,above,strong};
+      pass=trend&&near&&above&&strong;
     } else if(scr==='qulla'){
       const ema10=d[C.EMA10], ema20=d[C.EMA20], perfW=d[C['Perf.W']];
       const avg30=d[C.average_volume_30d_calc], avg90=d[C.average_volume_90d_calc];
@@ -3183,6 +3266,8 @@ function saveFilterPrefs(){
       liqMin:num('liqMin'),earnDays:num('earnDays'),runMin:num('runMin'),consolWeeks:num('consolWeeks'),
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
       epsQoqMin:num('epsQoqMin'),revQoqMin:num('revQoqMin'),
+      vcpContractions:num('vcpContractions'),vcpDepthMax:num('vcpDepthMax'),pivotBelow:num('pivotBelow'),
+      vcpDryUp:$('vcpDryUp')?.checked,
       adrMin:num('adrMin'),move6Min:num('move6Min'),move3Min:num('move3Min'),
       emaDistMax:num('emaDistMax'),weekRangeMax:num('weekRangeMax'),volSharesMin:num('volSharesMin'),
       perfYMin:num('perfYMin'),finvizVolMin:num('finvizVolMin'),
@@ -3220,6 +3305,7 @@ function loadFilterPrefs(){
     set('liqMin',p.liqMin); set('earnDays',p.earnDays); set('runMin',p.runMin); set('consolWeeks',p.consolWeeks);
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     set('epsQoqMin',p.epsQoqMin); set('revQoqMin',p.revQoqMin);
+    set('vcpContractions',p.vcpContractions); set('vcpDepthMax',p.vcpDepthMax); set('pivotBelow',p.pivotBelow);
     set('adrMin',p.adrMin); set('move6Min',p.move6Min); set('move3Min',p.move3Min);
     set('emaDistMax',p.emaDistMax); set('weekRangeMax',p.weekRangeMax); set('volSharesMin',p.volSharesMin);
     set('perfYMin',p.perfYMin); set('finvizVolMin',p.finvizVolMin);
@@ -3232,6 +3318,7 @@ function loadFilterPrefs(){
     if($('requireMarginTrend')&&p.requireMarginTrend!=null) $('requireMarginTrend').checked=p.requireMarginTrend;
     if($('requireVCP')&&p.requireVCP!=null) $('requireVCP').checked=p.requireVCP;
     if($('requireRSLine')&&p.requireRSLine!=null) $('requireRSLine').checked=p.requireRSLine;
+    if($('vcpDryUp')&&p.vcpDryUp!=null) $('vcpDryUp').checked=p.vcpDryUp;
     toggleFundFields();
   } catch(e){}
 }
