@@ -166,3 +166,49 @@ Non-obvious pieces, all of them found by measuring live rather than by reading:
   (`#filterPanel:not(.panel-vcp)`), unlike the six enumerated rules above it.
   Those list every panel by name, so an eighth screener would be invisible in
   all of them until appended to each line.
+
+---
+
+## Data accuracy — audited against Nasdaq (2026-08-24)
+
+The screener has two upstream feeds and they are **not** equally trustworthy.
+Verifying one against the other only proves consistency, so this audit went to
+`api.nasdaq.com/api/quote/{sym}/historical` — the listing exchange — as the
+arbiter. Results, and the three fixes they forced:
+
+- **Prices are exact.** 30 of 30 sampled closes across 10 symbols matched
+  Nasdaq's official history to the cent (0.000%). Everything derived from them
+  — SMA50/150/200, EMA10/20, 52-week high/low, RS Rating — is therefore sound.
+  Do not re-litigate this layer without a third-party source; TradingView vs
+  Yahoo agreement is not evidence.
+- **Yahoo's split adjustment is applied to some bars of a symbol and not
+  others.** MNST really did split 2:1 in July 2026. Yahoo returned 21/07 and
+  31/07 correctly ($47.23, $48.19) and 23/07 and 03/08 at exactly 2.00x
+  ($93.56 vs the official $46.78) — volume halved on the same days — while
+  reporting `splits: {}`, so there is no event to key off. `_barsSane()` now
+  rejects a series that crosses price scale twice or more, and `validateExact`
+  drops the row rather than falling back. **A single large jump is deliberately
+  kept**: a real split in an unadjusted feed never reverts, and a genuine
+  session can gap 35%+ (AMD did 23.7% in this same universe). Rate: ~0.5% of
+  the universe, concentrated in recently-split names.
+- **TradingView's `ADR` column understates the true 20-bar average daily
+  range.** Confirmed from Nasdaq's own high/low: MSFT column 1.84 vs real 2.45,
+  MU 5.25 vs 6.99. Median ratio 0.901 with a tail to 0.751, so the coarse
+  gate's ×0.9 slack was cutting names that qualify (BA real 3.00, HCA real
+  3.07, against a 3% threshold). Now ×0.75. The exact check still recomputes
+  from bars, so this only widens the candidate set, never the final one.
+- **TradingView's `Perf.6M` column is unreliable and was the only Qullamaggie
+  criterion never re-verified.** Against Nasdaq: CRCT column 30.3% vs real
+  20.5%, SIBN column 30.3% vs real 26.8% — both passed a 30% gate they do not
+  meet. `_qullaExactOK` now measures the 3M and 6M moves from bars like every
+  other gate it applies. Live effect: 118 → 110 results, all 5 verified
+  violations gone. **Do not gate on Perf.3M/Perf.6M without re-measuring.**
+
+Live counts before → after: SEPA 10→9, Power Play 6→5, VCP 45→46,
+מומנטום שנתי 658→655, Qullamaggie 118→110. The small moves on the first four
+are ordinary intraday drift plus corrupt-series drops, not a logic change.
+
+One guard in `_qullaExactOK` (`n>=127` / `n>=64`) is documentation, not logic:
+a negative array index yields `undefined`, so the comparison is `NaN < x` which
+is already false. Mutation testing correctly reports it as uncoverable — that
+is expected, not a gap to chase.
