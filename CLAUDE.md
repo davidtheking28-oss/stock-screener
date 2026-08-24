@@ -123,3 +123,46 @@ a live 5,545-name scan used to measure each change before it shipped.
   whatever was last scanned.
 - **Scroll position lives on `#tableView`, not `window`** — the results table
   scrolls internally. Any scroll-restore logic has to target both.
+
+---
+
+## VCP screener (added 2026-08-24)
+
+A seventh screener (`vcp`, "VCP / פריצה") that treats Minervini's Volatility
+Contraction Pattern as the primary gate rather than an optional SEPA toggle.
+Two-phase like SEPA/Power/Qulla: `applyFilters` does the cheap Trend Template
+alignment, `validateExact` → `_vcpExactFail` measures the base from OHLC bars.
+
+Non-obvious pieces, all of them found by measuring live rather than by reading:
+
+- **`close > s50` is deliberately NOT part of the coarse pass.** The final
+  contraction of a real VCP routinely undercuts the 50-day for a few days right
+  before the pivot — the tightest and most actionable point in the pattern.
+  Adding it drops exactly the setups the screener exists to find.
+- **No-bars drops the row.** Unlike `_sepaExactFail`, there is no Perf.6M
+  fallback: a "VCP candidate" that was never checked for a VCP is precisely
+  what this screener must not show. A failed OHLC fetch is a dropped name, on
+  purpose.
+- **The score must be recomputed after `validateExact`.** Every term of it
+  reads `r.vcp`, which only exists once that pass annotates the row. `scan()`
+  scores right after `applyFilters`, so without the explicit rescore in the
+  `.then()` the whole screener ranks on RS and EPS alone.
+- **`_vcp().tighteningOK` compares only the LAST TWO legs.** That is fine as
+  one narrowing gate stacked on the Trend Template's eight criteria, and far
+  too loose as a screener's primary test: `_vcp` counts every ≥3% dip in a
+  90-bar window, so a noisy drift yields 7-10 legs and passes on whichever two
+  happen to shrink at the end. Measured live at that setting: GOOG, XOM, WELL
+  and CSX topped the list — mega-cap noise, not bases. `_vcp` now also returns
+  `depths` (purely additive; the SEPA toggle and the VCP column still read
+  `tighteningOK`), and `_vcpExactFail` requires the last `minC` legs to be
+  strictly decreasing. **Do not swap that back for `tighteningOK`.**
+- **The default is 3 contractions, not 2.** Measured on the same universe:
+  2 → 129 names with sequences that are mostly noise (NTRA: 9.17, 9.34, 9.15,
+  6.45); 3 → 45 with clean ones (CNK: 17.94, 6.93, 4.20); 4 → 13, which is
+  Minervini's strictest reading and too sparse to be useful most days. Same
+  call as Power Play's `consolWeeks`: expose it as a field, ship the practical
+  default.
+- **The panel-visibility CSS for `.f-vcp` is written negated**
+  (`#filterPanel:not(.panel-vcp)`), unlike the six enumerated rules above it.
+  Those list every panel by name, so an eighth screener would be invisible in
+  all of them until appended to each line.
