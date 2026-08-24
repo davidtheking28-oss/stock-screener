@@ -417,6 +417,12 @@
     const vGood = _vcp(rising);
     check('_vcp: tightening base is detected', vGood && vGood.contractions >= 2 && vGood.tighteningOK === true,
       JSON.stringify(vGood));
+    // The VCP screener's tightening rule reads the whole sequence, so _vcp has
+    // to keep handing it out — tighteningOK alone is only the last two legs.
+    check('_vcp: exposes every leg depth, not just the last two',
+      Array.isArray(vGood.depths) && vGood.depths.length === vGood.contractions
+      && Math.abs(vGood.depths[vGood.depths.length - 1] - vGood.lastDepth) < 0.01,
+      JSON.stringify(vGood.depths));
 
     const row = b => ({ perf6: 30, vcp: _vcp(b) });
     check('vcp: a tightening base just under the pivot passes',
@@ -445,11 +451,28 @@
     const loose = base([25, 18, 12], 0.985);
     check('vcp: last contraction deeper than the max is dropped',
       _vcpExactFail(row(loose), loose, { minC: 2, maxDepth: 8, maxBelow: 10, reqDryUp: false }) === true);
-    // Pinned on the boundary rather than a literal, so this keeps testing the
-    // gate itself if the fixture's contraction count ever shifts.
+    // Synthetic depths so the count and the sequence can be varied one at a
+    // time — the OHLC fixture's own leg count includes noise legs that are not
+    // monotonic, which is exactly the case the sequence rule below exists for.
+    const withDepths = ds => ({ perf6: 30, vcp: { contractions: ds.length, depths: ds, lastDepth: ds[ds.length - 1], tighteningOK: ds[ds.length - 1] < ds[ds.length - 2], volDryUp: true, pivot: 100, distToPivot: -2 } });
+    const g = { maxDepth: 12, maxBelow: 10, reqDryUp: false };
     check('vcp: the minimum contraction count is honoured at the boundary',
-      _vcpExactFail(row(rising), rising, { minC: vGood.contractions, maxDepth: 12, maxBelow: 10, reqDryUp: false }) === false
-      && _vcpExactFail(row(rising), rising, { minC: vGood.contractions + 1, maxDepth: 12, maxBelow: 10, reqDryUp: false }) === true);
+      _vcpExactFail(withDepths([12, 8, 4]), rising, { ...g, minC: 3 }) === false
+      && _vcpExactFail(withDepths([12, 8, 4]), rising, { ...g, minC: 4 }) === true);
+    // The whole point of the pattern: EVERY leg in the required window has to
+    // be shallower than the one before it. tighteningOK alone compares only the
+    // last two, so ten noisy legs pass it whenever the final pair happens to
+    // shrink — measured live, that is how GOOG/XOM/WELL reached the top of this
+    // screener before the sequence rule replaced it.
+    check('vcp: tightening is measured across the whole required window',
+      _vcpExactFail(withDepths([4, 12, 9, 6]), rising, { ...g, minC: 3 }) === false
+      && _vcpExactFail(withDepths([4, 12, 9, 6]), rising, { ...g, minC: 4 }) === true);
+    check('vcp: a flat (non-shrinking) leg is not a contraction',
+      _vcpExactFail(withDepths([10, 6, 6]), rising, { ...g, minC: 3 }) === true);
+    // Rows restored from an older results cache predate the depths array.
+    check('vcp: falls back to tighteningOK when depths are absent',
+      _vcpExactFail({ perf6: 30, vcp: { contractions: 3, lastDepth: 4, tighteningOK: true, volDryUp: true, pivot: 100, distToPivot: -2 } }, rising, { ...g, minC: 3 }) === false
+      && _vcpExactFail({ perf6: 30, vcp: { contractions: 3, lastDepth: 4, tighteningOK: false, volDryUp: true, pivot: 100, distToPivot: -2 } }, rising, { ...g, minC: 3 }) === true);
     // No bars = the base was never measured. This screener has nothing to fall
     // back on, so it must drop the row rather than pass it through unchecked.
     check('vcp: no OHLC bars drops the row (no Perf.6M fallback)',

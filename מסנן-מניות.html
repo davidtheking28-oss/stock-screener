@@ -1373,7 +1373,7 @@ function _ma200Rising(bars){
 // each shallower than the one before it, on drying-up volume. Walks the last
 // `lookback` bars, cuts the base at each swing high, and measures the drawdown
 // that follows it. Returns null when there isn't enough history to judge.
-// {contractions, lastDepth, tighteningOK, volDryUp, pivot, distToPivot}
+// {contractions, lastDepth, tighteningOK, volDryUp, pivot, distToPivot, depths}
 function _vcp(bars, lookback=90){
   if(!bars || bars.length<60) return null;
   const w=bars.slice(-lookback), n=w.length, k=3;
@@ -1414,7 +1414,13 @@ function _vcp(bars, lookback=90){
   const at=real[real.length-1].at;
   const recentVol=volOf(at,n-1), baseVol=volOf(0,at);
   const volDryUp=(recentVol==null||baseVol==null||baseVol===0)?null:recentVol<baseVol;
-  return {contractions:real.length, lastDepth:real[real.length-1].depth, tighteningOK, volDryUp, pivot, distToPivot};
+  // depths is what lets a caller judge the WHOLE sequence. tighteningOK only
+  // compares the last two legs, which is enough as one narrowing gate stacked
+  // on the Trend Template but far too loose as a screener's primary test — a
+  // noisy mega-cap drift produces 8-10 legs and passes on whichever two happen
+  // to shrink at the end (measured live: GOOG, XOM, WELL all did).
+  return {contractions:real.length, lastDepth:real[real.length-1].depth, tighteningOK, volDryUp, pivot, distToPivot,
+          depths:real.map(l=>+l.depth.toFixed(2))};
 }
 // Relative-strength line = price / benchmark. Minervini and IBD both read the
 // RS line making a new high *before* price clears its own pivot as the strongest
@@ -1499,9 +1505,16 @@ function _vcpExactFail(r, bars, opts={}){
   if(_ma200Rising(bars)===false) return true;
   const v=r.vcp;
   if(!v) return true;
-  if(v.contractions < (opts.minC ?? 2)) return true;
-  // Each pullback shallower than the one before it — the contraction itself.
-  if(!v.tighteningOK) return true;
+  const minC = opts.minC ?? 2;
+  if(v.contractions < minC) return true;
+  // Each pullback shallower than the one before it — the contraction itself,
+  // and the one thing the pattern is named for. Checked across the last minC
+  // legs, not just the final pair: v.tighteningOK compares two, so a chart with
+  // ten random legs passes it on any two that happen to shrink. Rows restored
+  // from an older results cache have no depths array; fall back to the pair.
+  const legs = Array.isArray(v.depths) ? v.depths.slice(-minC) : null;
+  if(!legs){ if(!v.tighteningOK) return true; }
+  else if(legs.length < minC || legs.some((d,i)=>i>0 && d>=legs[i-1])) return true;
   if(v.lastDepth==null || v.lastDepth > (opts.maxDepth ?? 12)) return true;
   if(opts.reqDryUp && v.volDryUp!==true) return true;
   if(v.distToPivot==null) return true;
