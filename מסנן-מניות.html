@@ -262,7 +262,7 @@ body {
 .perf-panel {
   display: none; flex-wrap: wrap; align-items: center; gap: 14px;
   margin: 10px 0 4px; padding: 9px 13px;
-  border: 1px solid var(--border); border-radius: 9px;
+  border: 1px solid var(--border); border-radius: 14px;
   background: var(--fill);
 }
 .perf-panel.show { display: flex; }
@@ -300,7 +300,7 @@ body {
 .field-picker-panel {
   position: fixed; z-index: 70;
   background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 10px; padding: 5px; box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  border-radius: 14px; padding: 5px; box-shadow: 0 8px 28px rgba(0,0,0,0.5);
   display: flex; flex-direction: column; gap: 1px;
   opacity: 0; transform: translateY(-4px); pointer-events: none;
   transition: opacity 0.12s ease-out, transform 0.12s ease-out;
@@ -416,7 +416,7 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: al
 .btn-scan {
   background: linear-gradient(135deg, oklch(64% 0.2 258) 0%, oklch(60% 0.22 268) 100%);
   color: oklch(97% 0.01 252);
-  padding: 10px 24px; min-height: 40px; border-radius: 10px;
+  padding: 10px 24px; min-height: 40px; border-radius: 14px;
   font: 700 13px var(--sans); letter-spacing: 0.3px;
   box-shadow: 0 4px 14px oklch(64% 0.2 258 / 0.3), inset 0 1px 0 oklch(100% 0 0 / 0.12);
   transition: filter 0.15s ease-out, box-shadow 0.15s ease-out, transform 0.1s;
@@ -433,7 +433,7 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: al
 .btn-ghost:hover { background: var(--bg3); color: var(--text); }
 .btn-rescan {
   background: transparent; color: var(--text2);
-  padding: 5px 12px; border-radius: 8px; min-height: 30px;
+  padding: 5px 12px; border-radius: 14px; min-height: 30px;
   font: 600 12px var(--sans); letter-spacing: 0;
   border: 1px solid var(--border);
   transition: background 0.12s, color 0.12s;
@@ -442,7 +442,7 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: al
 .btn-rescan:disabled { opacity: 0.4; cursor: not-allowed; }
 .filter-select {
   background: var(--bg2); border: 1px solid var(--border);
-  color: var(--text2); border-radius: 8px;
+  color: var(--text2); border-radius: 14px;
   padding: 5px 9px; font: 500 12px var(--sans); cursor: pointer;
   transition: border-color 0.12s;
 }
@@ -453,7 +453,7 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: al
 .col-picker-panel {
   position: fixed;
   background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 12px; padding: 12px 14px; z-index: 60;
+  border-radius: 14px; padding: 12px 14px; z-index: 60;
   display: none; grid-template-columns: 1fr 1fr; gap: 8px 18px;
   min-width: 230px;
   box-shadow: 0 8px 28px rgba(0,0,0,0.5);
@@ -467,7 +467,7 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: al
 .results-panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 14px;
   overflow: hidden;
 }
 .results-header {
@@ -593,11 +593,11 @@ tbody tr:last-child td { border-bottom: none; }
 .modal { position: fixed; inset: 0; background: rgba(3,8,18,0.88); backdrop-filter: blur(6px); display: none; place-items: center; z-index: 100; padding: 20px; }
 .modal.open { display: grid; animation: modalBackdrop 0.2s ease-out; }
 .modal.open .modal-box { animation: modalSlide 0.22s cubic-bezier(0.16,1,0.3,1); }
-.modal-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 18px; width: min(1200px,96vw); height: min(82vh,820px); display: flex; flex-direction: column; overflow: hidden; }
+.modal-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; width: min(1200px,96vw); height: min(82vh,820px); display: flex; flex-direction: column; overflow: hidden; }
 .modal-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .modal-ticker { font: 700 16px var(--mono); color: var(--text); }
 .modal-name { font-size: 12px; color: var(--text3); margin-top: 2px; }
-.modal-close { width: 36px; height: 36px; border-radius: 8px; background: var(--fill2); border: 1px solid var(--border); color: var(--text2); font-size: 16px; display: grid; place-items: center; }
+.modal-close { width: 36px; height: 36px; border-radius: 14px; background: var(--fill2); border: 1px solid var(--border); color: var(--text2); font-size: 16px; display: grid; place-items: center; }
 .modal-close:hover { color: var(--text); background: var(--fill3); }
 #modalChart { flex: 1; min-height: 0; }
 
@@ -627,7 +627,7 @@ tbody tr:last-child td { border-bottom: none; }
 .scroll-top-btn:hover { background: rgba(79,131,255,0.14); }
 
 /* ── Toast ── */
-.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(14px); background: var(--surface); border: 1px solid rgba(255,255,255,0.1); color: var(--text); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity 0.2s ease-out, transform 0.2s cubic-bezier(0.16,1,0.3,1); z-index: 200; pointer-events: none; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(14px); background: var(--surface); border: 1px solid rgba(255,255,255,0.1); color: var(--text); padding: 10px 20px; border-radius: 14px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity 0.2s ease-out, transform 0.2s cubic-bezier(0.16,1,0.3,1); z-index: 200; pointer-events: none; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ── Daily banner ── */
