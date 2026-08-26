@@ -16,7 +16,12 @@
 <link rel="preconnect" href="https://s3.tradingview.com">
 <link rel="dns-prefetch" href="https://www.tradingview.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Two families, on purpose: Heebo for text (it carries Latin too, so Inter was
+     only ever a redundant fallback) and JetBrains Mono for tickers and figures.
+     DM Mono was dropped — it ships no 700 weight, yet every number here asks for
+     700, so all of them were rendering as browser-synthesized faux bold. -->
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>const _thq=new URLSearchParams(location.search).get('theme');if(_thq==='tj'||_thq==='tj-light')document.documentElement.dataset.theme=_thq;</script>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23091525'/%3E%3Ctext x='16' y='23' font-family='monospace' font-weight='900' font-size='20' fill='%234f83ff' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E">
@@ -62,8 +67,8 @@
   --text2:    oklch(76% 0.04 252);
   --text3:    oklch(64% 0.04 252);
   --mono:     'JetBrains Mono', monospace;
-  --mono-data:'DM Mono', 'JetBrains Mono', monospace;
-  --sans:     'Inter', system-ui, sans-serif;
+  --mono-data:'JetBrains Mono', monospace;
+  --sans:     'Heebo', system-ui, sans-serif;
   --chart-bg: #0a1120;
   --chart-bar: #ffffff;
   --chart-vol: rgba(255,255,255,0.25);
@@ -79,7 +84,7 @@ html[data-theme="tj"] {
   --green:#2dd4a0; --red:#ff6b8a; --amber:#fbbf24;
   --text:#f1f5f9; --text2:#a8b8cc; --text3:oklch(70% 0.025 258);
   --chart-bg:oklch(17% 0.008 280);
-  --sans:'Heebo','Inter',system-ui,sans-serif;
+  --sans:'Heebo',system-ui,sans-serif;
 }
 html[data-theme="tj"] .btn-scan { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
 html[data-theme="tj-light"] {
@@ -97,7 +102,7 @@ html[data-theme="tj-light"] {
      on (table headers, legend, hints). Darkened to clear AA. */
   --text:#0f172a; --text2:#334155; --text3:oklch(37% 0.03 258);
   --chart-bg:oklch(99.2% 0.003 258); --chart-bar:#334155; --chart-vol:rgba(51,65,85,0.22); --chart-txt:#64748b;
-  --sans:'Heebo','Inter',system-ui,sans-serif;
+  --sans:'Heebo',system-ui,sans-serif;
 }
 html[data-theme="tj-light"] .btn-scan { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -385,9 +390,9 @@ body {
   background: var(--fill); border: 1px solid var(--border);
   color: var(--text); border-radius: var(--r2);
   padding: 7px 10px; width: 100%;
-  /* DM Mono only ships weight 400/500 — asking for 600 here forced the
-     browser to synthesize a fake bold, which is what read as blurry/rough
-     digits. JetBrains Mono has a real 600 face, so it renders crisp. */
+  /* This field hit the DM Mono faux-bold problem first and was moved to
+     --mono on its own; --mono-data has since been collapsed onto JetBrains
+     Mono too, so both now have a real 600/700 face. */
   font: 600 var(--t-base) var(--mono);
   transition: border-color 0.15s var(--ease), background 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
