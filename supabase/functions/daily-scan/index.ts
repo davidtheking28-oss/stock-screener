@@ -48,6 +48,10 @@ async function scanQuery(typeFilter: Record<string, unknown>, primaryOnly: boole
       ...(primaryOnly ? [{ left: "is_primary", operation: "equal", right: true }] : []),
       { left: "close", operation: "egreater", right: 2 },
       { left: "market_cap_basic", operation: "egreater", right: 50000000 },
+      // Mirrors the client-side fetchUniverse() OTC exclusion (2026-08-26) —
+      // this scan feeds the nightly job, so it needs the same filter or OTC
+      // names quietly come back in through here.
+      { left: "exchange", operation: "in_range", right: ["AMEX", "NASDAQ", "NYSE"] },
     ],
     markets: ["america"],
     sort: { sortBy: "market_cap_basic", sortOrder: "desc" },
