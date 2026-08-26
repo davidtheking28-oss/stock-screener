@@ -2357,7 +2357,13 @@ const _universeBody = (typeFilter, primaryOnly) => ({
     typeFilter,
     ...(primaryOnly ? [{left:"is_primary",operation:"equal",right:true}] : []),
     {left:"close",operation:"egreater",right:2},
-    {left:"market_cap_basic",operation:"egreater",right:50000000}
+    {left:"market_cap_basic",operation:"egreater",right:50000000},
+    // markets:["america"] alone still includes OTC/Pink Sheets names (exchange
+    // "OTC", "PINK", "OTCQB", "OTCQX", "GREY", ...) — restrict to the three
+    // primary listed exchanges so the whole universe is real exchange-listed
+    // stock. US-listed ADRs (TSM, ASML, NVO, SAP, TM) list on NYSE/NASDAQ
+    // themselves, so this doesn't touch the dr-type query's job of including them.
+    {left:"exchange",operation:"in_range",right:["AMEX","NASDAQ","NYSE"]}
   ],
   markets:["america"],
   sort:{sortBy:"market_cap_basic",sortOrder:"desc"},
