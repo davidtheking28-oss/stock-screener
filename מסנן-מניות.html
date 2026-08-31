@@ -550,7 +550,7 @@ tbody tr:last-child td { border-bottom: none; }
 .sector-lock-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .sector-tag.locked { color: var(--accent2); background: rgba(79,131,255,0.1); border-color: rgba(79,131,255,0.28); font-weight: 600; }
 
-.star-btn { background: none; border: none; cursor: pointer; font-size: 15px; padding: 2px 4px; border-radius: 4px; transition: transform 0.1s; }
+.star-btn { background: none; border: none; cursor: pointer; font-size: 15px; padding: 5px 6px; min-width: 24px; min-height: 24px; border-radius: 4px; transition: transform 0.1s; }
 .star-btn:hover { opacity: 0.7; }
 .star-btn.on { color: var(--amber); }
 .star-btn.off { color: var(--text3); }
@@ -707,7 +707,7 @@ tbody tr:last-child td { border-bottom: none; }
   height: var(--ctl-h); padding: 0 10px; font: 500 var(--t-base) var(--sans); width: 130px;
   transition: width 0.2s var(--ease), border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
-.ticker-search:focus { outline: none; border-color: var(--accent); width: 160px; }
+.ticker-search:focus { outline: none; border-color: var(--accent); width: 160px; background: oklch(64% 0.2 258 / 0.06); box-shadow: 0 0 0 3px oklch(64% 0.2 258 / 0.18); }
 .ticker-search::placeholder { color: var(--text3); }
 
 /* ── New badge ── */
@@ -796,13 +796,14 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
-<div class="main">
+<main class="main">
+  <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">מסנן מניות SEPA — Minervini Trend Template</h1>
 
   <div id="dailyBanner" class="daily-banner" style="display:none"></div>
 
   <!-- Filter -->
   <div class="filter-panel open" id="filterPanel">
-    <div class="filter-header" onclick="document.getElementById('filterPanel').classList.toggle('open')">
+    <div class="filter-header" role="button" tabindex="0" aria-expanded="true" aria-controls="filterPanel" onclick="_toggleFilterPanel(this)" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();_toggleFilterPanel(this)}">
       <span class="filter-title">קריטריוני סינון</span>
       <span class="filter-sub" id="filterSub">Trend Template + SEPA</span>
       <span class="filter-arrow">&#9660;</span>
@@ -810,19 +811,19 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="filter-body">
       <div class="screeners">
         <span class="preset-label">מסנן:</span>
-        <button class="screener-btn active" data-screener="sepa" onclick="setScreener('sepa')">Minervini SEPA</button>
-        <button class="screener-btn" data-screener="power" onclick="setScreener('power')">Power Play</button>
-        <button class="screener-btn" data-screener="vcp" onclick="setScreener('vcp')">VCP / פריצה</button>
-        <button class="screener-btn" data-screener="qulla" onclick="setScreener('qulla')">Qullamaggie</button>
-        <button class="screener-btn" data-screener="finviz" onclick="setScreener('finviz')">מומנטום שנתי</button>
-        <button class="screener-btn" data-screener="growth" onclick="setScreener('growth')">מסנן פונדמנטלי</button>
-        <button class="screener-btn" data-screener="commodities" onclick="setScreener('commodities')">סחורות</button>
+        <button class="screener-btn active" aria-pressed="true" data-screener="sepa" onclick="setScreener('sepa')">Minervini SEPA</button>
+        <button class="screener-btn" aria-pressed="false" data-screener="power" onclick="setScreener('power')">Power Play</button>
+        <button class="screener-btn" aria-pressed="false" data-screener="vcp" onclick="setScreener('vcp')">VCP / פריצה</button>
+        <button class="screener-btn" aria-pressed="false" data-screener="qulla" onclick="setScreener('qulla')">Qullamaggie</button>
+        <button class="screener-btn" aria-pressed="false" data-screener="finviz" onclick="setScreener('finviz')">מומנטום שנתי</button>
+        <button class="screener-btn" aria-pressed="false" data-screener="growth" onclick="setScreener('growth')">מסנן פונדמנטלי</button>
+        <button class="screener-btn" aria-pressed="false" data-screener="commodities" onclick="setScreener('commodities')">סחורות</button>
       </div>
       <div class="presets f-sepa">
         <span class="preset-label">פריסט:</span>
-        <button class="preset-btn active" onclick="applyPreset('classic',this)">קלאסי Minervini</button>
-        <button class="preset-btn" onclick="applyPreset('aggressive',this)">אגרסיבי</button>
-        <button class="preset-btn" onclick="applyPreset('conservative',this)">שמרני</button>
+        <button class="preset-btn active" aria-pressed="true" onclick="applyPreset('classic',this)">קלאסי Minervini</button>
+        <button class="preset-btn" aria-pressed="false" onclick="applyPreset('aggressive',this)">אגרסיבי</button>
+        <button class="preset-btn" aria-pressed="false" onclick="applyPreset('conservative',this)">שמרני</button>
         <span class="preset-sep"></span>
         <span id="myPresets"></span>
         <button class="preset-btn preset-save" onclick="saveMyPreset()" title="שמור את הערכים הנוכחיים כפריסט">+ שמור</button>
@@ -930,7 +931,7 @@ tbody tr:last-child td { border-bottom: none; }
           <button class="btn-ghost" onclick="toggleColPicker(event)" title="בחר עמודות">עמודות &#8862;</button>
           <div class="col-picker-panel" id="colPickerPanel"></div>
         </div>
-        <button class="btn-ghost" onclick="exportTickers()" title="העתק כל הטיקרים לקליפבורד">עתק רשימה</button>
+        <button class="btn-ghost" onclick="exportTickers()" title="העתק כל הטיקרים לקליפבורד">העתק רשימה</button>
         <button class="btn-ghost" onclick="exportCSV()">ייצוא CSV</button>
         <span class="kbd-hint" id="kbdHint" title="ניווט מקלדת: j/k לזוז · Enter לפתוח גרף · w להוסיף/הסיר ממעקב · Esc לסגור">j/k/w &#8629;</span>
       </div>
@@ -944,7 +945,7 @@ tbody tr:last-child td { border-bottom: none; }
     המידע באתר זה מוצג למטרות מידע ולימוד בלבד, אינו מהווה ייעוץ השקעות, שיווק השקעות או המלצה לביצוע פעולות בניירות ערך, ואינו תחליף לייעוץ אישי המתחשב בנתונים ובצרכים של כל אדם. המסחר בניירות ערך כרוך בסיכון להפסד. הנתונים מסופקים על ידי צדדים שלישיים וייתכנו אי-דיוקים או עיכובים. השימוש באתר באחריות המשתמש בלבד.
   </footer>
 
-</div>
+</main>
 
 <!-- Modal -->
 <div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
@@ -989,7 +990,7 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <button class="scroll-top-btn" id="scrollTopBtn" title="חזרה למעלה" aria-label="חזרה למעלה">
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
 </button>
@@ -2075,12 +2076,17 @@ function validateInputs(){
 /* ════════════════════════════════════
    PRESETS
 ════════════════════════════════════ */
+// Toggle .active + aria-pressed together — the visual state and the state
+// exposed to assistive tech must never drift apart.
+function _setActiveBtn(selector, activeBtn){
+  document.querySelectorAll(selector).forEach(b=>{ b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+  if(activeBtn){ activeBtn.classList.add('active'); activeBtn.setAttribute('aria-pressed','true'); }
+}
 const PRESET_NAMES = {classic:'קלאסי Minervini',aggressive:'אגרסיבי',conservative:'שמרני'};
 function applyPreset(key, btn){
   const p=PRESETS[key]; if(!p) return;
   Object.entries(p).forEach(([k,v])=>{ setFieldValue($(k),v); });
-  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
+  _setActiveBtn('.preset-btn', btn);
   updUnitHints();
   const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+PRESET_NAMES[key];
   saveFilterPrefs();   // same silent-loss path as setScreener above
@@ -2115,8 +2121,7 @@ function applyMyPreset(name, btn){
   if(p._screener && p._screener!==activeScreener) setScreener(p._screener, false);
   PRESET_FIELDS.forEach(k=>{ if(p[k]!=null) setFieldValue($(k),p[k]); });
   ['useFund','requireProfit','requireEpsAccel','requireRevAccel','requireMarginTrend','requireVCP','requireRSLine','vcpDryUp'].forEach(k=>{ const el=$(k); if(el && typeof p[k]==='boolean') el.checked=p[k]; });
-  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
-  btn?.classList.add('active');
+  _setActiveBtn('.preset-btn', btn);
   updUnitHints(); toggleFundFields(); saveFilterPrefs();
   const sub=$('filterSub'); if(sub) sub.textContent='פריסט: '+name;
 }
@@ -2133,8 +2138,14 @@ function renderMyPresets(){
     '<button class="preset-btn preset-mine" onclick="applyMyPreset('+JSON.stringify(n).replace(/"/g,'&quot;')+',this)" title="'+
     (all[n]._screener?('מסנן: '+(SCREENERS[all[n]._screener]?.name||all[n]._screener)):'')+'">'+
     esc(n).replace(/\\'/g,"'")+
-    '<span class="preset-x" onclick="deleteMyPreset(event,'+JSON.stringify(n).replace(/"/g,'&quot;')+')" title="מחק">✕</span></button>'
+    '<span class="preset-x" role="button" tabindex="0" onclick="deleteMyPreset(event,'+JSON.stringify(n).replace(/"/g,'&quot;')+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();deleteMyPreset(event,'+JSON.stringify(n).replace(/"/g,'&quot;')+')}" title="מחק">✕</span></button>'
   ).join('');
+}
+
+function _toggleFilterPanel(headerEl){
+  const panel = document.getElementById('filterPanel');
+  const open = panel.classList.toggle('open');
+  headerEl.setAttribute('aria-expanded', String(open));
 }
 
 const SCREENER_HEADS = {sepa:'טכני — Trend Template', power:'טכני — Power Play', vcp:'טכני — בסיס VCP', qulla:'טכני — Qullamaggie Breakout', finviz:'טכני — מומנטום שנתי', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
@@ -2148,10 +2159,10 @@ function setScreener(key, applyDef=true){
   $('filterSections').classList.toggle('single', !cfg.fund);
   const sub=$('filterSub'); if(sub) sub.textContent=cfg.sub;
   const th=$('techHead'); if(th) th.textContent=SCREENER_HEADS[key];
-  document.querySelectorAll('.screener-btn').forEach(b=>b.classList.toggle('active', b.dataset.screener===key));
+  document.querySelectorAll('.screener-btn').forEach(b=>{ const on=b.dataset.screener===key; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
   if(applyDef){
     Object.entries(SCREENER_DEFAULTS[key]||{}).forEach(([k,v])=>{ setFieldValue($(k),v); });
-    if(key==='sepa') document.querySelectorAll('.preset-btn').forEach((b,i)=>b.classList.toggle('active', i===0));
+    if(key==='sepa') document.querySelectorAll('.preset-btn').forEach((b,i)=>{ b.classList.toggle('active', i===0); b.setAttribute('aria-pressed', String(i===0)); });
     updUnitHints();
     // setFieldValue fires no event and the button's own is a click, so the
     // debounced panel saver never sees this. Without it the screener choice
@@ -2873,7 +2884,7 @@ function renderTable(rows){
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button>'
         +(IN_JOURNAL?'<button class="jrnl-btn" onclick="sendToJournal(event,\''+r.ticker+'\')" title="הוסף ליומן המסחר" aria-label="הוסף ליומן המסחר">+</button>':'')
       +'</td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+earnB+'</div><div class="cname">'+esc(r.name)+'</div></td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+earnB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
@@ -2974,9 +2985,9 @@ function renderGallery(){
     const rsHi=r.rs>=80, rsMid=r.rs>=60;
     const rsC = rsHi?'var(--green)':rsMid?'var(--amber)':'var(--text3)';
     const rsBg = rsHi?'rgba(46,204,113,0.13)':rsMid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
-    return '<div class="gcard" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')">'
+    return '<div class="gcard" role="button" tabindex="0" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&event.target===this){event.preventDefault();openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')}">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button>'
-      +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name">'+esc(r.name)+'</div>'
+      +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
       +(earnB?'<div class="gcard-tags">'+earnB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span></div></div>'
