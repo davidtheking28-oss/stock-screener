@@ -114,6 +114,8 @@ body {
   background: var(--bg);
   min-height: 100vh;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ── Topbar ── */
@@ -522,7 +524,7 @@ tbody tr:last-child td { border-bottom: none; }
 .sym { font: 700 15px var(--mono); color: var(--text); cursor: copy; letter-spacing: 0.3px; }
 .sym:hover { color: var(--accent2); }
 .cname { font-size: 11px; color: var(--text3); margin-top: 2px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; direction: ltr; text-align: right; white-space: nowrap; }
-.mn { font: 500 13px var(--mono-data); color: var(--text2); direction: ltr; unicode-bidi: isolate; }
+.mn { font: 500 13px var(--mono-data); color: var(--text2); direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
 .mn.hi { color: var(--text); font-weight: 600; }
 .pos { color: var(--green); } .neg { color: var(--red); }
 
