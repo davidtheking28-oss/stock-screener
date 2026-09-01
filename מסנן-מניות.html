@@ -2245,8 +2245,14 @@ async function checkAndSaveHistory(tickers){
   const fresh = tickers.filter(t=>!known.has(t));
   fresh.forEach(t=>newToday.add(t));
   tickers.forEach(t=>{ if(known.get(t)?.first_seen===today) newToday.add(t); });
-  if(fresh.length) await _sb.from('screener_history').insert(
-    fresh.map(t=>({user_id:_currentUser.id, screener:activeScreener, ticker:t, first_seen:today, last_seen:today}))
+  // upsert with ignoreDuplicates, not insert: two scans racing (e.g. the
+  // screener open both as a journal iframe and its own tab) can both read
+  // the same "not seen yet" snapshot and both try to insert the same
+  // (user_id, screener, ticker) primary key — plain insert 409s on the
+  // second one, upsert+ignoreDuplicates just no-ops it.
+  if(fresh.length) await _sb.from('screener_history').upsert(
+    fresh.map(t=>({user_id:_currentUser.id, screener:activeScreener, ticker:t, first_seen:today, last_seen:today})),
+    { onConflict: 'user_id,screener,ticker', ignoreDuplicates: true }
   );
   const seen = tickers.filter(t=>known.has(t));
   if(seen.length) await _sb.from('screener_history').update({last_seen:today})
