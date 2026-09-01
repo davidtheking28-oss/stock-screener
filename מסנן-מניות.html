@@ -499,10 +499,17 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: co
 }
 
 /* ── Table ── */
-.table-wrap { overflow-x: auto; max-height: 72vh; overflow-y: auto; }
+/* max-height + its own overflow-y made this the page's SECOND scrollbar — the
+   page itself already scrolls (body has no fixed height), so a table tall
+   enough to hit 72vh scrolled independently inside a page that was also
+   scrolling. One scroll region only: the table now grows with the page, and
+   thead's sticky offset moves from 0 to the topbar's own height (54px) since
+   it now sticks against the page, directly under the topbar, not against a
+   removed local scroll container. */
+.table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 thead th {
-  position: sticky; top: 0; z-index: 2;
+  position: sticky; top: 54px; z-index: 2;
   background: var(--bg2); color: var(--text3);
   font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: 0.5px;
   padding: 10px 11px; text-align: right; cursor: pointer; white-space: nowrap;
