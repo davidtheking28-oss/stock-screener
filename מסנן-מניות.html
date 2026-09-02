@@ -481,13 +481,20 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: co
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  overflow: hidden;
 }
+/* overflow:hidden used to live here purely to clip children to the rounded
+   corners — but ANY ancestor with overflow != visible (hidden included, even
+   with nothing to scroll) becomes the scrollport position:sticky measures
+   against. With it here, thead's sticky offset stopped clamping at top:54px
+   against the page at all (confirmed live: top kept decreasing past 54
+   instead of locking, letting the previous row bleed through). Corners are
+   clipped locally instead, on the two elements that actually reach them. */
 .results-header {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 18px; border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
   background: var(--bg2);
+  border-radius: 14px 14px 0 0;
 }
 .results-title { font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); }
 .results-count { color: var(--accent2); }
@@ -514,10 +521,27 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: co
    enough to hit 72vh scrolled independently inside a page that was also
    scrolling. One scroll region only: the table now grows with the page, and
    thead's sticky offset moves from 0 to the topbar's own height (54px) since
-   it now sticks against the page, directly under the topbar, not against a
-   removed local scroll container. */
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; }
+   it now sticks against the page, directly under the topbar — in theory.
+   In practice ANY ancestor with overflow != visible on either axis becomes
+   a scroll container, and position:sticky is computed relative to the
+   NEAREST one of those, not the page — even one that never itself scrolls.
+   .table-wrap's own overflow-x:auto already made it exactly that container:
+   its height is auto (== its content's height, nothing to scroll internally),
+   so thead's "stuck" offset was being measured against a scrollport that
+   never moves — sticky was silently inert. Confirmed live: with overflow
+   forced to visible, thead's top clamped at 54px correctly on scroll; with
+   overflow-x:auto restored, top just tracked its own static position 1:1
+   with page scroll (no clamp at all), letting the row above visibly bleed
+   through the header at some scroll depths. There is no plain-CSS way to
+   keep overflow-x:auto AND have position:sticky resolve against the page at
+   the same time — they are the same "nearest scroll container" mechanism —
+   so the auto-scroll (for a table wider than a narrow screen) only applies
+   below the same 680px breakpoint used elsewhere in this file; the desktop
+   sizes this app is actually built for (see the file's own responsive
+   review notes) get a correctly sticking header instead. */
+.table-wrap { overflow-x: visible; }
+@media (max-width: 680px) { .table-wrap { overflow-x: auto; } }
+table { width: 100%; border-collapse: separate; border-spacing: 0; }
 thead th {
   position: sticky; top: 54px; z-index: 2;
   background: var(--bg2); color: var(--text3);
@@ -533,6 +557,8 @@ thead th.sorted { color: var(--accent2); background: linear-gradient(oklch(64% 0
 .sort-arr { font-size: 10px; opacity: 0.5; margin-right: 2px; }
 thead th.sorted .sort-arr { opacity: 1; }
 tbody td { padding: 9px 11px; border-bottom: 1px solid var(--border2); vertical-align: middle; white-space: nowrap; }
+tbody tr:last-child td:first-child { border-radius: 0 0 0 14px; }
+tbody tr:last-child td:last-child  { border-radius: 0 0 14px 0; }
 tbody tr { cursor: pointer; transition: background 0.1s; }
 @media (hover: hover) and (pointer: fine) {
   tbody tr:hover { background: oklch(64% 0.2 258 / 0.06); }
