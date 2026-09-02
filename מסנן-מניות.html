@@ -187,7 +187,15 @@ body {
   border-radius: var(--r4);
   margin-bottom: var(--s4);
   overflow: hidden;
-  position: relative;
+  /* Sticky under the topbar (54px, same offset the results table's thead
+     already sticks to — see the comment near .table-wrap) so changing a
+     filter after scrolling down into the results doesn't need a scroll back
+     to the top of the page. Collapsed by default via .filter-header's own
+     toggle, and .filter-body already caps its own open height at 700px, so
+     a long filter list can't push the results off-screen entirely. */
+  position: sticky;
+  top: 54px;
+  z-index: 10;
 }
 .filter-header {
   display: flex;
