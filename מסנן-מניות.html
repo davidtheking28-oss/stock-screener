@@ -243,6 +243,15 @@ body {
   background: var(--accent-solid); border-color: var(--accent-solid);
   color: var(--on-accent);
 }
+/* Watchlist tab: keep the preset row visible (so it's still reachable) but
+   collapse everything below it (the actual scan criteria + "סרוק את השוק"),
+   and un-highlight whichever preset happens to be active — the watchlist
+   isn't scoped to any one of them, so lighting one up read as this being a
+   filtered scan rather than a saved list. */
+.filter-panel.wl-mode .filter-body > *:not(.screeners) { display: none; }
+.filter-panel.wl-mode .screener-btn.active {
+  background: var(--fill); border-color: var(--border); color: var(--text2);
+}
 #filterPanel.panel-power .f-sepa, #filterPanel.panel-growth .f-sepa, #filterPanel.panel-commodities .f-sepa, #filterPanel.panel-qulla .f-sepa, #filterPanel.panel-finviz .f-sepa { display: none; }
 #filterPanel.panel-sepa .f-power, #filterPanel.panel-growth .f-power, #filterPanel.panel-commodities .f-power, #filterPanel.panel-qulla .f-power, #filterPanel.panel-finviz .f-power { display: none; }
 #filterPanel.panel-growth .f-tech, #filterPanel.panel-commodities .f-tech, #filterPanel.panel-qulla .f-tech, #filterPanel.panel-finviz .f-tech { display: none; }
@@ -2856,11 +2865,10 @@ function setView(v){
   const kh=$('kbdHint'); if(kh) kh.style.display=(v==='gallery')?'none':'';
   const cpw=$('colPickerWrap'); if(cpw) cpw.style.display=(v==='gallery')?'none':(allResults.length?'':'none');
   if(v==='watchlist' && watchlist.size>0) $('resultsPanel').style.display='block';
-  // The watchlist is a saved list, not a scan — showing the filter panel
-  // (with a screener preset lit up, ready to re-scan the market) alongside
-  // it reads as the two being mixed together. Hidden on this tab, restored
-  // on the others.
-  const fp=$('filterPanel'); if(fp) fp.style.display=(v==='watchlist')?'none':'';
+  // The watchlist is a saved list, not a scan — the preset row stays
+  // reachable (.wl-mode CSS), but the actual scan criteria/button collapse
+  // and no preset shows as "active" while here.
+  const fp=$('filterPanel'); if(fp) fp.classList.toggle('wl-mode', v==='watchlist');
   syncStatBar();
   render();
 }
