@@ -2838,7 +2838,7 @@ function sortResults(){ sortRows(results); }
 // exported the screener list; with a search active every one of them ignored
 // the filter.
 function visibleRows(){
-  const base = view==='watchlist'
+  const base = (view==='watchlist'||view==='watchlist-gallery')
     ? sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean))
     : results;
   if(!searchQuery) return base;
@@ -2850,25 +2850,34 @@ function render(){
   $('resCount').textContent='('+visibleRows().length+')';
   if(view==='table')       renderTable();
   else if(view==='gallery') renderGallery();
+  else if(view==='watchlist-gallery') renderWatchlistGallery();
   else                      renderWatchlist();
 }
 
 function setView(v){
+  // Clicking "טבלה"/"גרפים" while already browsing the watchlist stays on
+  // the watchlist's own rows instead of silently jumping back to the
+  // general scan results — only the layout (table vs cards) changes.
+  if((v==='table'||v==='gallery') && (view==='watchlist'||view==='watchlist-gallery')) {
+    v = v==='gallery' ? 'watchlist-gallery' : 'watchlist';
+  }
   view=v;
   try{ localStorage.setItem('sepa_view', v); }catch(e){}
+  const isWl = v==='watchlist'||v==='watchlist-gallery';
   ['tabTable','tabGallery','tabWatchlist'].forEach(id=>$(id)?.classList.remove('active'));
-  if(v==='table')     $('tabTable')?.classList.add('active');
-  if(v==='gallery')   $('tabGallery')?.classList.add('active');
-  if(v==='watchlist') $('tabWatchlist')?.classList.add('active');
+  if(v==='table')              $('tabTable')?.classList.add('active');
+  if(v==='gallery')            $('tabGallery')?.classList.add('active');
+  if(v==='watchlist')          $('tabWatchlist')?.classList.add('active');
+  if(v==='watchlist-gallery'){ $('tabGallery')?.classList.add('active'); $('tabWatchlist')?.classList.add('active'); }
   $('tableView').style.display  =(v==='table'||v==='watchlist')?'block':'none';
-  $('galleryView').style.display= v==='gallery'?'grid':'none';
-  const kh=$('kbdHint'); if(kh) kh.style.display=(v==='gallery')?'none':'';
-  const cpw=$('colPickerWrap'); if(cpw) cpw.style.display=(v==='gallery')?'none':(allResults.length?'':'none');
-  if(v==='watchlist' && watchlist.size>0) $('resultsPanel').style.display='block';
+  $('galleryView').style.display=(v==='gallery'||v==='watchlist-gallery')?'grid':'none';
+  const kh=$('kbdHint'); if(kh) kh.style.display=(v==='gallery'||v==='watchlist-gallery')?'none':'';
+  const cpw=$('colPickerWrap'); if(cpw) cpw.style.display=(v==='gallery'||v==='watchlist-gallery')?'none':(allResults.length?'':'none');
+  if(isWl && watchlist.size>0) $('resultsPanel').style.display='block';
   // The watchlist is a saved list, not a scan — the preset row stays
   // reachable (.wl-mode CSS), but the actual scan criteria/button collapse
   // and no preset shows as "active" while here.
-  const fp=$('filterPanel'); if(fp) fp.classList.toggle('wl-mode', v==='watchlist');
+  const fp=$('filterPanel'); if(fp) fp.classList.toggle('wl-mode', isWl);
   syncStatBar();
   render();
 }
@@ -2879,7 +2888,7 @@ function setView(v){
 let _scanStatHtml='';
 function syncStatBar(){
   const sb=$('statBar'); if(!sb) return;
-  if(view==='watchlist'){
+  if(view==='watchlist'||view==='watchlist-gallery'){
     if(_scanStatHtml===''&&sb.innerHTML) _scanStatHtml=sb.innerHTML;
     const shown=visibleRows().length;
     sb.innerHTML='<b>'+shown+'</b> מתוך <b>'+watchlist.size+'</b> במעקב \xb7 עוברות את ה-Trend Template';
@@ -3084,17 +3093,20 @@ function _tableResetWindow(){ _tableRows=[]; _tableAt=0; _tableToken++; }
 /* ════════════════════════════════════
    GALLERY
 ════════════════════════════════════ */
-function renderGallery(){
+function renderGallery(srcRows){
+  const fromWatchlist = srcRows !== undefined;
   const g=$('galleryView');
-  if(!results.length){
-    const hint = allResults.length>0 ? 'הסקטור הנוכחי ריק — נסה "כל הסקטורים"' : 'שנה את הפילטרים והסרוק שנית';
-    _ohlcDisposeAll(); g.innerHTML=emptyHtml('אין תוצאות בגלריה', hint); _galleryKey=''; return;
+  const base = fromWatchlist ? srcRows : results;
+  if(!base.length){
+    const hint = fromWatchlist ? 'לחץ ☆ ליד מניה להוספה'
+      : (allResults.length>0 ? 'הסקטור הנוכחי ריק — נסה "כל הסקטורים"' : 'שנה את הפילטרים והסרוק שנית');
+    _ohlcDisposeAll(); g.innerHTML=emptyHtml(fromWatchlist?'רשימת המעקב ריקה':'אין תוצאות בגלריה', hint); _galleryKey=''; return;
   }
-  const rows = searchQuery ? results.filter(r=>r.ticker.includes(searchQuery)||r.name.toUpperCase().includes(searchQuery)) : results;
+  const rows = searchQuery ? base.filter(r=>r.ticker.includes(searchQuery)||r.name.toUpperCase().includes(searchQuery)) : base;
   if(!rows.length){
     _ohlcDisposeAll(); g.innerHTML=emptyHtml('לא נמצאה מניה תואמת','נקה את החיפוש כדי לראות את כל הגרפים'); _galleryKey=''; return;
   }
-  const _key=rows.map(r=>r.sym).join(',')+'|'
+  const _key=(fromWatchlist?'wl|':'sc|')+rows.map(r=>r.sym).join(',')+'|'
     +rows.map(r=>(r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')).join('');
   if(_key===_galleryKey && g.querySelector('.gcard')){
     g.querySelectorAll('.gcard .star-btn').forEach((btn,i)=>{ const r=rows[i]; if(!r) return; const on=watchlist.has(r.ticker); btn.className='star-btn '+(on?'on':'off'); btn.textContent=on?'★':'☆'; });
@@ -3172,6 +3184,19 @@ function renderWatchlist(){
     return;
   }
   renderTable(wlRows);
+}
+
+// Switching to "גרפים" while browsing the watchlist used to silently drop
+// back to the general scan results' gallery — this keeps the same watchlist
+// rows, just as cards instead of a table.
+function renderWatchlistGallery(){
+  $('tableView').style.display='none'; $('galleryView').style.display='grid';
+  if(watchlist.size===0 || !Object.keys(ttUniverse).length){
+    renderGallery([]);
+    return;
+  }
+  const wlRows=sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean));
+  renderGallery(wlRows);
 }
 
 /* ════════════════════════════════════
