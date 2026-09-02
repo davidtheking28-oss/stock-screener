@@ -1218,7 +1218,7 @@ const _lsJSON = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k))
 const _wlRaw = _lsJSON('sepa_wl', []);
 let watchlist  = new Set(Array.isArray(_wlRaw) ? _wlRaw : []);
 const _savedSort = _lsJSON('sepa_sort', null);
-let sortKey = _savedSort?.sortKey||'score', sortDir = _savedSort?.sortDir??-1;
+let sortKey = _savedSort?.sortKey||'firstSeen', sortDir = _savedSort?.sortDir??-1;
 let view = localStorage.getItem('sepa_view')||'table', activeRow = -1;
 let _galleryKey = '', _tableKey = '';
 let _tableRows = [], _tableAt = 0;
