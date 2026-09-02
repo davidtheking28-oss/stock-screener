@@ -2856,6 +2856,11 @@ function setView(v){
   const kh=$('kbdHint'); if(kh) kh.style.display=(v==='gallery')?'none':'';
   const cpw=$('colPickerWrap'); if(cpw) cpw.style.display=(v==='gallery')?'none':(allResults.length?'':'none');
   if(v==='watchlist' && watchlist.size>0) $('resultsPanel').style.display='block';
+  // The watchlist is a saved list, not a scan — showing the filter panel
+  // (with a screener preset lit up, ready to re-scan the market) alongside
+  // it reads as the two being mixed together. Hidden on this tab, restored
+  // on the others.
+  const fp=$('filterPanel'); if(fp) fp.style.display=(v==='watchlist')?'none':'';
   syncStatBar();
   render();
 }
