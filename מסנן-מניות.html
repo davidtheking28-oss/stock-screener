@@ -2855,12 +2855,14 @@ function render(){
 }
 
 function setView(v){
-  // Clicking "טבלה"/"גרפים" while already browsing the watchlist stays on
-  // the watchlist's own rows instead of silently jumping back to the
-  // general scan results — only the layout (table vs cards) changes.
-  if((v==='table'||v==='gallery') && (view==='watchlist'||view==='watchlist-gallery')) {
-    v = v==='gallery' ? 'watchlist-gallery' : 'watchlist';
-  }
+  // Clicking "גרפים" from the watchlist tab shows watchlist cards instead of
+  // the general scan's — but this is a ONE-WAY door, not sticky: "טבלה"
+  // always means the real table (the escape hatch back to the actual filter
+  // criteria), and "גרפים" from watchlist-gallery itself also exits, same as
+  // from anywhere else. A version that kept redirecting every table/gallery
+  // click while "already in watchlist" trapped the user with no way back to
+  // the scan criteria at all once they'd clicked into watchlist-gallery.
+  if(v==='gallery' && view==='watchlist') v='watchlist-gallery';
   view=v;
   try{ localStorage.setItem('sepa_view', v); }catch(e){}
   const isWl = v==='watchlist'||v==='watchlist-gallery';
