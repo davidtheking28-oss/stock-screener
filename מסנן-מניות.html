@@ -187,15 +187,17 @@ body {
   border-radius: var(--r4);
   margin-bottom: var(--s4);
   overflow: hidden;
-  /* Sticky under the topbar (54px, same offset the results table's thead
-     already sticks to — see the comment near .table-wrap) so changing a
-     filter after scrolling down into the results doesn't need a scroll back
-     to the top of the page. Collapsed by default via .filter-header's own
-     toggle, and .filter-body already caps its own open height at 700px, so
-     a long filter list can't push the results off-screen entirely. */
-  position: sticky;
-  top: 54px;
-  z-index: 10;
+  /* Reverted sticky positioning (2026-09-02, same day) — it collided with
+     the results table's own sticky thead (also top:54px). The filter panel
+     is OPEN by default (432px), so sticking it pinned that whole height and
+     pushed thead to render under it, covering the first data row. thead
+     activates its own sticking only once scrolled well past where this
+     panel's short container has already scrolled fully out of view, so a
+     stacked offset (topbar + filter-header height) just traded the overlap
+     for a gap instead. Making the filter panel reachable while scrolled
+     into results needs a different approach (e.g. JS toggling thead's
+     offset), not a plain sticky flag — not attempted here. */
+  position: relative;
 }
 .filter-header {
   display: flex;
@@ -1116,6 +1118,7 @@ const COL_DEFS = [
   {key:'liq',    label:'נזילות $',   defaultOn:false},
   {key:'mc',     label:'שווי שוק',   defaultOn:false},
   {key:'sector', label:'סקטור',      defaultOn:false},
+  {key:'firstSeen', label:'נוסף למעקב', defaultOn:true},
 ];
 
 const UNIVERSE_CACHE_KEY = 'sepa_universe_v1';
@@ -1652,6 +1655,10 @@ let colVis = _lsJSON('sepa_colvis', null) || Object.fromEntries(COL_DEFS.map(c=>
 if(!('adr' in colVis)) colVis.adr = true;
 let searchQuery = '';
 let newToday = new Set();
+// ticker -> 'YYYY-MM-DD' the ticker first appeared in this screener's results,
+// filled in by checkAndSaveHistory from screener_history. Populated async
+// after the first paint of a scan, same as newToday.
+let firstSeenByTicker = new Map();
 // Debounced search — typing fast used to trigger a full render() (gallery view
 // disposes+recreates every chart + re-fetches OHLC) on every single keystroke,
 // visibly stuttering. Only the final value after a short pause actually renders;
@@ -1689,6 +1696,19 @@ const fmtVol = v => {
   return v.toString();
 };
 const col = (key, html) => colVis[key] ? html : '';
+// 'YYYY-MM-DD' -> 'DD/MM' (or 'DD/MM/YY' across a year boundary), 'היום'/'אתמול'
+// for the two dates a user actually cares to distinguish at a glance. Missing
+// (checkAndSaveHistory hasn't resolved yet, or never ran — logged-out preview)
+// reads as '—', not a blank cell that looks broken.
+function fmtFirstSeen(iso){
+  if(!iso) return '—';
+  const now=new Date(), today=now.toISOString().slice(0,10);
+  const yesterday=new Date(now.getTime()-86400000).toISOString().slice(0,10);
+  if(iso===today) return 'היום';
+  if(iso===yesterday) return 'אתמול';
+  const [y,m,d]=iso.split('-');
+  return y===String(now.getFullYear()) ? d+'/'+m : d+'/'+m+'/'+y.slice(2);
+}
 // esc() targets values interpolated into an inline onclick="…'VALUE'…", so it
 // escapes the JS string quote as well as the HTML ones. Don't use it for plain
 // markup — escHtml is the one for that.
@@ -2246,12 +2266,13 @@ async function checkAndSaveHistory(tickers){
   // flagged חדש and the whole list was re-inserted as duplicates.
   if(histErr){ console.error('[screener_history]', histErr); return; }
   const known = new Map((prev||[]).map(h=>[h.ticker,h]));
+  known.forEach((h,t)=>firstSeenByTicker.set(t,h.first_seen));
   if(watchlist.size > 0 && prev){
     const exits = prev.filter(h=>watchlist.has(h.ticker) && !currentSet.has(h.ticker) && h.last_seen >= yesterday).map(h=>h.ticker);
     if(exits.length) toast('יצאו מהסינון: '+exits.join(', '), 6000);
   }
   const fresh = tickers.filter(t=>!known.has(t));
-  fresh.forEach(t=>newToday.add(t));
+  fresh.forEach(t=>{ newToday.add(t); firstSeenByTicker.set(t,today); });
   tickers.forEach(t=>{ if(known.get(t)?.first_seen===today) newToday.add(t); });
   // upsert with ignoreDuplicates, not insert: two scans racing (e.g. the
   // screener open both as a journal iframe and its own tab) can both read
@@ -2364,11 +2385,11 @@ async function scan(force=false){
         // screener ranked on RS and EPS alone.
         if(activeScreener==='vcp') allResults.forEach(x=>{ x.score=calcScore(x,'vcp'); });
         saveResultsCache(); finalize(false);
-        checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken && newToday.size){ saveResultsCache(); render(); } });
+        checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken){ saveResultsCache(); render(); } });
         toast('נמצאו '+results.length+' מניות');
       }).catch(()=>{ if(myToken===_scanToken) finalize(false); });
     } else {
-      checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken && newToday.size){ saveResultsCache(); render(); } });
+      checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken){ saveResultsCache(); render(); } });
       toast('נמצאו '+results.length+' מניות');
     }
   }catch(e){
@@ -2742,7 +2763,12 @@ const SORTS={
   vcp:r=>{ const v=r.vcp; if(!v||!v.contractions) return -1e9;
            return v.contractions*10 + (v.tighteningOK?50:0) + (v.volDryUp?25:0)
                   + (v.distToPivot==null?0:Math.max(-20,v.distToPivot)); },
-  rsline:r=>r.rsLine?(r.rsLine.atHigh?0:r.rsLine.pctFromHigh):-1e9
+  rsline:r=>r.rsLine?(r.rsLine.atHigh?0:r.rsLine.pctFromHigh):-1e9,
+  // 'YYYY-MM-DD' strings sort chronologically as plain strings — no Date
+  // parsing needed. Missing (not yet resolved by checkAndSaveHistory) sorts
+  // first under ascending, last under descending, either way grouped rather
+  // than scattered through the middle.
+  firstSeen:r=>firstSeenByTicker.get(r.ticker)||''
 };
 function sortRows(rows){ const f=SORTS[sortKey]||SORTS.score; return rows.sort((a,b)=>(f(a)>f(b)?1:f(a)<f(b)?-1:0)*sortDir); }
 function sortResults(){ sortRows(results); }
@@ -2831,10 +2857,12 @@ function renderTable(rows){
   // rows whenever the inputs that shape them are unchanged, patching only the
   // stars (the one thing that can change without changing the key).
   // validateExact annotates rows with .vcp/.rsLine and checkAndSaveHistory fills
-  // newToday, then both call render() — with none of that in the key the early
-  // return kept serving stale HTML, so the VCP column read "—" forever and the
-  // חדש badge never appeared.
-  const _annot = rows.map(r => (r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')).join('');
+  // newToday/firstSeenByTicker, then both call render() — with none of that in
+  // the key the early return kept serving stale HTML, so the VCP column read
+  // "—" forever, the חדש badge never appeared, and (same bug) the "added on"
+  // column would never fill in once checkAndSaveHistory resolved after the
+  // first paint.
+  const _annot = rows.map(r => (r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')+(firstSeenByTicker.get(r.ticker)||'')).join('');
   const _tKey = view+'|'+sortKey+'|'+sortDir+'|'+scKind+'|'
     +COL_DEFS.map(c=>colVis[c.key]?1:0).join('')+'|'+rows.map(r=>r.sym).join(',')+'|'+_annot;
   if(_tKey===_tableKey && tv.querySelector('tbody tr')){
@@ -2876,6 +2904,7 @@ function renderTable(rows){
     +(colVis.liq   ? th('נזילות $','liq','נפח דולרי ממוצע ליום (מחיר × נפח ממוצע 10 ימים)') : '')
     +(colVis.mc    ? th('שווי שוק','mc','שווי שוק בדולרים') : '')
     +(colVis.sector? '<th>סקטור</th>' : '')
+    +(colVis.firstSeen? th('נוסף למעקב','firstSeen','התאריך שבו המניה הופיעה לראשונה בתוצאות הסינון הזה') : '')
     +'</tr>';
 
   const bodyRows=rows.map(r=>{
@@ -2958,6 +2987,7 @@ function renderTable(rows){
       +col('liq',    '<td><span class="mn">$'+fmtB(r.dollarVol)+'</span></td>')
       +col('mc',     '<td><span class="mn">'+fmtB(r.mc)+'</span></td>')
       +col('sector', '<td><span class="sector-tag">'+escHtml(String(r.sector||'').split(' ').slice(0,2).join(' '))+'</span></td>')
+      +col('firstSeen', '<td><span class="mn" style="color:var(--text3)">'+fmtFirstSeen(firstSeenByTicker.get(r.ticker))+'</span></td>')
       +'</tr>';
   });
 
