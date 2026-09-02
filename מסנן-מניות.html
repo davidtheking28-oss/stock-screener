@@ -1105,7 +1105,6 @@ const COL_DEFS = [
   {key:'score',  label:'ציון SEPA',  defaultOn:true},
   {key:'rs',     label:'RS',         defaultOn:true},
   {key:'adr',    label:'ADR%',       defaultOn:true},
-  {key:'vcp',    label:'VCP',        defaultOn:true},
   {key:'rsline', label:'קו RS',      defaultOn:false},
   {key:'perfY',  label:'ביצʹ 1Y',  defaultOn:true},
   {key:'perf3',  label:'ביצʹ 3M',  defaultOn:false},
@@ -2891,7 +2890,6 @@ function renderTable(rows){
     +(colVis.score ? th(scHeadLbl,'score',scHeadTip) : '')
     +(colVis.rs    ? th('RS','rs','דירוג יחסי 1–99') : '')
     +(colVis.adr   ? th('ADR%','adr','תנודתיות יומית ממוצעת — בסיס לגודל פוזיציה וסטופ') : '')
-    +(colVis.vcp   ? th('VCP','vcp','התכווצות תנודתיות — מספר ההתכווצויות בבסיס. ✓ = מתהדק על נפח מתייבש') : '')
     +(colVis.rsline? th('קו RS','rsline','קו העוצמה היחסית מול SPY — שיא חדש לפני פריצת המחיר הוא סימן חוזק') : '')
     +(colVis.perfY ? th('ביצֹ 1Y','perfY','שינוי מחיר ב-12 חודשים האחרונים') : '')
     +(colVis.perf3 ? th('ביצֹ 3M','perf3','שינוי מחיר ב-3 חודשים האחרונים') : '')
@@ -2957,17 +2955,6 @@ function renderTable(rows){
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
       +col('adr',    (()=>{const a=r.adrPct??r.volD;const c=a==null?'var(--text3)':a>=5?'var(--green)':a>=3.5?'var(--amber)':'var(--text3)';return '<td><span class="mn" style="color:'+c+';font-weight:600">'+(a==null?'—':a.toFixed(1)+'%')+'</span></td>';})())
-      +col('vcp',    (()=>{
-          const v=r.vcp;
-          if(!v||!v.contractions) return '<td><span class="mn" style="color:var(--text3)">—</span></td>';
-          const tight=v.tighteningOK && v.contractions>=2;
-          const c=tight?(v.volDryUp?'var(--green)':'var(--amber)'):'var(--text3)';
-          const tip='‏'+v.contractions+' התכווצויות · האחרונה '+v.lastDepth.toFixed(1)+'%'
-            +(v.volDryUp==null?'':' · נפח '+(v.volDryUp?'מתייבש':'לא מתייבש'))
-            +(v.distToPivot==null?'':' · '+Math.abs(v.distToPivot).toFixed(1)+'% מנקודת הפריצה');
-          return '<td title="'+tip+'"><span class="mn" style="color:'+c+';font-weight:600">'
-            +v.contractions+'T'+(tight&&v.volDryUp?' ✓':'')+'</span></td>';
-        })())
       +col('rsline', (()=>{
           const l=r.rsLine;
           if(!l) return '<td><span class="mn" style="color:var(--text3)">—</span></td>';
