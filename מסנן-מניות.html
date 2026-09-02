@@ -1070,11 +1070,24 @@ const _sb = HAS_SUPABASE ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : 
    replies with tj:session, and this calls setSession with them. */
 const IN_JOURNAL = (() => { try { return window.parent && window.parent !== window; } catch (e) { return false; } })();
 const JOURNAL_ORIGIN = location.origin;
+// The journal re-sends tj:session on its own SIGNED_IN/TOKEN_REFRESHED events
+// (a real token refresh happens periodically for as long as the tab stays
+// open), and setSession() fires this app's own onAuthStateChange as a fresh
+// SIGNED_IN every single time it's called — not just the first. That re-ran
+// loadUserData(), which does `watchlist = new Set(wlData...)` and clobbered
+// any watchlist change made since the last hand-off (removing a ticker
+// looked like it silently "didn't work"), and re-ran checkAndSaveHistory's
+// exit/entry toasts on data that hadn't actually changed (reported live:
+// the same "יצאו/נכנסו לסינון" toasts kept firing repeatedly). One hand-off
+// is enough — Supabase's own client keeps the session alive afterward.
+let _ssoApplied = false;
 if (IN_JOURNAL && _sb) {
   window.addEventListener('message', (e) => {
+    if (_ssoApplied) return;
     if (e.origin !== JOURNAL_ORIGIN || e.source !== window.parent) return;
     const msg = e.data;
     if (!msg || msg.type !== 'tj:session' || !msg.accessToken || !msg.refreshToken) return;
+    _ssoApplied = true;
     _sb.auth.setSession({ access_token: msg.accessToken, refresh_token: msg.refreshToken }).then(() => {
       if (allResults.length) checkAndSaveHistory(allResults.map(r => r.ticker)).then(() => render());
     });
