@@ -284,14 +284,6 @@ body {
 .perf-stat-lbl { font: 600 10px var(--sans); color: var(--text3); }
 .perf-stat-val { font: 700 13px var(--mono-data); font-variant-numeric: tabular-nums; }
 .perf-note { font: 500 10px var(--sans); color: var(--text3); margin-right: auto; }
-.jrnl-btn {
-  margin-top: 4px; width: 22px; height: 22px; padding: 0;
-  display: block; border-radius: 5px; cursor: pointer;
-  border: 1px solid rgba(79,131,255,0.35); background: rgba(79,131,255,0.08);
-  color: var(--accent); font: 700 14px var(--sans); line-height: 1;
-  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
-}
-.jrnl-btn:hover { background: var(--accent); color: oklch(99% 0.005 258); border-color: var(--accent); }
 .preset-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
 .preset-save { border-style: dashed; }
 .preset-mine { display: inline-flex; align-items: center; gap: 6px; }
@@ -816,7 +808,7 @@ tbody tr:last-child td { border-bottom: none; }
   .screener-btn, .preset-btn, .field-picker-item { min-height: 44px; }
   .btn-rescan, .topbar .btn-ghost { min-height: 44px; }
   .field-combo input, select, .ticker-search { min-height: 44px; }
-  .star-btn, .jrnl-btn { min-width: 44px; min-height: 44px; }
+  .star-btn { min-width: 44px; min-height: 44px; }
   .btn-scan { min-height: 44px; }
   /* The box itself stays small on purpose; the row it sits in is the target. */
   input[type=checkbox] { width: 18px; height: 18px; }
@@ -831,7 +823,7 @@ tbody tr:last-child td { border-bottom: none; }
      color/opacity/shadow, on the elements whose hover/focus/active state
      would otherwise become a silent, unannounced snap. transform and layout
      properties (translateY, max-height, width) stay killed above. */
-  button, a, input, select, .ticker-search, .gcard, .toast, tbody tr, .sym, .ss-chip, .star-btn, .preset-x, .jrnl-btn {
+  button, a, input, select, .ticker-search, .gcard, .toast, tbody tr, .sym, .ss-chip, .star-btn, .preset-x {
     transition-duration: 0.15s !important;
     transition-property: color, background-color, border-color, opacity, box-shadow !important;
   }
@@ -1770,36 +1762,6 @@ function toggleWL(e, ticker){
 function copyTicker(e, ticker){
   e.stopPropagation();
   navigator.clipboard?.writeText(ticker).then(()=>toast(ticker+' הועתק ✓'));
-}
-
-/* ── Trading-journal bridge ──
-   The screener runs in an iframe inside the journal. When it does, each row
-   offers to hand its setup over so the trade can be logged without retyping
-   the symbol, entry and stop. Outside the frame the button never renders. */
-const JOURNAL_ORIGIN='https://davidtheking28-oss.github.io';
-const IN_JOURNAL=(()=>{ try{ return window.parent && window.parent!==window; }catch(e){ return false; } })();
-function sendToJournal(e, ticker){
-  e.stopPropagation();
-  const r=results.find(x=>x.ticker===ticker) || allResults.find(x=>x.ticker===ticker);
-  if(!r) return;
-  // Stop below the base low when the pattern gives one, else an ADR-based stop.
-  // Must be the real ADR: Volatility.D is a single session and runs ~half, which
-  // placed every ADR-derived stop about twice as tight as intended.
-  const adr=r.adrPct??r.volD??3;
-  const stop=(r.vcp&&r.vcp.pivot&&r.vcp.lastDepth!=null)
-    ? +(r.close*(1-Math.min(r.vcp.lastDepth,adr*2.5)/100)).toFixed(2)
-    : +(r.close*(1-adr*2/100)).toFixed(2);
-  try{
-    window.parent.postMessage({
-      type:'tj:add-trade',
-      payload:{
-        symbol:r.ticker, entryPrice:+r.close.toFixed(2), stop,
-        pivot:r.vcp?.pivot!=null?+r.vcp.pivot.toFixed(2):null,
-        sector:r.sector, rs:r.rs, score:r.score, screener:activeScreener
-      }
-    }, JOURNAL_ORIGIN);
-    toast(ticker+' נשלח ליומן ✓');
-  }catch(err){ toast('לא ניתן לשלוח ליומן'); }
 }
 
 /* ════════════════════════════════════
@@ -2974,7 +2936,6 @@ function renderTable(rows){
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button>'
-        +(IN_JOURNAL?'<button class="jrnl-btn" onclick="sendToJournal(event,\''+r.ticker+'\')" title="הוסף ליומן המסחר" aria-label="הוסף ליומן המסחר">+</button>':'')
       +'</td>'
       +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+earnB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
