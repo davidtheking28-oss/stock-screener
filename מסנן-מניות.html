@@ -1710,10 +1710,17 @@ let colVis = _lsJSON('sepa_colvis', null) || Object.fromEntries(COL_DEFS.map(c=>
 if(!('adr' in colVis)) colVis.adr = true;
 let searchQuery = '';
 let newToday = new Set();
-// ticker -> 'YYYY-MM-DD' the ticker first appeared in this screener's results,
-// filled in by checkAndSaveHistory from screener_history. Populated async
-// after the first paint of a scan, same as newToday.
+// 'screener|ticker' -> 'YYYY-MM-DD' the ticker first appeared in THAT
+// screener's results, filled in by checkAndSaveHistory from screener_history.
+// Populated async after the first paint of a scan, same as newToday. Keyed on
+// screener+ticker, not ticker alone — the same ticker can genuinely have a
+// different first_seen per screener type (a stock newly qualifying for
+// Qullamaggie today may have been in SEPA's results for weeks), confirmed
+// live for hundreds of tickers. A ticker-only key meant switching screener
+// tabs silently overwrote the date with whichever screener's fetch landed
+// last, showing the wrong one for tickers in overlapping results.
 let firstSeenByTicker = new Map();
+const _fsKey = (screener, ticker) => screener + '|' + ticker;
 // Debounced search — typing fast used to trigger a full render() (gallery view
 // disposes+recreates every chart + re-fetches OHLC) on every single keystroke,
 // visibly stuttering. Only the final value after a short pause actually renders;
@@ -2282,22 +2289,28 @@ function showSkeleton(){
 
 async function checkAndSaveHistory(tickers){
   if(!_currentUser || !_sb || !tickers.length) return;
+  // Captured once, not re-read from the global mid-function — this function
+  // awaits a query, and the user can switch screener tabs (changing
+  // activeScreener) before it resolves. Writing under whatever tab is active
+  // NOW instead of the one these tickers actually belong to would silently
+  // mislabel dates the same way the ticker-only cache key used to.
+  const scr = activeScreener;
   const today = new Date().toISOString().slice(0,10);
   const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
   const currentSet = new Set(tickers);
   const {data:prev, error:histErr} = await _sb.from('screener_history')
-    .select('ticker,first_seen,last_seen').eq('user_id',_currentUser.id).eq('screener',activeScreener);
+    .select('ticker,first_seen,last_seen').eq('user_id',_currentUser.id).eq('screener',scr);
   // A failed read used to look identical to "no history": every ticker was
   // flagged חדש and the whole list was re-inserted as duplicates.
   if(histErr){ console.error('[screener_history]', histErr); return; }
   const known = new Map((prev||[]).map(h=>[h.ticker,h]));
-  known.forEach((h,t)=>firstSeenByTicker.set(t,h.first_seen));
+  known.forEach((h,t)=>firstSeenByTicker.set(_fsKey(scr,t),h.first_seen));
   if(watchlist.size > 0 && prev){
     const exits = prev.filter(h=>watchlist.has(h.ticker) && !currentSet.has(h.ticker) && h.last_seen >= yesterday).map(h=>h.ticker);
     if(exits.length) toast('יצאו מהסינון: '+exits.join(', '), 6000);
   }
   const fresh = tickers.filter(t=>!known.has(t));
-  fresh.forEach(t=>{ newToday.add(t); firstSeenByTicker.set(t,today); });
+  fresh.forEach(t=>{ newToday.add(t); firstSeenByTicker.set(_fsKey(scr,t),today); });
   tickers.forEach(t=>{ if(known.get(t)?.first_seen===today) newToday.add(t); });
   // upsert with ignoreDuplicates, not insert: two scans racing (e.g. the
   // screener open both as a journal iframe and its own tab) can both read
@@ -2305,12 +2318,12 @@ async function checkAndSaveHistory(tickers){
   // (user_id, screener, ticker) primary key — plain insert 409s on the
   // second one, upsert+ignoreDuplicates just no-ops it.
   if(fresh.length) await _sb.from('screener_history').upsert(
-    fresh.map(t=>({user_id:_currentUser.id, screener:activeScreener, ticker:t, first_seen:today, last_seen:today})),
+    fresh.map(t=>({user_id:_currentUser.id, screener:scr, ticker:t, first_seen:today, last_seen:today})),
     { onConflict: 'user_id,screener,ticker', ignoreDuplicates: true }
   );
   const seen = tickers.filter(t=>known.has(t));
   if(seen.length) await _sb.from('screener_history').update({last_seen:today})
-    .eq('user_id',_currentUser.id).eq('screener',activeScreener).in('ticker',seen);
+    .eq('user_id',_currentUser.id).eq('screener',scr).in('ticker',seen);
   if(watchlist.size > 0){
     const wlNew = [...newToday].filter(t=>watchlist.has(t));
     if(wlNew.length) toast('נכנסו לסינון היום: '+wlNew.join(', '), 6000);
@@ -2793,7 +2806,7 @@ const SORTS={
   // parsing needed. Missing (not yet resolved by checkAndSaveHistory) sorts
   // first under ascending, last under descending, either way grouped rather
   // than scattered through the middle.
-  firstSeen:r=>firstSeenByTicker.get(r.ticker)||''
+  firstSeen:r=>firstSeenByTicker.get(_fsKey(r.scoreKind||activeScreener,r.ticker))||''
 };
 function sortRows(rows){ const f=SORTS[sortKey]||SORTS.score; return rows.sort((a,b)=>(f(a)>f(b)?1:f(a)<f(b)?-1:0)*sortDir); }
 function sortResults(){ sortRows(results); }
@@ -2887,7 +2900,7 @@ function renderTable(rows){
   // "—" forever, the חדש badge never appeared, and (same bug) the "added on"
   // column would never fill in once checkAndSaveHistory resolved after the
   // first paint.
-  const _annot = rows.map(r => (r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')+(firstSeenByTicker.get(r.ticker)||'')).join('');
+  const _annot = rows.map(r => (r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')+(firstSeenByTicker.get(_fsKey(r.scoreKind||activeScreener,r.ticker))||'')).join('');
   const _tKey = view+'|'+sortKey+'|'+sortDir+'|'+scKind+'|'
     +COL_DEFS.map(c=>colVis[c.key]?1:0).join('')+'|'+rows.map(r=>r.sym).join(',')+'|'+_annot;
   if(_tKey===_tableKey && tv.querySelector('tbody tr')){
@@ -2999,7 +3012,7 @@ function renderTable(rows){
       +col('liq',    '<td><span class="mn">$'+fmtB(r.dollarVol)+'</span></td>')
       +col('mc',     '<td><span class="mn">'+fmtB(r.mc)+'</span></td>')
       +col('sector', '<td><span class="sector-tag">'+escHtml(String(r.sector||'').split(' ').slice(0,2).join(' '))+'</span></td>')
-      +col('firstSeen', '<td><span class="mn" style="color:var(--text3)">'+fmtFirstSeen(firstSeenByTicker.get(r.ticker))+'</span></td>')
+      +col('firstSeen', '<td><span class="mn" style="color:var(--text3)">'+fmtFirstSeen(firstSeenByTicker.get(_fsKey(r.scoreKind||activeScreener,r.ticker)))+'</span></td>')
       +'</tr>';
   });
 
