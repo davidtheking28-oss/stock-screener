@@ -1057,6 +1057,31 @@ const SUPABASE_ANON = '__SUPABASE_ANON__';
 const HAS_SUPABASE  = !SUPABASE_ANON.startsWith('__');
 const _sb = HAS_SUPABASE ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : null;
 
+/* ── Journal SSO ──
+   The screener has its own separate Supabase auth (Google/email) — signing
+   into the journal does not carry over, since browser storage is per-origin
+   even when this page is only ever reached via the journal's iframe. Without
+   a session here, checkAndSaveHistory's `if(!_currentUser) return` bails
+   immediately, and "נוסף למעקב" silently stayed "—" for every row for every
+   journal user — nobody had ever separately logged into the screener itself.
+   The journal and the screener are both served from the same github.io
+   account (different paths, same origin), so the parent can safely hand its
+   own session's tokens down: this pings it once embedded, the journal
+   replies with tj:session, and this calls setSession with them. */
+const IN_JOURNAL = (() => { try { return window.parent && window.parent !== window; } catch (e) { return false; } })();
+const JOURNAL_ORIGIN = location.origin;
+if (IN_JOURNAL && _sb) {
+  window.addEventListener('message', (e) => {
+    if (e.origin !== JOURNAL_ORIGIN || e.source !== window.parent) return;
+    const msg = e.data;
+    if (!msg || msg.type !== 'tj:session' || !msg.accessToken || !msg.refreshToken) return;
+    _sb.auth.setSession({ access_token: msg.accessToken, refresh_token: msg.refreshToken }).then(() => {
+      if (allResults.length) checkAndSaveHistory(allResults.map(r => r.ticker)).then(() => render());
+    });
+  });
+  window.addEventListener('load', () => window.parent.postMessage({ type: 'tj:screener-ready' }, JOURNAL_ORIGIN));
+}
+
 /* ════════════════════════════════════
    CONSTANTS
 ════════════════════════════════════ */
