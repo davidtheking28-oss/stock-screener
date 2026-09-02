@@ -1721,6 +1721,15 @@ let newToday = new Set();
 // last, showing the wrong one for tickers in overlapping results.
 let firstSeenByTicker = new Map();
 const _fsKey = (screener, ticker) => screener + '|' + ticker;
+// ticker -> 'YYYY-MM-DD' the ticker was actually added to the watchlist
+// (screener_watchlist.created_at), populated by loadUserData and updated
+// optimistically by toggleWL. The "נוסף למעקב" COLUMN uses this, not
+// firstSeenByTicker above — those are two different questions
+// (first_seen is "when did a scan first surface this ticker", scoped per
+// screener type; this is "when did I star it"), and the column's own label
+// only ever asked the second one. Rows never starred correctly show "—"
+// here even if they have scan history.
+let watchlistAddedAt = new Map();
 // Debounced search — typing fast used to trigger a full render() (gallery view
 // disposes+recreates every chart + re-fetches OHLC) on every single keystroke,
 // visibly stuttering. Only the final value after a short pause actually renders;
@@ -1802,6 +1811,8 @@ function toggleWL(e, ticker){
   e.stopPropagation();
   const adding = !watchlist.has(ticker);
   adding ? watchlist.add(ticker) : watchlist.delete(ticker);
+  if(adding) watchlistAddedAt.set(ticker, new Date().toISOString().slice(0,10));
+  else watchlistAddedAt.delete(ticker);
   saveWL(ticker, adding); render();
 }
 function copyTicker(e, ticker){
@@ -2806,7 +2817,7 @@ const SORTS={
   // parsing needed. Missing (not yet resolved by checkAndSaveHistory) sorts
   // first under ascending, last under descending, either way grouped rather
   // than scattered through the middle.
-  firstSeen:r=>firstSeenByTicker.get(_fsKey(r.scoreKind||activeScreener,r.ticker))||''
+  firstSeen:r=>watchlistAddedAt.get(r.ticker)||''
 };
 function sortRows(rows){ const f=SORTS[sortKey]||SORTS.score; return rows.sort((a,b)=>(f(a)>f(b)?1:f(a)<f(b)?-1:0)*sortDir); }
 function sortResults(){ sortRows(results); }
@@ -2900,7 +2911,7 @@ function renderTable(rows){
   // "—" forever, the חדש badge never appeared, and (same bug) the "added on"
   // column would never fill in once checkAndSaveHistory resolved after the
   // first paint.
-  const _annot = rows.map(r => (r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')+(firstSeenByTicker.get(_fsKey(r.scoreKind||activeScreener,r.ticker))||'')).join('');
+  const _annot = rows.map(r => (r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')+(watchlistAddedAt.get(r.ticker)||'')).join('');
   const _tKey = view+'|'+sortKey+'|'+sortDir+'|'+scKind+'|'
     +COL_DEFS.map(c=>colVis[c.key]?1:0).join('')+'|'+rows.map(r=>r.sym).join(',')+'|'+_annot;
   if(_tKey===_tableKey && tv.querySelector('tbody tr')){
@@ -2983,7 +2994,19 @@ function renderTable(rows){
     const volEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+Math.min((vr??0)*50,100)+'%;background:'+vCol+';color:'+vCol+'"></div></div><span class="mn" style="color:'+vCol+'">'+fmtVol(r.vol)+'</span></div>';
 
     const priceStr=r.close>=100?r.close.toFixed(0):r.close.toFixed(2);
-    const isNew = newToday.has(r.ticker);
+    // newToday is scoped to whatever scan() last ran (one screener at a
+    // time), reset at the top of scan() — correct for the table/gallery
+    // views, which always show that same scan's own results. The watchlist
+    // view pulls rows from ttUniverse instead (a background cache spanning
+    // whatever scan last touched each ticker, not tied to any one run), so
+    // reading the same global Set there flagged tickers "חדש" just because
+    // SOME unrelated past scan happened to find them fresh — reported live
+    // on ZD/UFCS while sitting on the watchlist tab. "חדש" there means
+    // "added to the watchlist today" instead, which is what's actually true
+    // in that context.
+    const isNew = view==='watchlist'
+      ? watchlistAddedAt.get(r.ticker)===new Date().toISOString().slice(0,10)
+      : newToday.has(r.ticker);
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button>'
@@ -3012,7 +3035,7 @@ function renderTable(rows){
       +col('liq',    '<td><span class="mn">$'+fmtB(r.dollarVol)+'</span></td>')
       +col('mc',     '<td><span class="mn">'+fmtB(r.mc)+'</span></td>')
       +col('sector', '<td><span class="sector-tag">'+escHtml(String(r.sector||'').split(' ').slice(0,2).join(' '))+'</span></td>')
-      +col('firstSeen', '<td><span class="mn" style="color:var(--text3)">'+fmtFirstSeen(firstSeenByTicker.get(_fsKey(r.scoreKind||activeScreener,r.ticker)))+'</span></td>')
+      +col('firstSeen', '<td><span class="mn" style="color:var(--text3)">'+fmtFirstSeen(watchlistAddedAt.get(r.ticker))+'</span></td>')
       +'</tr>';
   });
 
@@ -3273,7 +3296,7 @@ async function initAuth(){
 
 async function loadUserData(){
   const [{data:wlData},{data:prefData}] = await Promise.all([
-    _sb.from('screener_watchlist').select('ticker').eq('user_id',_currentUser.id),
+    _sb.from('screener_watchlist').select('ticker,created_at').eq('user_id',_currentUser.id),
     _sb.from('screener_prefs').select('col_vis').eq('user_id',_currentUser.id).maybeSingle()
   ]);
   // loadResultsCache() has already rendered from the local copy by the time this
@@ -3284,7 +3307,10 @@ async function loadUserData(){
   const wlBefore = [...watchlist].sort().join(',');
   const cvBefore = JSON.stringify(colVis);
 
-  if(wlData) watchlist = new Set(wlData.map(r=>r.ticker));
+  if(wlData) {
+    watchlist = new Set(wlData.map(r=>r.ticker));
+    watchlistAddedAt = new Map(wlData.map(r=>[r.ticker, (r.created_at||'').slice(0,10)]));
+  }
   if(prefData?.col_vis) colVis = prefData.col_vis;
   if(!('adr' in colVis)) colVis.adr = true;
 
