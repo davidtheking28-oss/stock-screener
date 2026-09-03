@@ -2922,13 +2922,15 @@ function render(){
 }
 
 function setMode(m){
-  if(m===mode) return;
+  // No `if(m===mode) return` short-circuit: state and DOM can disagree (a boot
+  // that restored mode='watch' before anything applied it), and the one thing
+  // that must never happen is a click on the tab you are supposedly already on
+  // doing nothing at all. applyView is idempotent.
   mode=m;
   try{ localStorage.setItem('sepa_mode', m); }catch(e){}
   applyView();
 }
 function setLayout(l){
-  if(l===layout) return;
   layout=l;
   try{ localStorage.setItem('sepa_layout', l); }catch(e){}
   applyView();
@@ -2969,7 +2971,10 @@ function syncStatBar(){
     // how many of the names shown pass it instead of implying the rest don't exist.
     const tt=[...watchlist].filter(t=>ttUniverse[t] && ttUniverse[t].ttPass!==false).length;
     sb.innerHTML='<b>'+shown+'</b> במעקב \xb7 <b>'+tt+'</b> עוברות את ה-Trend Template';
-  } else if(_scanStatHtml){
+  } else {
+    // Assigning even when empty: entering the watchlist before any scan left
+    // the watchlist summary stuck in the topbar after switching back, because
+    // there was no captured scan text to overwrite it with.
     sb.innerHTML=_scanStatHtml;
   }
 }
@@ -3439,7 +3444,10 @@ async function loadUserData(){
 
   if(cvChanged) buildColPicker();
   _tableKey=''; _galleryKey='';
-  if(allResults.length) render();
+  // The watchlist renders from ttUniverse, not from a scan, so gating this on
+  // allResults left a signed-in user sitting on the מעקב tab with an empty list
+  // until they ran a scan.
+  if(allResults.length || mode==='watch'){ syncStatBar(); render(); }
 }
 
 function updateAuthUI(){
@@ -3661,6 +3669,13 @@ updUnitHints();
 renderMyPresets();
 loadUniverseCache();
 loadResultsCache();
+// loadResultsCache calls applyView, but bails before it whenever there is no
+// usable cache (none saved, older than a day, or from a different screener).
+// mode/layout are restored from localStorage regardless, so that path left the
+// tabs painted as 'screen'/'table' while mode was really 'watch' — the source
+// tabs lied, .wl-mode was missing, and clicking the מעקב tab you appeared not
+// to be on did nothing.
+applyView();
 initAuth().then(loadDailyStatus);
 
 const _scrollTopBtn = $('scrollTopBtn');
