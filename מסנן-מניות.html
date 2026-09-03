@@ -255,6 +255,9 @@ body {
    isn't scoped to any one of them, so lighting one up read as this being a
    filtered scan rather than a saved list. */
 .filter-panel.wl-mode .filter-body > *:not(.screeners) { display: none; }
+/* .screeners' own bottom margin used to separate it from the criteria that
+   .wl-mode hides, leaving ~48px of empty panel under it. */
+.filter-panel.wl-mode .screeners { margin-bottom: 0; }
 .filter-panel.wl-mode .screener-btn.active {
   background: var(--fill); border-color: var(--border); color: var(--text2);
 }
@@ -503,7 +506,6 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: co
   background: var(--bg2);
   border-radius: 14px 14px 0 0;
 }
-.results-title { font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); }
 .results-count { color: var(--accent2); }
 .results-controls { display: flex; align-items: center; gap: 8px; margin-right: auto; flex-wrap: wrap; }
 .view-tabs { display: flex; gap: 2px; background: var(--bg2); border-radius: var(--r2); padding: 3px; height: var(--ctl-h); }
@@ -743,10 +745,21 @@ tbody tr:last-child td { border-bottom: none; }
   .main { padding: 12px 14px; }
   #statBar { font-size: 11px; }
   .results-header { padding: 10px 12px; gap: 8px; }
+  /* Once these wrap onto their own line, margin-right:auto still pulls them to
+     the main-end (left on RTL), leaving them 56px out of alignment with the
+     source tabs above. Give the wrapped row the whole line instead. */
+  .results-controls { margin-right: 0; flex: 1 1 100%; }
   .view-tab { padding: 5px 9px; font-size: 11px; }
   .kbd-hint { display: none; }
   .table-wrap { max-height: 62vh; }
-  thead th { font-size: 10px; padding: 8px 7px; }
+  /* Below this breakpoint .table-wrap gets overflow-x:auto (which promotes
+     overflow-y to auto) plus a max-height, so it becomes a real scrollport and
+     IS the sticky containing block — top:54px then pushes the header 54px DOWN
+     from the wrap's own top edge and parks it on the first two rows at every
+     scroll position. Measured: wrap.top 966, th.top 1020, first row top 998.
+     Inside its own scroller the offset must be 0; the 54px only makes sense
+     when thead sticks against the page, under the topbar. */
+  thead th { font-size: 10px; padding: 8px 7px; top: 0; }
   tbody td { padding: 7px 7px; }
   .gallery { grid-template-columns: 1fr; }
   /* Sticky star + ticker columns so they stay visible when scrolling horizontally */
@@ -810,7 +823,10 @@ tbody tr:last-child td { border-bottom: none; }
   display: inline-block; font: 700 9px var(--sans); color: var(--text3);
   background: var(--fill2); border: 1px dashed var(--border);
   padding: 1px 5px; border-radius: 4px; letter-spacing: 0.3px;
-  margin-left: 5px; vertical-align: middle;
+  /* margin-RIGHT, like .earn-badge and .new-badge: on this RTL page that is the
+     side facing the preceding content. margin-left put the 5px on the badge's
+     far edge and left it touching the earnings badge with zero separation. */
+  margin-right: 5px; vertical-align: middle;
 }
 
 .sector-strength {
@@ -848,7 +864,11 @@ tbody tr:last-child td { border-bottom: none; }
 @media (max-width: 640px) {
   :root { --ctl-h: 44px; }
   .ss-chip { min-height: 44px; padding: 8px 12px; }
-  .results-controls .btn-ghost, .view-tab, .src-tab { min-height: 44px; }
+  /* .view-tab is deliberately NOT in this list: its parent .view-tabs is
+     already --ctl-h (44px) tall with 3px of padding, so forcing the child to
+     44px too made the active tab's background bleed 3px out of the rounded
+     pill. The 44px touch target is satisfied by the parent's height. */
+  .results-controls .btn-ghost, .src-tab { min-height: 44px; }
   .screener-btn, .preset-btn, .field-picker-item { min-height: 44px; }
   .btn-rescan, .topbar .btn-ghost { min-height: 44px; }
   .field-combo input, select, .ticker-search { min-height: 44px; }
@@ -888,7 +908,7 @@ tbody tr:last-child td { border-bottom: none; }
   <div id="statBar"></div>
   <div class="topbar-end">
     <span id="scanTime"></span>
-    <button class="btn-rescan" id="scanBtn" onclick="scan(true)" style="display:none">&#8635; סרוק שנית</button>
+    <button class="btn-rescan" id="scanBtn" onclick="if(mode==='watch')setMode('screen');scan(true)" style="display:none">&#8635; סרוק שנית</button>
     <div id="authChip"><button class="btn-ghost" style="font-size:12px" onclick="toggleAuthModal()">כניסה</button></div>
   </div>
 </div>
@@ -1866,15 +1886,25 @@ function escHtml(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&l
 const _toastQ=[]; let _toastBusy=false;
 function toast(msg, dur=2600){ _toastQ.push({msg,dur}); if(!_toastBusy) _toastNext(); }
 function _toastNext(){ if(!_toastQ.length){_toastBusy=false;return;} _toastBusy=true; const {msg,dur}=_toastQ.shift(); const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>{ t.classList.remove('show'); setTimeout(_toastNext,260); },dur); }
+// Tickers whose write is still in flight. supabase-js registers its OWN
+// visibilitychange handler, and its recovery path ends in
+// _notifyAllSubscribers('SIGNED_IN'), so tabbing back to the journal re-runs
+// loadUserData() — which does `watchlist = new Set(serverRows)`. A removal
+// whose DELETE had not landed yet was silently restored by that read. This is
+// NOT the postMessage path, so _ssoApplied cannot guard it.
+const _wlPending = new Set();
 async function saveWL(ticker, adding){
   if(_currentUser && _sb){
+    _wlPending.add(ticker);
     const { error } = adding
       ? await _sb.from('screener_watchlist').upsert({user_id:_currentUser.id, ticker})
       : await _sb.from('screener_watchlist').delete().eq('user_id',_currentUser.id).eq('ticker',ticker);
     // Signed in, saveWL skips the localStorage fallback — so a failed write meant
     // the star stayed lit and the change vanished on the next reload, silently.
+    _wlPending.delete(ticker);
     if(error){
       if(adding) watchlist.delete(ticker); else watchlist.add(ticker);
+      watchlistAddedAt.delete(ticker);
       toast('שמירת רשימת המעקב נכשלה');
       render();
     }
@@ -3510,11 +3540,16 @@ async function loadUserData(){
   // as "it's loading the stocks again". Only redraw when the server copy really
   // differs from what is already on screen.
   const wlBefore = [...watchlist].sort().join(',');
+  const wlBeforeSet = new Set(watchlist);
   const cvBefore = JSON.stringify(colVis);
 
   if(wlData) {
     watchlist = new Set(wlData.map(r=>r.ticker));
     watchlistAddedAt = new Map(wlData.map(r=>[r.ticker, (r.created_at||'').slice(0,10)]));
+    // Re-apply anything still being written. Without this a refresh triggered
+    // between the optimistic update and the DB round trip reverts the user's
+    // click — see _wlPending.
+    _wlPending.forEach(t=>{ wlBeforeSet.has(t) ? watchlist.add(t) : watchlist.delete(t); });
   }
   if(prefData?.col_vis) colVis = prefData.col_vis;
   if(!('adr' in colVis)) colVis.adr = true;
