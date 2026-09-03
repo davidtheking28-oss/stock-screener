@@ -2300,11 +2300,21 @@ function _toggleFilterPanel(headerEl){
   const panel = document.getElementById('filterPanel');
   const open = panel.classList.toggle('open');
   headerEl.setAttribute('aria-expanded', String(open));
+  // Opening the criteria panel is a screener action. On the watchlist tab
+  // .wl-mode collapses everything but the preset row, so expanding the header
+  // there revealed nothing and read as a dead click.
+  if(open && mode==='watch') setMode('screen');
 }
 
 const SCREENER_HEADS = {sepa:'טכני — Trend Template', power:'טכני — Power Play', vcp:'טכני — בסיס VCP', qulla:'טכני — Qullamaggie Breakout', finviz:'טכני — מומנטום שנתי', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
 function setScreener(key, applyDef=true){
   if(!SCREENERS[key]) return;
+  // Picking a screener means "show me this screen", so it leaves the watchlist.
+  // The criteria are collapsed under .wl-mode, so clicking a preset while on
+  // the מעקב tab changed only hidden markup and looked like nothing happened.
+  // applyDef is false for the two restore-time callers (saved prefs, boot),
+  // which must not yank a user who opened straight onto the watchlist.
+  if(applyDef && mode==='watch') setMode('screen');
   activeScreener=key;
   try{ localStorage.setItem('sepa_screener', key); }catch(e){}
   const cfg=SCREENERS[key], panel=$('filterPanel');
