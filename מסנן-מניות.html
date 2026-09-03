@@ -1033,9 +1033,14 @@ tbody tr:last-child td { border-bottom: none; }
   <!-- Results -->
   <div class="results-panel" id="resultsPanel" style="display:none">
     <div class="results-header">
-      <div class="src-tabs" role="tablist">
-        <button class="src-tab active" id="tabScreen" role="tab" aria-selected="true" onclick="setMode('screen')">תוצאות סריקה <span class="results-count" id="resCount"></span></button>
-        <button class="src-tab" id="tabWatch" role="tab" aria-selected="false" onclick="setMode('watch')">&#9733; מעקב <span class="results-count" id="wlCount"></span></button>
+      <div class="src-tabs">
+        <!-- Plain buttons + aria-selected, not role="tablist"/"tab": that pattern
+             sets an assistive-tech user's expectation of arrow-key navigation
+             and an aria-controls-linked panel, neither of which exists here (same
+             as #tabTable/#tabGallery below, which never claimed the role). A
+             half-built tab widget is worse than an honest button. -->
+        <button class="src-tab active" id="tabScreen" aria-selected="true" onclick="setMode('screen')">תוצאות סריקה <span class="results-count" id="resCount"></span></button>
+        <button class="src-tab" id="tabWatch" aria-selected="false" onclick="setMode('watch')">&#9733; מעקב <span class="results-count" id="wlCount"></span></button>
       </div>
       <div id="sectorWrap"></div>
       <div class="results-controls">
@@ -1295,6 +1300,13 @@ let _rawUniverse = null, _rawTime = 0, _rsMapMem = null;
 // three screeners that skip validateExact never set and which watchlist rows
 // never carry at all. Bumped wherever allResults/ttUniverse are replaced.
 let _dataGen = 0;
+// A separate counter for ttUniverse (the watchlist's data source). ttUniverse
+// and allResults/results change independently — starring a ticker only ever
+// touches ttUniverse, never results — but both render caches shared ONE
+// counter, so a star click bumped the SCREEN table's cache too and forced a
+// full rebuild of the scan table even though nothing in it had changed. Each
+// render cache picks whichever counter actually governs its own rows.
+let _wlDataGen = 0;
 let _commUniverse = null, _commTime = 0;
 const UNIVERSE_TTL = 15*60*1000;
 const SCAN_TIMEOUT = 30*1000;
@@ -1304,8 +1316,13 @@ let _currentUser = null;
 const _lsJSON = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch(e) { return fb; } };
 const _wlRaw = _lsJSON('sepa_wl', []);
 let watchlist  = new Set(Array.isArray(_wlRaw) ? _wlRaw : []);
-const _savedSort = _lsJSON('sepa_sort', null);
-let sortKey = _savedSort?.sortKey||'firstSeen', sortDir = _savedSort?.sortDir??-1;
+const _savedSortScreen = _lsJSON('sepa_sort_screen', null) || _lsJSON('sepa_sort', null);
+const _savedSortWatch  = _lsJSON('sepa_sort_watch',  null);
+let _sortByMode = {
+  screen: {key:_savedSortScreen?.sortKey||'score',     dir:_savedSortScreen?.sortDir??-1},
+  watch:  {key:_savedSortWatch?.sortKey||'firstSeen',  dir:_savedSortWatch?.sortDir??-1},
+};
+let sortKey = _sortByMode.screen.key, sortDir = _sortByMode.screen.dir;
 // Two independent axes, deliberately NOT one 'view' string: `mode` is which
 // list you are looking at (the scan's results vs. the saved watchlist),
 // `layout` is how it is drawn (table vs. cards). Folding both into one value
@@ -1892,17 +1909,29 @@ function _toastNext(){ if(!_toastQ.length){_toastBusy=false;return;} _toastBusy=
 // loadUserData() — which does `watchlist = new Set(serverRows)`. A removal
 // whose DELETE had not landed yet was silently restored by that read. This is
 // NOT the postMessage path, so _ssoApplied cannot guard it.
-const _wlPending = new Set();
+// A plain Set collapses two overlapping writes on the SAME ticker (star,
+// unstar, star again before the first resolves): the faster call's own
+// .delete(ticker) on completion would clear the ticker out from under the
+// still-in-flight slower call, reopening exactly the race this exists to
+// close. Keyed by a per-call token instead — "pending" means "the most
+// recent call for this ticker hasn't resolved yet", and a call's error
+// handler only reverts state if it is still that most recent call (a
+// superseded, since-resolved call reverting the ticker after a later click
+// already changed it would silently undo the user's actual final choice).
+const _wlPending = new Map();
+let _wlSeq = 0;
 async function saveWL(ticker, adding){
   if(_currentUser && _sb){
-    _wlPending.add(ticker);
+    const mySeq = ++_wlSeq;
+    _wlPending.set(ticker, mySeq);
     const { error } = adding
       ? await _sb.from('screener_watchlist').upsert({user_id:_currentUser.id, ticker})
       : await _sb.from('screener_watchlist').delete().eq('user_id',_currentUser.id).eq('ticker',ticker);
+    const isLatest = _wlPending.get(ticker)===mySeq;
+    if(isLatest) _wlPending.delete(ticker);
     // Signed in, saveWL skips the localStorage fallback — so a failed write meant
     // the star stayed lit and the change vanished on the next reload, silently.
-    _wlPending.delete(ticker);
-    if(error){
+    if(error && isLatest){
       if(adding) watchlist.delete(ticker); else watchlist.add(ticker);
       watchlistAddedAt.delete(ticker);
       toast('שמירת רשימת המעקב נכשלה');
@@ -1933,14 +1962,20 @@ function toggleWL(e, ticker){
   //     validateExact keeps mutating in place.
   // saveUniverseCache, or a reload restores the pre-star map and the row is
   // gone again — the exact bug this block exists to fix.
+  // _wlDataGen only needs to move when the ROW DATA actually changed (a new
+  // ttUniverse entry was just created) — not on every star click, and NOT the
+  // shared _dataGen: that counter also drives the SCREEN table's cache key, so
+  // bumping it here forced a full rebuild of the scan table too even though
+  // nothing in `results` had changed. The star-only patch further down in
+  // renderTable now handles the toggle itself without any cache-bust at all.
   if(adding && !ttUniverse[ticker]){
     const row=allResults.find(r=>r.ticker===ticker);
     if(row){
       ttUniverse[ticker]={...row, ttPass:undefined, scoreKind:'sepa', score:calcScore(row)};
       saveUniverseCache();
+      _wlDataGen++;
     }
   }
-  _dataGen++;
   saveWL(ticker, adding); render();
 }
 function copyTicker(e, ticker){
@@ -1951,10 +1986,19 @@ function copyTicker(e, ticker){
 /* ════════════════════════════════════
    UNIVERSE CACHE
 ════════════════════════════════════ */
+let _saveUniverseCacheTimer=null;
 function saveUniverseCache(){
-  try {
-    localStorage.setItem(UNIVERSE_CACHE_KEY, JSON.stringify({data:ttUniverse, time:Date.now()}));
-  } catch(e) {}
+  // ttUniverse holds every ticker the reference scan has ever passed this
+  // session (hundreds of rows), not just the watchlist — a star click paid a
+  // full JSON.stringify + localStorage.setItem of that whole object,
+  // synchronously on the main thread, on every click. Debounced, matching the
+  // filter panel's own saveFilterPrefs pattern.
+  clearTimeout(_saveUniverseCacheTimer);
+  _saveUniverseCacheTimer=setTimeout(()=>{
+    try {
+      localStorage.setItem(UNIVERSE_CACHE_KEY, JSON.stringify({data:ttUniverse, time:Date.now()}));
+    } catch(e) {}
+  }, 400);
 }
 
 function loadUniverseCache(){
@@ -2530,7 +2574,7 @@ async function scan(force=false){
     if(!isCommodities){
       ttUniverse = {};
       applyFilters(universe, rsMap, {skipFund:true, forceTickers:watchlist}).forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
-      _dataGen++;
+      _wlDataGen++;
       saveUniverseCache();
     }
     if(!wasResultsVisible) $('filterPanel')?.classList.remove('open');
@@ -2567,7 +2611,7 @@ async function scan(force=false){
     if(needsExact){
       validateExact(allResults, activeScreener).then(v=>{
         if(myToken!==_scanToken) return;   // superseded by a newer scan
-        allResults = v;
+        allResults = v; _dataGen++;
         // Every term of the VCP score reads r.vcp, which only exists after the
         // pass above annotated the row — scoring before it leaves the whole
         // screener ranked on RS and EPS alone.
@@ -2966,6 +3010,14 @@ const SORTS={
 };
 function sortRows(rows){ const f=SORTS[sortKey]||SORTS.score; return rows.sort((a,b)=>(f(a)>f(b)?1:f(a)<f(b)?-1:0)*sortDir); }
 function sortResults(){ sortRows(results); }
+// Swap in the sort state remembered for this mode. Called from applyView, so
+// switching tabs always shows each list under its own last (or default) order
+// instead of one shared key leaking between two populations with different
+// natural sorts.
+function _restoreSortForMode(){
+  const m=_sortByMode[mode==='watch'?'watch':'screen'];
+  sortKey=m.key; sortDir=m.dir;
+}
 
 // The single source of truth for "what is actually on screen right now" — the
 // count, the CSV export and the clipboard export all have to agree with the
@@ -2980,7 +3032,13 @@ function visibleRows(){
   if(!searchQuery) return base;
   return base.filter(r=>(r.ticker||'').includes(searchQuery)||(r.name||'').toUpperCase().includes(searchQuery));
 }
-function setSort(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k;sortDir=-1;} sortResults(); render(); try{localStorage.setItem('sepa_sort',JSON.stringify({sortKey,sortDir}));}catch(e){} }
+function setSort(k){
+  if(sortKey===k) sortDir*=-1; else {sortKey=k;sortDir=-1;}
+  const bucket=mode==='watch'?'watch':'screen';
+  _sortByMode[bucket]={key:sortKey,dir:sortDir};
+  sortResults(); render();
+  try{localStorage.setItem('sepa_sort_'+bucket,JSON.stringify({sortKey,sortDir}));}catch(e){}
+}
 
 function render(){
   // Each tab reports the size of ITS OWN source, in both modes and regardless
@@ -3025,6 +3083,7 @@ function setLayout(l){
 }
 function applyView(){
   const isWl = mode==='watch';
+  _restoreSortForMode(); sortResults();
   $('tabScreen')?.classList.toggle('active', !isWl);
   $('tabWatch') ?.classList.toggle('active',  isWl);
   $('tabScreen')?.setAttribute('aria-selected', String(!isWl));
@@ -3085,10 +3144,18 @@ function renderTable(rows){
   if(searchQuery) rows=rows.filter(r=>r.ticker.includes(searchQuery)||r.name.toUpperCase().includes(searchQuery));
   const tv=$('tableView');
   if(!rows.length){
-    const hint = allResults.length>0
+    // A search term matching nothing fell into the same branch as "the scan
+    // itself produced zero rows" — which, on the watchlist tab, told the user
+    // to try a wider sector or a looser filter, controls that don't even
+    // exist there (sectorWrap is hidden in watch mode). Search gets its own
+    // message, in both modes.
+    let hint;
+    if(searchQuery) hint='נקה את החיפוש כדי לראות את כל התוצאות';
+    else if(mode==='watch') hint='לחץ ☆ ליד מניה להוספה';
+    else hint = allResults.length>0
       ? 'הסקטור הנוכחי ריק — נסה "כל הסקטורים"'
       : 'נסה פריסט שמרני, הורד RS מינימום או הסר פילטרים פונדמנטליים';
-    tv.innerHTML=emptyHtml('אין תוצאות',hint); _tableKey=''; _tableResetWindow();
+    tv.innerHTML=emptyHtml(searchQuery?'לא נמצאה מניה תואמת':'אין תוצאות',hint); _tableKey=''; _tableResetWindow();
     return;
   }
 
@@ -3104,16 +3171,30 @@ function renderTable(rows){
   // "—" forever, the חדש badge never appeared, and (same bug) the "added on"
   // column would never fill in once checkAndSaveHistory resolved after the
   // first paint.
-  const _annot = rows.map(r => (r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')+(watchlistAddedAt.get(r.ticker)||'')).join('');
-  const _tKey = _dataGen+'|'+mode+'|'+layout+'|'+sortKey+'|'+sortDir+'|'+scKind+'|'
+  // watchlistAddedAt is deliberately NOT in this key — starring/unstarring a
+  // row used to change it, busting the cache and forcing a full innerHTML
+  // rebuild of the whole table on every single click (hundreds of rows
+  // regenerated: a visible flash, and the scroll position jumping). The
+  // star-only fast path below now also patches the "חדש" badge and the
+  // "נוסף למעקב" cell directly, so it no longer needs to be in the key.
+  const _annot = rows.map(r => (r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')).join('');
+  const _tKey = (mode==='watch'?_wlDataGen:_dataGen)+'|'+mode+'|'+layout+'|'+sortKey+'|'+sortDir+'|'+scKind+'|'
     +COL_DEFS.map(c=>colVis[c.key]?1:0).join('')+'|'+rows.map(r=>r.sym).join(',')+'|'+_annot;
   if(_tKey===_tableKey && tv.querySelector('tbody tr')){
-    tv.querySelectorAll('tbody .star-btn').forEach((btn,i)=>{
+    tv.querySelectorAll('tbody tr').forEach((tr,i)=>{
       const r=rows[i]; if(!r) return;
       const on=watchlist.has(r.ticker);
-      btn.className='star-btn '+(on?'on':'off');
-      btn.textContent=on?'★':'☆';
-      btn.setAttribute('aria-label', on?'הסר מרשימת מעקב':'הוסף לרשימת מעקב');
+      const btn=tr.querySelector('.star-btn');
+      if(btn){
+        btn.className='star-btn '+(on?'on':'off');
+        btn.textContent=on?'★':'☆';
+        btn.setAttribute('aria-label', on?'הסר מרשימת מעקב':'הוסף לרשימת מעקב');
+      }
+      const isNew = mode==='watch'
+        ? watchlistAddedAt.get(r.ticker)===new Date().toISOString().slice(0,10)
+        : newToday.has(r.ticker);
+      const badge=tr.querySelector('.new-badge'); if(badge) badge.style.display=isNew?'':'none';
+      const fs=tr.querySelector('.fs-val'); if(fs) fs.textContent=fmtFirstSeen(watchlistAddedAt.get(r.ticker));
     });
     return;
   }
@@ -3208,7 +3289,7 @@ function renderTable(rows){
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button>'
       +'</td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה">'+(isNew?'<span class="new-badge">חדש</span>':'')+r.ticker+earnB+ttB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div></td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה"><span class="new-badge" style="'+(isNew?'':'display:none')+'">חדש</span>'+r.ticker+earnB+ttB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
@@ -3232,7 +3313,7 @@ function renderTable(rows){
       +col('liq',    '<td><span class="mn">$'+fmtB(r.dollarVol)+'</span></td>')
       +col('mc',     '<td><span class="mn">'+fmtB(r.mc)+'</span></td>')
       +col('sector', '<td><span class="sector-tag">'+escHtml(String(r.sector||'').split(' ').slice(0,2).join(' '))+'</span></td>')
-      +col('firstSeen', '<td><span class="mn" style="color:var(--text3)">'+fmtFirstSeen(watchlistAddedAt.get(r.ticker))+'</span></td>')
+      +col('firstSeen', '<td><span class="mn fs-val" style="color:var(--text3)">'+fmtFirstSeen(watchlistAddedAt.get(r.ticker))+'</span></td>')
       +'</tr>';
   });
 
@@ -3281,10 +3362,10 @@ function renderGallery(srcRows){
   if(!rows.length){
     _ohlcDisposeAll(); g.innerHTML=emptyHtml('לא נמצאה מניה תואמת','נקה את החיפוש כדי לראות את כל הגרפים'); _galleryKey=''; return;
   }
-  const _key=_dataGen+'|'+(fromWatchlist?'wl|':'sc|')+rows.map(r=>r.sym).join(',')+'|'
+  const _key=(fromWatchlist?_wlDataGen:_dataGen)+'|'+(fromWatchlist?'wl|':'sc|')+rows.map(r=>r.sym).join(',')+'|'
     +rows.map(r=>(r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')).join('');
   if(_key===_galleryKey && g.querySelector('.gcard')){
-    g.querySelectorAll('.gcard .star-btn').forEach((btn,i)=>{ const r=rows[i]; if(!r) return; const on=watchlist.has(r.ticker); btn.className='star-btn '+(on?'on':'off'); btn.textContent=on?'★':'☆'; });
+    g.querySelectorAll('.gcard .star-btn').forEach((btn,i)=>{ const r=rows[i]; if(!r) return; const on=watchlist.has(r.ticker); btn.className='star-btn '+(on?'on':'off'); btn.textContent=on?'★':'☆'; btn.setAttribute('aria-label', on?'הסר מרשימת מעקב':'הוסף לרשימת מעקב'); });
     return;
   }
   _galleryKey=_key;
@@ -3308,7 +3389,7 @@ function renderGallery(srcRows){
     const rsC = rsHi?'var(--green)':rsMid?'var(--amber)':'var(--text3)';
     const rsBg = rsHi?'rgba(46,204,113,0.13)':rsMid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
     return '<div class="gcard" role="button" tabindex="0" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&event.target===this){event.preventDefault();openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')}">'
-      +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button>'
+      +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button>'
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
       +((earnB||ttB)?'<div class="gcard-tags">'+earnB+ttB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
@@ -3469,7 +3550,7 @@ document.addEventListener('keydown', e=>{
   // calls showSkeleton(), which writes placeholder rows straight into
   // #tableView — the user's watchlist table while on the מעקב tab.
   if(e.key==='r'&&!e.ctrlKey&&!e.metaKey){ e.preventDefault(); if(mode==='watch') setMode('screen'); scan(); return; }
-  if(e.key==='?'){ toast('j/k ניווט · w מעקב · r סריקה · Enter גרף · Esc סגור',4000); return; }
+  if(e.key==='?'){ toast(layout==='table' ? 'j/k ניווט · w מעקב · r סריקה · Enter גרף · Esc סגור' : 'r סריקה · Esc סגור',4000); return; }
   if(layout!=='table') return;
   // Skeleton placeholders are <tr>s too — without this filter j/k walks them and
   // Enter calls openChart(undefined,undefined,undefined).
@@ -3549,7 +3630,7 @@ async function loadUserData(){
     // Re-apply anything still being written. Without this a refresh triggered
     // between the optimistic update and the DB round trip reverts the user's
     // click — see _wlPending.
-    _wlPending.forEach(t=>{ wlBeforeSet.has(t) ? watchlist.add(t) : watchlist.delete(t); });
+    _wlPending.forEach((seq,t)=>{ wlBeforeSet.has(t) ? watchlist.add(t) : watchlist.delete(t); });
   }
   if(prefData?.col_vis) colVis = prefData.col_vis;
   if(!('adr' in colVis)) colVis.adr = true;
@@ -3564,7 +3645,7 @@ async function loadUserData(){
     ttUniverse = {};
     applyFilters(_rawUniverse, _rsMapMem, {skipFund:true, forceTickers:watchlist})
       .forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
-    saveUniverseCache(); _dataGen++;
+    saveUniverseCache(); _wlDataGen++;
   }
   const cvChanged = JSON.stringify(colVis) !== cvBefore;
   if(!wlChanged && !cvChanged) return;
