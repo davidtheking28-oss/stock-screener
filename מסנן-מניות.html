@@ -215,9 +215,15 @@ body {
 .filter-panel.open .filter-arrow { transform: rotate(180deg); }
 .filter-body {
   max-height: 0; overflow: hidden; padding: 0 20px;
-  transition: max-height 0.28s var(--ease-out-strong), padding-bottom 0.28s;
+  transition: max-height 0.28s var(--ease-out-strong), padding-bottom 0.28s, padding-top 0.28s;
 }
-.filter-panel.open .filter-body { max-height: 700px; padding-bottom: 18px; }
+/* Measured at 0px of clearance between the header's box and the first
+   screener button — the header text and the button row read as one crowded
+   block ("it sits on top of the other one"). The header keeps its own
+   padding; the body gets the separation, and a hairline marks where the
+   header ends, but only while open so the collapsed panel stays one clean bar. */
+.filter-panel.open .filter-body { max-height: 700px; padding-top: 16px; padding-bottom: 18px; }
+.filter-panel.open .filter-header { border-bottom: 1px solid var(--border2); }
 
 @keyframes termReveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .filter-panel.open .screeners { animation: termReveal .32s ease-out both; }
@@ -795,6 +801,11 @@ tbody tr:last-child td { border-bottom: none; }
   margin-right: 5px; vertical-align: middle;
 }
 .earn-badge.soon { color: var(--amber); background: rgba(245,185,74,0.12); border-color: rgba(245,185,74,0.3); }
+.wl-missing {
+  padding: 9px 18px; border-top: 1px solid var(--border);
+  font: 500 11px var(--sans); color: var(--text3); line-height: 1.7;
+}
+.wl-missing b { color: var(--text2); font-family: var(--mono); font-weight: 600; }
 .tt-badge {
   display: inline-block; font: 700 9px var(--sans); color: var(--text3);
   background: var(--fill2); border: 1px dashed var(--border);
@@ -1025,6 +1036,7 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
     </div>
     <div id="sectorStrength" class="sector-strength"></div>
+    <div id="wlMissing" class="wl-missing" style="display:none"></div>
     <div id="tableView" class="table-wrap"></div>
     <div id="galleryView" class="gallery" style="display:none"></div>
   </div>
@@ -1256,6 +1268,13 @@ function _restoreScroll(){
 let allResults = [], results = [], ttUniverse = {};
 let _scanToken = 0;
 let _rawUniverse = null, _rawTime = 0, _rsMapMem = null;
+// Both render caches key on the SYMBOL LIST, not on the rows' contents, so a
+// rescan that returns the same tickers repainted nothing — prices, RS and
+// scores stayed on the previous scan's numbers while the clock updated. It
+// only ever busted by accident, via the vcp/rsLine annotations, which the
+// three screeners that skip validateExact never set and which watchlist rows
+// never carry at all. Bumped wherever allResults/ttUniverse are replaced.
+let _dataGen = 0;
 let _commUniverse = null, _commTime = 0;
 const UNIVERSE_TTL = 15*60*1000;
 const SCAN_TIMEOUT = 30*1000;
@@ -1282,7 +1301,14 @@ try {
   }
   mode   = localStorage.getItem('sepa_mode')   || mode;
   layout = localStorage.getItem('sepa_layout') || layout;
+  localStorage.removeItem('sepa_view');
 } catch(e){}
+// Same guard activeScreener already has. An unrecognised `mode` degrades
+// harmlessly (everything tests === 'watch'), but an unrecognised `layout` sets
+// BOTH containers to display:none while render() still paints into #tableView —
+// a permanently blank results area.
+if(mode!=='watch')      mode='screen';
+if(layout!=='gallery')  layout='table';
 let _galleryKey = '', _tableKey = '';
 let _tableRows = [], _tableAt = 0;
 let _tableToken = 0, _galleryToken = 0;
@@ -1865,12 +1891,26 @@ function toggleWL(e, ticker){
   else watchlistAddedAt.delete(ticker);
   // ttUniverse is only rebuilt by a scan, so a name starred after the last one
   // had no row and vanished from the watchlist until the next scan. Carry the
-  // row over from the results it was starred from. ttPass is left undefined —
-  // unknown, not "fails" — so no "מחוץ למגמה" badge gets invented for it.
+  // row over from the results it was starred from — but as a COPY, with the
+  // screener-specific fields neutralised:
+  //   · ttPass on an allResults row means "passed the ACTIVE screener", not the
+  //     Trend Template. Copying it verbatim asserted a Qullamaggie/growth pass
+  //     as a Trend Template pass, in the badge and in the stat bar's counter.
+  //     undefined = not measured yet, which is the truth until the next scan.
+  //   · scoreKind drives the whole column's header (renderTable reads row 0),
+  //     so one qulla-stamped row could relabel a column of SEPA scores.
+  //   · the spread also breaks the alias with the allResults row, which
+  //     validateExact keeps mutating in place.
+  // saveUniverseCache, or a reload restores the pre-star map and the row is
+  // gone again — the exact bug this block exists to fix.
   if(adding && !ttUniverse[ticker]){
     const row=allResults.find(r=>r.ticker===ticker);
-    if(row) ttUniverse[ticker]=row;
+    if(row){
+      ttUniverse[ticker]={...row, ttPass:undefined, scoreKind:'sepa', score:calcScore(row)};
+      saveUniverseCache();
+    }
   }
+  _dataGen++;
   saveWL(ticker, adding); render();
 }
 function copyTicker(e, ticker){
@@ -1910,7 +1950,7 @@ function loadResultsCache(){
     const {allResults:ar, scr, time, nt} = JSON.parse(raw);
     if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(RESULTS_CACHE_KEY); return; }
     if(scr && scr !== activeScreener) return;
-    allResults = ar;
+    allResults = ar; _dataGen++;
     if(Array.isArray(nt) && new Date(time).toDateString()===new Date().toDateString()) newToday = new Set(nt);
     applySectorFilter(); sortResults();
     $('resultsPanel').style.display='block';
@@ -2453,13 +2493,14 @@ async function scan(force=false){
       $('breadthChip').classList.add('show');
     }
 
-    allResults = applyFilters(universe, rsMap);
+    allResults = applyFilters(universe, rsMap); _dataGen++;
     allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
     const needsExact = activeScreener==='sepa' || activeScreener==='power' || activeScreener==='qulla' || activeScreener==='vcp';
 
     if(!isCommodities){
       ttUniverse = {};
       applyFilters(universe, rsMap, {skipFund:true, forceTickers:watchlist}).forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
+      _dataGen++;
       saveUniverseCache();
     }
     if(!wasResultsVisible) $('filterPanel')?.classList.remove('open');
@@ -2912,13 +2953,30 @@ function visibleRows(){
 function setSort(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k;sortDir=-1;} sortResults(); render(); try{localStorage.setItem('sepa_sort',JSON.stringify({sortKey,sortDir}));}catch(e){} }
 
 function render(){
-  const shown=visibleRows().length;
-  // Each source tab carries its own count, so the one you are NOT on still
-  // says how much is waiting there.
-  $('resCount').textContent='('+(mode==='screen'?shown:results.length)+')';
-  const wc=$('wlCount'); if(wc) wc.textContent='('+(mode==='watch'?shown:watchlist.size)+')';
+  // Each tab reports the size of ITS OWN source, in both modes and regardless
+  // of the search box. Making the active tab show the filtered count instead
+  // meant the מעקב count changed the instant you clicked it (16 -> 0 before the
+  // first scan), which reads as the list having just been emptied.
+  $('resCount').textContent='('+results.length+')';
+  const wc=$('wlCount'); if(wc) wc.textContent='('+watchlist.size+')';
   if(mode==='watch') layout==='gallery' ? renderWatchlistGallery() : renderWatchlist();
   else               layout==='gallery' ? renderGallery()          : renderTable();
+  _renderWlMissing();
+}
+
+// forceTickers can only rescue a ticker that is still IN the scanned universe.
+// A watchlist name that falls under $2, drops below $50M market cap or leaves
+// AMEX/NASDAQ/NYSE is filtered out before applyFilters ever sees it, so it has
+// no row and .filter(Boolean) drops it — silently, which is exactly the case
+// the decouple was meant to cover. Name them instead of losing them.
+function _renderWlMissing(){
+  const el=$('wlMissing'); if(!el) return;
+  const missing = mode==='watch' ? [...watchlist].filter(t=>!ttUniverse[t]) : [];
+  if(!missing.length){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='';
+  el.innerHTML='במעקב ללא נתונים מהסריקה האחרונה: '
+    +missing.map(t=>'<b>'+escHtml(t)+'</b>').join(', ')
+    +' · ייתכן שירדו מתחת לסף המחיר/שווי השוק של הסריקה או עברו בורסה.';
 }
 
 function setMode(m){
@@ -2966,11 +3024,12 @@ function syncStatBar(){
   const sb=$('statBar'); if(!sb) return;
   if(mode==='watch'){
     if(_scanStatHtml===''&&sb.innerHTML) _scanStatHtml=sb.innerHTML;
-    const shown=visibleRows().length;
-    // The watchlist is no longer cut down to the Trend Template, so this counts
-    // how many of the names shown pass it instead of implying the rest don't exist.
-    const tt=[...watchlist].filter(t=>ttUniverse[t] && ttUniverse[t].ttPass!==false).length;
-    sb.innerHTML='<b>'+shown+'</b> במעקב \xb7 <b>'+tt+'</b> עוברות את ה-Trend Template';
+    // Both numbers off the SAME array. Counting `shown` from visibleRows (search
+    // filtered) and `tt` from the whole watchlist produced "2 במעקב · 11 עוברות"
+    // the moment anything was typed in the search box.
+    const rows=visibleRows();
+    const tt=rows.filter(r=>r.ttPass!==false).length;
+    sb.innerHTML='<b>'+rows.length+'</b> במעקב \xb7 <b>'+tt+'</b> עוברות את ה-Trend Template';
   } else {
     // Assigning even when empty: entering the watchlist before any scan left
     // the watchlist summary stuck in the topbar after switching back, because
@@ -3016,7 +3075,7 @@ function renderTable(rows){
   // column would never fill in once checkAndSaveHistory resolved after the
   // first paint.
   const _annot = rows.map(r => (r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')+(watchlistAddedAt.get(r.ticker)||'')).join('');
-  const _tKey = mode+'|'+layout+'|'+sortKey+'|'+sortDir+'|'+scKind+'|'
+  const _tKey = _dataGen+'|'+mode+'|'+layout+'|'+sortKey+'|'+sortDir+'|'+scKind+'|'
     +COL_DEFS.map(c=>colVis[c.key]?1:0).join('')+'|'+rows.map(r=>r.sym).join(',')+'|'+_annot;
   if(_tKey===_tableKey && tv.querySelector('tbody tr')){
     tv.querySelectorAll('tbody .star-btn').forEach((btn,i)=>{
@@ -3192,7 +3251,7 @@ function renderGallery(srcRows){
   if(!rows.length){
     _ohlcDisposeAll(); g.innerHTML=emptyHtml('לא נמצאה מניה תואמת','נקה את החיפוש כדי לראות את כל הגרפים'); _galleryKey=''; return;
   }
-  const _key=(fromWatchlist?'wl|':'sc|')+rows.map(r=>r.sym).join(',')+'|'
+  const _key=_dataGen+'|'+(fromWatchlist?'wl|':'sc|')+rows.map(r=>r.sym).join(',')+'|'
     +rows.map(r=>(r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')).join('');
   if(_key===_galleryKey && g.querySelector('.gcard')){
     g.querySelectorAll('.gcard .star-btn').forEach((btn,i)=>{ const r=rows[i]; if(!r) return; const on=watchlist.has(r.ticker); btn.className='star-btn '+(on?'on':'off'); btn.textContent=on?'★':'☆'; });
@@ -3203,6 +3262,11 @@ function renderGallery(srcRows){
   const cards=rows.map(r=>{
     const wl=watchlist.has(r.ticker);
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
+    // The same badge renderTable draws. Without it a watchlist name that fails
+    // the Trend Template looked identical to one that passes, as soon as you
+    // switched the watchlist to גרפים.
+    const ttB = (fromWatchlist && r.ttPass===false)
+      ? '<span class="tt-badge" title="במעקב, אך אינה עוברת כרגע את ה-Trend Template">מחוץ למגמה</span>' : '';
     const priceStr = r.close>=100 ? Math.round(r.close).toLocaleString('en-US') : r.close.toFixed(2);
     const stat=(lbl,v,tip)=>{
       const up=(v??0)>=0, cls=up?'pos':'neg';
@@ -3216,7 +3280,7 @@ function renderGallery(srcRows){
     return '<div class="gcard" role="button" tabindex="0" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&event.target===this){event.preventDefault();openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')}">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')">'+(wl?'★':'☆')+'</button>'
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
-      +(earnB?'<div class="gcard-tags">'+earnB+'</div>':'')+'</div></div>'
+      +((earnB||ttB)?'<div class="gcard-tags">'+earnB+ttB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span></div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
@@ -3266,7 +3330,10 @@ function renderWatchlist(){
   // used to render in the Set's insertion order while the header arrow flipped.
   const wlRows=sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean));
   if(!wlRows.length){
-    $('tableView').innerHTML=emptyHtml('המניות במעקב לא עוברות את תנאי ה-Trend Template','בדוק את הפילטרים הטכניים או סרוק שנית');
+    // Since the decouple a failing name is KEPT (tagged ttPass:false), so this
+    // branch can only mean "no data for any of them" — not "they all failed".
+    // The old text sent the user to the technical filters, which cannot help.
+    $('tableView').innerHTML=emptyHtml('אין נתונים למניות שברשימת המעקב','סרוק את השוק כדי למשוך נתונים עדכניים');
     return;
   }
   renderTable(wlRows);
@@ -3349,8 +3416,13 @@ function exportCSV(){
 function exportTickers(){
   // Watchlist entries with no ttUniverse row aren't rendered, but they're still
   // the user's tickers — keep the fallback so copy doesn't silently drop them.
+  // The fallback keeps watchlist entries that have no ttUniverse row (they are
+  // still the user's tickers), but it must still honour the search box, or
+  // "העתק רשימה" copies the whole list while three rows are on screen.
+  const q=searchQuery;
   const src = mode==='watch'
-    ? [...watchlist].map(t=>ttUniverse[t]?.sym||t)
+    ? [...watchlist].filter(t=>!q||t.includes(q)||(ttUniverse[t]?.name||'').toUpperCase().includes(q))
+                    .map(t=>ttUniverse[t]?.sym||t)
     : visibleRows().map(r=>r.sym);
   if(!src.length){ toast('אין מניות להעתקה'); return; }
   navigator.clipboard?.writeText(src.join(',')).then(()=>toast(src.length+' טיקרים הועתקו ✓ מוכן להדבקה ב-TradingView'));
@@ -3363,7 +3435,10 @@ document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){ closeModal(); closeAuthModal(); return; }
   const tag=document.activeElement?.tagName;
   if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA') return;
-  if(e.key==='r'&&!e.ctrlKey&&!e.metaKey){ e.preventDefault(); scan(); return; }
+  // Leaving watch mode first, like every other screener entry point: scan()
+  // calls showSkeleton(), which writes placeholder rows straight into
+  // #tableView — the user's watchlist table while on the מעקב tab.
+  if(e.key==='r'&&!e.ctrlKey&&!e.metaKey){ e.preventDefault(); if(mode==='watch') setMode('screen'); scan(); return; }
   if(e.key==='?'){ toast('j/k ניווט · w מעקב · r סריקה · Enter גרף · Esc סגור',4000); return; }
   if(layout!=='table') return;
   // Skeleton placeholders are <tr>s too — without this filter j/k walks them and
@@ -3377,8 +3452,12 @@ document.addEventListener('keydown', e=>{
   } else if(e.key==='w'&&activeRow>=0&&rows[activeRow]){
     const ticker=rows[activeRow].dataset.ticker; if(!ticker) return;
     const adding=!watchlist.has(ticker);
-    adding?watchlist.add(ticker):watchlist.delete(ticker);
-    saveWL(ticker,adding); render();
+    // Must go through toggleWL, not re-implement it: this branch used to update
+    // only the Set, skipping watchlistAddedAt (so "נוסף למעקב" stayed "—", the
+    // חדש badge never fired and the firstSeen sort ranked it last) and the
+    // ttUniverse row-copy (so the name had no row on the מעקב tab at all until
+    // the next scan). The star button and the w key have to mean the same thing.
+    toggleWL({stopPropagation(){}}, ticker);
     toast((adding?'נוסף':'הוסר')+' ממעקב: '+ticker);
     return;
   } else return;
@@ -3412,8 +3491,10 @@ async function initAuth(){
       watchlist = new Set(Array.isArray(wl) ? wl : []);
       colVis = _lsJSON('sepa_colvis', null) || Object.fromEntries(COL_DEFS.map(c=>[c.key,c.defaultOn]));
       buildColPicker();
-      _tableKey=''; _galleryKey='';
-      if(allResults.length) render();
+      _tableKey=''; _galleryKey=''; _dataGen++;
+      // Same reasoning as loadUserData above — signing out while on מעקב with
+      // no scan this session left the server-side rows painted on screen.
+      if(allResults.length || mode==='watch') applyView();
     }
   });
 }
@@ -3439,6 +3520,17 @@ async function loadUserData(){
   if(!('adr' in colVis)) colVis.adr = true;
 
   const wlChanged = [...watchlist].sort().join(',') !== wlBefore;
+  // The watchlist arrives from Supabase AFTER boot, and nothing awaits it — a
+  // scan started in that window (button, or the r hotkey) built ttUniverse with
+  // forceTickers pointing at an empty Set, so every failing watchlist name was
+  // dropped again and the truncated map was cached for 24h. Rebuild it here
+  // whenever the set actually changed and the raw universe is still in memory.
+  if(wlChanged && _rawUniverse && _rsMapMem){
+    ttUniverse = {};
+    applyFilters(_rawUniverse, _rsMapMem, {skipFund:true, forceTickers:watchlist})
+      .forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
+    saveUniverseCache(); _dataGen++;
+  }
   const cvChanged = JSON.stringify(colVis) !== cvBefore;
   if(!wlChanged && !cvChanged) return;
 
@@ -3447,7 +3539,12 @@ async function loadUserData(){
   // The watchlist renders from ttUniverse, not from a scan, so gating this on
   // allResults left a signed-in user sitting on the מעקב tab with an empty list
   // until they ran a scan.
-  if(allResults.length || mode==='watch'){ syncStatBar(); render(); }
+  // applyView, not render: #resultsPanel is authored display:none and the ONLY
+  // thing that reveals it in watch mode is applyView. Boot's applyView sees an
+  // empty local watchlist (saveWL writes sepa_wl only when signed OUT), so a
+  // signed-in user landing on מעקב got the watchlist drawn inside a panel that
+  // was still hidden — a blank page. This is the path the journal iframe takes.
+  if(allResults.length || mode==='watch') applyView();
 }
 
 function updateAuthUI(){
