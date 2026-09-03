@@ -1073,11 +1073,11 @@ tbody tr:last-child td { border-bottom: none; }
 </main>
 
 <!-- Modal -->
-<div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" onclick="if(event.target===this)closeModal()">
   <div class="modal-box">
     <div class="modal-head">
       <div><div class="modal-ticker" id="modalTitle"></div><div class="modal-name" id="modalSub"></div></div>
-      <button class="modal-close" onclick="closeModal()">&#10005;</button>
+      <button class="modal-close" onclick="closeModal()" aria-label="סגור">&#10005;</button>
     </div>
     <div id="modalChart"></div>
   </div>
@@ -3062,9 +3062,16 @@ function _renderWlMissing(){
   const missing = mode==='watch' ? [...watchlist].filter(t=>!ttUniverse[t]) : [];
   if(!missing.length){ el.style.display='none'; el.innerHTML=''; return; }
   el.style.display='';
+  // Two different reasons look identical (no ttUniverse row) but call for
+  // different text: _rawUniverse is only ever set once a scan has actually
+  // completed this session (or been restored from cache) — before that, a
+  // missing row just means "not scanned yet", not "fell out of the universe".
+  const reason = _rawUniverse
+    ? ' · ייתכן שירדו מתחת לסף המחיר/שווי השוק של הסריקה או עברו בורסה.'
+    : ' · סרוק את השוק כדי למשוך עבורן נתונים.';
   el.innerHTML='במעקב ללא נתונים מהסריקה האחרונה: '
     +missing.map(t=>'<b>'+escHtml(t)+'</b>').join(', ')
-    +' · ייתכן שירדו מתחת לסף המחיר/שווי השוק של הסריקה או עברו בורסה.';
+    +reason;
 }
 
 function setMode(m){
@@ -3189,6 +3196,7 @@ function renderTable(rows){
         btn.className='star-btn '+(on?'on':'off');
         btn.textContent=on?'★':'☆';
         btn.setAttribute('aria-label', on?'הסר מרשימת מעקב':'הוסף לרשימת מעקב');
+        btn.setAttribute('aria-pressed', String(on));
       }
       const isNew = mode==='watch'
         ? watchlistAddedAt.get(r.ticker)===new Date().toISOString().slice(0,10)
@@ -3287,7 +3295,7 @@ function renderTable(rows){
       ? '<span class="tt-badge" title="במעקב, אך אינה עוברת כרגע את ה-Trend Template">מחוץ למגמה</span>' : '';
     const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
-      +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button>'
+      +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
       +'</td>'
       +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה"><span class="new-badge" style="'+(isNew?'':'display:none')+'">חדש</span>'+r.ticker+earnB+ttB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div></td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
@@ -3365,7 +3373,7 @@ function renderGallery(srcRows){
   const _key=(fromWatchlist?_wlDataGen:_dataGen)+'|'+(fromWatchlist?'wl|':'sc|')+rows.map(r=>r.sym).join(',')+'|'
     +rows.map(r=>(r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')).join('');
   if(_key===_galleryKey && g.querySelector('.gcard')){
-    g.querySelectorAll('.gcard .star-btn').forEach((btn,i)=>{ const r=rows[i]; if(!r) return; const on=watchlist.has(r.ticker); btn.className='star-btn '+(on?'on':'off'); btn.textContent=on?'★':'☆'; btn.setAttribute('aria-label', on?'הסר מרשימת מעקב':'הוסף לרשימת מעקב'); });
+    g.querySelectorAll('.gcard .star-btn').forEach((btn,i)=>{ const r=rows[i]; if(!r) return; const on=watchlist.has(r.ticker); btn.className='star-btn '+(on?'on':'off'); btn.textContent=on?'★':'☆'; btn.setAttribute('aria-label', on?'הסר מרשימת מעקב':'הוסף לרשימת מעקב'); btn.setAttribute('aria-pressed', String(on)); });
     return;
   }
   _galleryKey=_key;
@@ -3389,7 +3397,7 @@ function renderGallery(srcRows){
     const rsC = rsHi?'var(--green)':rsMid?'var(--amber)':'var(--text3)';
     const rsBg = rsHi?'rgba(46,204,113,0.13)':rsMid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
     return '<div class="gcard" role="button" tabindex="0" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&event.target===this){event.preventDefault();openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')}">'
-      +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'">'+(wl?'★':'☆')+'</button>'
+      +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
       +((earnB||ttB)?'<div class="gcard-tags">'+earnB+ttB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
@@ -3466,7 +3474,9 @@ function renderWatchlistGallery(){
 /* ════════════════════════════════════
    MODAL
 ════════════════════════════════════ */
+let _modalReturnFocus=null;
 function openChart(sym, ticker, name){
+  _modalReturnFocus=document.activeElement;
   $('modalTitle').textContent=ticker; $('modalSub').textContent=name;
   const wrap=$('modalChart'); wrap.innerHTML='';
   const config=JSON.stringify({
@@ -3486,8 +3496,18 @@ function openChart(sym, ticker, name){
   iframe.srcdoc=html;
   wrap.appendChild(iframe);
   $('modal').classList.add('open');
+  // Move focus into the modal so a keyboard/screen-reader user isn't left
+  // behind on a row button that's now covered by the dialog; the close button
+  // is the one native, always-present, always-actionable target inside it.
+  document.querySelector('#modal .modal-close')?.focus();
 }
-function closeModal(){ $('modal').classList.remove('open'); $('modalChart').innerHTML=''; }
+function closeModal(){
+  $('modal').classList.remove('open'); $('modalChart').innerHTML='';
+  // Return focus to whatever opened the modal (a table row, a gallery card),
+  // instead of leaving it on the now-hidden close button.
+  if(_modalReturnFocus && document.contains(_modalReturnFocus)) _modalReturnFocus.focus();
+  _modalReturnFocus=null;
+}
 
 /* ════════════════════════════════════
    EXPORT
