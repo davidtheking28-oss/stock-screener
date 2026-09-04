@@ -1316,9 +1316,24 @@ let _currentUser = null;
 const _lsJSON = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch(e) { return fb; } };
 const _wlRaw = _lsJSON('sepa_wl', []);
 let watchlist  = new Set(Array.isArray(_wlRaw) ? _wlRaw : []);
-const _savedSortScreen = _lsJSON('sepa_sort_screen', null) || _lsJSON('sepa_sort', null);
+// 'firstSeen' is the date a stock was starred — a watchlist concept. The old
+// shared 'sepa_sort' key was defaulted to it (for the watchlist's sake) back
+// when ONE sort served both tabs, so inheriting it into screen mode silently
+// ordered the scan by a column that is empty for nearly every scan row —
+// i.e. no ranking at all, which is the "not strongest to weakest" report.
+// A deliberate click on that column while on the scan tab still sticks; only
+// the inherited legacy value is refused. The legacy key is then dropped so it
+// can never come back.
+const _legacySort = _lsJSON('sepa_sort', null);
+const _legacyScreenSort = (_legacySort && _legacySort.sortKey!=='firstSeen') ? _legacySort : null;
+try { localStorage.removeItem('sepa_sort'); } catch(e){}
+const _savedSortScreen = _lsJSON('sepa_sort_screen', null) || _legacyScreenSort;
 const _savedSortWatch  = _lsJSON('sepa_sort_watch',  null);
 let _sortByMode = {
+  // The SEPA score IS the "strongest first" ranking the screener is for:
+  // RS 35% + EPS 25% + revenue 15% + proximity to the 52w high 15% + yearly
+  // performance 10% (each screener's own calcScore branch weights its own
+  // thesis first, fundamentals second).
   screen: {key:_savedSortScreen?.sortKey||'score',     dir:_savedSortScreen?.sortDir??-1},
   watch:  {key:_savedSortWatch?.sortKey||'firstSeen',  dir:_savedSortWatch?.sortDir??-1},
 };
