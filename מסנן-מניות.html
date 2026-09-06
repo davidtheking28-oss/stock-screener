@@ -186,17 +186,10 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--r4);
   margin-bottom: var(--s4);
-  overflow: hidden;
-  /* Reverted sticky positioning (2026-09-02, same day) — it collided with
-     the results table's own sticky thead (also top:54px). The filter panel
-     is OPEN by default (432px), so sticking it pinned that whole height and
-     pushed thead to render under it, covering the first data row. thead
-     activates its own sticking only once scrolled well past where this
-     panel's short container has already scrolled fully out of view, so a
-     stacked offset (topbar + filter-header height) just traded the overlap
-     for a gap instead. Making the filter panel reachable while scrolled
-     into results needs a different approach (e.g. JS toggling thead's
-     offset), not a plain sticky flag — not attempted here. */
+  /* overflow:hidden used to live here to clip the header/body to the panel's
+     rounded corners, which also made it the sticky containing block for any
+     sticky descendant (see .filter-header below) — same trap documented on
+     .results-panel. Corners are clipped per-child instead. */
   position: relative;
 }
 .filter-header {
@@ -206,8 +199,25 @@ body {
   padding: 13px 20px;
   cursor: pointer;
   user-select: none;
+  background: var(--surface);
+  border-radius: var(--r4) var(--r4) 0 0;
+  border-bottom: 1px solid var(--border2);
+  /* Sticks the collapse toggle under the topbar so filters stay reachable
+     while scrolled into the results table, instead of only while the panel's
+     own (open) height happens to still be on screen. Only the header sticks —
+     not the whole panel — so a long open filter body still scrolls normally.
+     Desktop only: thead's own sticky offset above is dynamically bumped by
+     this element's height (see the ResizeObserver near _toggleFilterPanel);
+     mobile has its own scroll-container sticky mechanism for thead (see the
+     680px media query) that this doesn't touch. Reverted once already
+     (2026-09-02) for colliding with thead at a fixed top:54px — this time
+     thead's offset is computed, not guessed. */
+  position: sticky;
+  top: 54px;
+  z-index: 30;
 }
 .filter-header:hover { background: var(--fill); }
+.filter-body { border-radius: 0 0 var(--r4) var(--r4); }
 .filter-title { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 700; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; }
 .filter-title::before { content: ''; width: 3px; height: 11px; border-radius: 1px; background: var(--accent2); flex-shrink: 0; }
 .filter-sub { font-size: 11px; color: var(--text3); }
@@ -223,7 +233,6 @@ body {
    padding; the body gets the separation, and a hairline marks where the
    header ends, but only while open so the collapsed panel stays one clean bar. */
 .filter-panel.open .filter-body { max-height: 700px; padding-top: 16px; padding-bottom: 18px; }
-.filter-panel.open .filter-header { border-bottom: 1px solid var(--border2); }
 
 @keyframes termReveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .filter-panel.open .screeners { animation: termReveal .32s ease-out both; }
@@ -570,7 +579,11 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: co
 @media (max-width: 680px) { .table-wrap { overflow-x: auto; } }
 table { width: 100%; border-collapse: separate; border-spacing: 0; }
 thead th {
-  position: sticky; top: 54px; z-index: 2;
+  /* --thead-top is topbar height (54px) + the sticky filter-header's own
+     measured height, kept live by a ResizeObserver (see _toggleFilterPanel).
+     A hardcoded 54px here collided with the header sticking at the same
+     offset — both position:sticky elements racing for the same pixel row. */
+  position: sticky; top: var(--thead-top, 54px); z-index: 2;
   background: var(--bg2); color: var(--text3);
   font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: 0.5px;
   padding: 10px 11px; text-align: right; cursor: pointer; white-space: nowrap;
@@ -760,6 +773,11 @@ tbody tr:last-child td { border-bottom: none; }
      Inside its own scroller the offset must be 0; the 54px only makes sense
      when thead sticks against the page, under the topbar. */
   thead th { font-size: 10px; padding: 8px 7px; top: 0; }
+  /* Mobile's topbar height is variable (auto, min 54px) and thead sticks
+     against .table-wrap's own scrollport here, not the page — the desktop
+     top-offset math above doesn't apply, so the header just scrolls away
+     normally rather than risk sticking at the wrong offset. */
+  .filter-header { position: static; }
   tbody td { padding: 7px 7px; }
   .gallery { grid-template-columns: 1fr; }
   /* Sticky star + ticker columns so they stay visible when scrolling horizontally */
@@ -2447,6 +2465,38 @@ function renderMyPresets(){
     '<span class="preset-x" role="button" tabindex="0" onclick="deleteMyPreset(event,'+JSON.stringify(n).replace(/"/g,'&quot;')+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();deleteMyPreset(event,'+JSON.stringify(n).replace(/"/g,'&quot;')+')}" title="מחק">✕</span></button>'
   ).join('');
 }
+
+// Keeps --thead-top (thead's sticky offset) in sync with the sticky
+// filter-header. position:sticky never lets an element escape its own
+// parent's box, so .filter-header (nested in the much shorter .filter-panel)
+// only stays stuck for the first ~panel-height of scroll — past that it
+// scrolls away with .filter-panel like any static content, same as thead
+// would if it had no offset at all. A flat "topbar + header height" offset
+// (what the first version of this fix used) is therefore only correct until
+// that point; past it, thead would still reserve empty space for a header
+// that is no longer there — the exact "gap instead of overlap" this was
+// reverted for once already. An IntersectionObserver on .filter-panel itself
+// tells us which of the two states we're in: watched with a rootMargin equal
+// to the sticky offset, it stops intersecting at the precise scroll position
+// where .filter-panel's bottom edge passes above the header's stuck
+// position — the same instant native sticky detaches the header.
+(function _watchFilterHeaderHeight(){
+  const el = document.querySelector('.filter-header');
+  const panel = document.querySelector('.filter-panel');
+  if(!el || !panel) return;
+  let headerH = el.offsetHeight;
+  let stuck = true;
+  let io;
+  const apply = () => document.documentElement.style.setProperty('--thead-top', (54 + (stuck ? headerH : 0)) + 'px');
+  const setupObserver = () => {
+    if(io) io.disconnect();
+    io = new IntersectionObserver((entries) => { stuck = entries[0].isIntersecting; apply(); }, { rootMargin: `-${54 + headerH}px 0px 0px 0px`, threshold: 0 });
+    io.observe(panel);
+  };
+  new ResizeObserver(() => { headerH = el.offsetHeight; apply(); setupObserver(); }).observe(el);
+  setupObserver();
+  apply();
+})();
 
 function _toggleFilterPanel(headerEl){
   const panel = document.getElementById('filterPanel');
