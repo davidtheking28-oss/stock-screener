@@ -2032,13 +2032,16 @@ function saveResultsCache(){
   } catch(e){}
 }
 
+// Returns whether a cached scan for the CURRENT activeScreener was actually
+// applied — setScreener uses this to tell "nothing to restore" from "restored
+// instantly" when switching screeners.
 function loadResultsCache(){
   try {
     const raw = localStorage.getItem(RESULTS_CACHE_KEY);
-    if(!raw) return;
+    if(!raw) return false;
     const {allResults:ar, scr, time, nt} = JSON.parse(raw);
-    if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(RESULTS_CACHE_KEY); return; }
-    if(scr && scr !== activeScreener) return;
+    if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(RESULTS_CACHE_KEY); return false; }
+    if(scr && scr !== activeScreener) return false;
     allResults = ar; _dataGen++;
     if(Array.isArray(nt) && new Date(time).toDateString()===new Date().toDateString()) newToday = new Set(nt);
     applySectorFilter(); sortResults();
@@ -2063,7 +2066,8 @@ function loadResultsCache(){
           ? ' <button onclick="scan(true)" style="background:none;border:none;padding:0;margin-right:6px;font:inherit;font-size:11px;color:var(--accent);cursor:pointer;text-decoration:underline">· הנתונים ישנים — רענן</button>'
           : ' <span style="color:var(--text3);font-size:11px">· לחץ "סרוק שנית" לעדכון</span>');
     _restoreScroll();
-  } catch(e){}
+    return true;
+  } catch(e){ return false; }
 }
 
 /* ════════════════════════════════════
@@ -2444,7 +2448,30 @@ function setScreener(key, applyDef=true){
   // applyDef is false for the two restore-time callers (saved prefs, boot),
   // which must not yank a user who opened straight onto the watchlist.
   if(applyDef && mode==='watch') setMode('screen');
+  const prevScreener=activeScreener, switching=applyDef && prevScreener!==key;
   activeScreener=key;
+  if(switching){
+    // RESULTS_CACHE_KEY only ever holds ONE screener's scan at a time, so
+    // switching screeners almost never has anything to restore instantly —
+    // and until now nothing cleared the OLD screener's table in the
+    // meantime, so it stayed fully visible (right-looking prices, scores,
+    // RS — just for the wrong screener) under the new screener's own
+    // subtitle/criteria, for as long as it took to click "סרוק" and wait for
+    // the scan. That's the "loads the previous screener's stocks" report.
+    // Capture BEFORE loadResultsCache(), which overwrites results/allResults
+    // when it applies — checking after would always read the new state.
+    const hadStaleResults = results.length>0;
+    // Repaints instantly if the last cached scan happens to already be this
+    // screener (e.g. switching back); otherwise, if the table was showing a
+    // DIFFERENT screener's rows, clear it to an honest empty state rather
+    // than leave mismatched data on screen.
+    const restored = loadResultsCache();
+    if(!restored && hadStaleResults){
+      allResults=[]; results=[]; _dataGen++;
+      $('resultsPanel').style.display='none';
+      $('colPickerWrap').style.display='none';
+    }
+  }
   try{ localStorage.setItem('sepa_screener', key); }catch(e){}
   const cfg=SCREENERS[key], panel=$('filterPanel');
   Object.keys(SCREENERS).forEach(k=>panel.classList.remove('panel-'+k));
