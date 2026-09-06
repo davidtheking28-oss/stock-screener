@@ -524,8 +524,10 @@
     check('vcp score: base tightness is worth 25',
       calcScore(vAt(0, -1), 'vcp') - calcScore(vAt(15, -1), 'vcp') === 25,
       calcScore(vAt(0, -1), 'vcp') + ' vs ' + calcScore(vAt(15, -1), 'vcp'));
-    check('vcp score: proximity to the pivot is worth 25',
-      calcScore(vAt(4, 0), 'vcp') - calcScore(vAt(4, -10), 'vcp') === 25,
+    // 25 -> 20 when revenue growth (r.rev) was folded in alongside RS — it was
+    // fetched for every screener already but scored in none but SEPA/qulla.
+    check('vcp score: proximity to the pivot is worth 20',
+      calcScore(vAt(4, 0), 'vcp') - calcScore(vAt(4, -10), 'vcp') === 20,
       calcScore(vAt(4, 0), 'vcp') + ' vs ' + calcScore(vAt(4, -10), 'vcp'));
     check('vcp score: a confirmed volume dry-up is worth points',
       calcScore(mkRow({ contractions: 3, lastDepth: 4, distToPivot: -1, volDryUp: true }), 'vcp')
