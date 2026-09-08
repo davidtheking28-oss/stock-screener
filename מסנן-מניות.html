@@ -894,10 +894,14 @@ tbody tr:last-child td { border-bottom: none; }
 @media (max-width: 640px) {
   :root { --ctl-h: 44px; }
   .ss-chip { min-height: 44px; padding: 8px 12px; }
-  /* .view-tab is deliberately NOT in this list: its parent .view-tabs is
-     already --ctl-h (44px) tall with 3px of padding, so forcing the child to
-     44px too made the active tab's background bleed 3px out of the rounded
-     pill. The 44px touch target is satisfied by the parent's height. */
+  /* .view-tabs is --ctl-h (44px) tall, but its own 3px vertical padding left
+     only 38px for the actual button — measured live, confirmed under the
+     44px touch-target minimum. Zeroing the wrapper's padding here (instead of
+     forcing the child to 44px, which bled the active pill's background past
+     the wrapper's rounded corners) lets the child's own min-height fill the
+     wrapper exactly, with no bleed since both are the same height. */
+  .view-tabs { padding: 0; }
+  .view-tab { min-height: 44px; }
   .results-controls .btn-ghost, .src-tab { min-height: 44px; }
   .screener-btn, .preset-btn, .field-picker-item { min-height: 44px; }
   .btn-rescan, .topbar .btn-ghost { min-height: 44px; }
@@ -1337,6 +1341,11 @@ let _dataGen = 0;
 // full rebuild of the scan table even though nothing in it had changed. Each
 // render cache picks whichever counter actually governs its own rows.
 let _wlDataGen = 0;
+// One-shot guard for the auto-scan setMode('watch') triggers when landing on
+// מעקב with a saved list but no ttUniverse data (see setMode). Only ever
+// fires once per page load — if that scan fails, the user still has the
+// manual "סרוק את השוק" button in the empty state to retry.
+let _autoWlScanTried = false;
 let _commUniverse = null, _commTime = 0;
 const UNIVERSE_TTL = 15*60*1000;
 const SCAN_TIMEOUT = 30*1000;
@@ -3205,6 +3214,18 @@ function setMode(m){
   mode=m;
   try{ localStorage.setItem('sepa_mode', m); }catch(e){}
   applyView();
+  // A saved watchlist with no ttUniverse row for any of it (no scan this
+  // session, cache expired) used to just sit on the "סרוק את השוק" empty
+  // state until clicked. The user asked for it to load automatically instead
+  // — safe here specifically because the view is already empty (nothing on
+  // screen to yank out from under anyone), unlike the auto-refresh-on-load
+  // this file deliberately removed elsewhere for real results already on
+  // screen (see loadResultsCache's own history). Fires at most once per page
+  // load; the manual button stays as the retry path if this scan fails.
+  if(m==='watch' && watchlist.size>0 && !Object.keys(ttUniverse).length && !_autoWlScanTried){
+    _autoWlScanTried = true;
+    scan();
+  }
 }
 function setLayout(l){
   layout=l;
