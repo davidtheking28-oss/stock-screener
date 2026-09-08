@@ -2330,6 +2330,28 @@ function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var
 // active-filter pass-rate renderSectorStrength's chips show. Empty string
 // (no badge) when no scan has populated sectorStrengthMap yet, rather than
 // showing a fabricated 0.
+// A universe cache saved before sectorStrengthMap started persisting (or one
+// that expires slower than 24h and just predates this) restores ttUniverse
+// with no sector-strength data at all — no scan runs on that boot (ttUniverse
+// is already non-empty), so the badge stayed missing until the user pressed
+// סרוק את השוק by hand. ttUniverse rows already carry ttPass (the Trend
+// Template gate) and sector per stock, so it can be rebuilt from the cache
+// itself with no network call.
+function backfillSectorStrength(){
+  if(Object.keys(sectorStrengthMap).length) return;
+  const rows = Object.values(ttUniverse);
+  if(!rows.length) return;
+  const agg={};
+  for(const r of rows){
+    if(r.ttPass===undefined || !r.sector) continue;
+    const a = agg[r.sector] ??= {up:0,rated:0};
+    a.rated++; if(r.ttPass) a.up++;
+  }
+  sectorStrengthMap = Object.fromEntries(
+    Object.entries(agg).map(([sec,{up,rated}])=>[sec, rated?Math.round(up/rated*100):0])
+  );
+}
+
 function sectorBadgeHtml(sector){
   // scan() never recomputes sectorStrengthMap for commodities (12 fixed
   // ETFs, no meaningful "sector breadth" concept), but it also doesn't clear
@@ -4159,6 +4181,7 @@ setScreener(activeScreener, false);
 updUnitHints();
 renderMyPresets();
 loadUniverseCache();
+backfillSectorStrength();
 loadResultsCache();
 // loadResultsCache calls applyView, but bails before it whenever there is no
 // usable cache (none saved, older than a day, or from a different screener).
