@@ -1381,7 +1381,12 @@ let _sortByMode = {
   // performance 10% (each screener's own calcScore branch weights its own
   // thesis first, fundamentals second).
   screen: {key:_savedSortScreen?.sortKey||'score',     dir:_savedSortScreen?.sortDir??-1},
-  watch:  {key:_savedSortWatch?.sortKey||'firstSeen',  dir:_savedSortWatch?.sortDir??-1},
+  // Same reasoning as screen: strongest-to-weakest by score is the useful
+  // default. firstSeen (when the ticker was starred) was the default before
+  // — a real ordering, just not the one "show me my watchlist" implies. A
+  // deliberate click on a different column while on מעקב still sticks and
+  // persists to sepa_sort_watch, same as before.
+  watch:  {key:_savedSortWatch?.sortKey||'score',      dir:_savedSortWatch?.sortDir??-1},
 };
 let sortKey = _sortByMode.screen.key, sortDir = _sortByMode.screen.dir;
 // Two independent axes, deliberately NOT one 'view' string: `mode` is which
