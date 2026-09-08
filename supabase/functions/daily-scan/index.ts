@@ -90,10 +90,22 @@ function computeRS(universe: Row[]): Record<string, number> {
     if (py != null) { s += 0.3 * py; w += 0.3; }
     return s / w;
   };
-  const valid = universe.map(r => ({ s: r.s, p: raw(r.d) })).filter(r => r.p != null).sort((a, b) => (a.p as number) - (b.p as number));
+  const valid = universe.map(r => ({ s: r.s, p: raw(r.d) as number })).filter(r => r.p != null).sort((a, b) => a.p - b.p);
   const n = valid.length; const map: Record<string, number> = {};
   // n <= 1 would make i/(n-1) divide by zero and yield NaN.
-  valid.forEach((row, i) => { map[row.s] = n <= 1 ? 50 : Math.max(1, Math.min(99, Math.round((i / (n - 1)) * 98) + 1)); });
+  const rate = (i: number) => n <= 1 ? 50 : Math.max(1, Math.min(99, Math.round((i / (n - 1)) * 98) + 1));
+  // Equal performance must get an equal rating — ranking on plain array index
+  // gave tied stocks adjacent ranks, so two identical performers could
+  // straddle a threshold purely on the universe's incoming sort order. The
+  // client fixed this (see the same comment there); this copy had not, so a
+  // tie could rank/score above rsMin in one and not the other on scan night.
+  let i = 0;
+  while (i < n) {
+    let j = i; while (j + 1 < n && valid[j + 1].p === valid[i].p) j++;
+    const r = rate((i + j) / 2);
+    for (let k = i; k <= j; k++) map[valid[k].s] = r;
+    i = j + 1;
+  }
   return map;
 }
 
