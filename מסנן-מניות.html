@@ -1328,6 +1328,11 @@ function _restoreScroll(){
 ════════════════════════════════════ */
 let allResults = [], results = [], ttUniverse = {};
 let _scanToken = 0;
+// Cancels validateExact's up-to-20 in-flight OHLC fetches when a newer scan
+// starts (switching screeners mid-scan) — without this, _scanToken's own
+// guard still discarded the RESULT correctly, but every request already sent
+// ran to completion first. Measured live: none were ever actually aborted.
+let _scanAbort = null;
 let _rawUniverse = null, _rawTime = 0, _rsMapMem = null;
 // Both render caches key on the SYMBOL LIST, not on the rows' contents, so a
 // rescan that returns the same tickers repainted nothing — prices, RS and
@@ -1608,14 +1613,19 @@ function _ohlcNext(){
 
 /* ── exact OHLC validation (1y bars) ── */
 const _valBars = new Map();
-async function _fetchBars1y(sym){
+async function _fetchBars1y(sym, signal){
   if(!HAS_SUPABASE) return null;
   const TTL=30*60*1000;
   const c=_valBars.get(sym);
   if(c && Date.now()-c.t<TTL) return c.bars;
   try{ const sc=JSON.parse(sessionStorage.getItem('ohlc1y_v2_'+sym)); if(sc && sc.t && Date.now()-sc.t<TTL){ _valBars.set(sym,{bars:sc.bars,t:sc.t}); return sc.bars; } }catch(e){}
   try{
-    const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?range=1y&symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON},signal:AbortSignal.timeout(SCAN_TIMEOUT)});
+    // Combined with the caller's own abort signal (validateExact, wired to a
+    // switch to a newer scan) when given — a plain timeout signal alone left
+    // every already-sent request running to completion even after its result
+    // was guaranteed to be thrown away by the _scanToken check.
+    const sig = signal ? AbortSignal.any([AbortSignal.timeout(SCAN_TIMEOUT), signal]) : AbortSignal.timeout(SCAN_TIMEOUT);
+    const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc?range=1y&symbol='+encodeURIComponent(sym),{headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON},signal:sig});
     if(!r.ok) return null;
     const j=await r.json(); const bars=Array.isArray(j.bars)?j.bars:[];
     // Only cache a real result. A 500/429 upstream still parses as JSON with no
@@ -1826,7 +1836,7 @@ function _vcpExactFail(r, bars, opts={}){
   if(v.distToPivot < -(opts.maxBelow ?? 10)) return true;
   return false;
 }
-async function validateExact(list, scr, onProgress){
+async function validateExact(list, scr, onProgress, signal){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   const adrMin=num('adrMin')||3, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
@@ -1836,12 +1846,12 @@ async function validateExact(list, scr, onProgress){
                  maxBelow:num('pivotBelow')||10, reqDryUp:!!$('vcpDryUp')?.checked};
   const consolBars=(num('consolWeeks')||2)*5;
   // One benchmark fetch for the whole pass — the RS line is price/SPY.
-  const spy=await _fetchBars1y('SPY').catch(()=>null);
+  const spy=await _fetchBars1y('SPY', signal).catch(()=>null);
   async function worker(){
     while(idx<list.length){
       const r=list[idx++];
       try{
-        const raw=await _fetchBars1y(r.ticker);
+        const raw=await _fetchBars1y(r.ticker, signal);
         // A series that flips price scale is not the same as a missing one:
         // "no bars" is a fetch that failed and the screeners fall back, while
         // this is positive evidence the numbers are wrong. Nothing can be
@@ -2660,6 +2670,8 @@ async function checkAndSaveHistory(tickers){
 async function scan(force=false){
   if(!validateInputs()) return;
   const myToken = ++_scanToken;
+  if(_scanAbort) _scanAbort.abort();
+  const myAbort = _scanAbort = new AbortController();
   const wasResultsVisible = $('resultsPanel').style.display==='block';
   _setScanLoading(true);
   newToday = new Set();
@@ -2743,7 +2755,7 @@ async function scan(force=false){
     const rb=$('scanBtn'); if(rb) rb.style.display='';
 
     if(needsExact){
-      validateExact(allResults, activeScreener).then(v=>{
+      validateExact(allResults, activeScreener, null, myAbort.signal).then(v=>{
         if(myToken!==_scanToken) return;   // superseded by a newer scan
         allResults = v; _dataGen++;
         // Every term of the VCP score reads r.vcp, which only exists after the
