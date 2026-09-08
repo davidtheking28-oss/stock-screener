@@ -2294,8 +2294,6 @@ function _calcScoreRaw(r, scr='sepa'){
   return Math.round(clamp(rsS+epsS+revS+hiS+perfYS,0,100));
 }
 function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var(--text3)'; }
-function scoreBorder(s)  { return s>=80?'rgba(46,204,113,0.28)':s>=60?'rgba(245,185,74,0.28)':'rgba(117,137,168,0.22)'; }
-function scoreBg(s)      { return s>=80?'rgba(46,204,113,0.13)':s>=60?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)'; }
 
 function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : m<1 ? '$'+Math.round(m*1000)+'K' : '$'+m+'M'; }
 function updUnitHints(){
