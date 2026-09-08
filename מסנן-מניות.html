@@ -2371,18 +2371,32 @@ async function backfillSectorStrength(){
     try{ universe = await fetchUniverse(); _rawUniverse=universe; _rawTime=Date.now(); }
     catch(e){ return; }
   }
+  let up=0, rated=0;
   const sectorAgg={};
   for(const r of universe){
     const d=r.d, c=d[C.close], s50=d[C.SMA50], s150=d[C.SMA150], s200=d[C.SMA200];
     if(!(c&&s50&&s150&&s200)) continue;
-    const sec=d[C.sector]; if(!sec) continue;
-    const a = sectorAgg[sec] ??= {up:0,rated:0};
-    a.rated++;
-    if(c>s150&&c>s200&&s150>s200&&s50>s150&&c>s50) a.up++;
+    rated++;
+    const sec=d[C.sector]; if(sec) (sectorAgg[sec] ??= {up:0,rated:0}).rated++;
+    if(c>s150&&c>s200&&s150>s200&&s50>s150&&c>s50){ up++; if(sec) sectorAgg[sec].up++; }
   }
   sectorStrengthMap = Object.fromEntries(
     Object.entries(sectorAgg).map(([sec,{up,rated}])=>[sec, rated?Math.round(up/rated*100):0])
   );
+  // scan() sets breadthChip's dot/label/show every time it runs — but a
+  // session that boots straight from a stale cache never calls scan(), so
+  // the chip stayed display:none and the sector ranking behind it had no
+  // visible entry point at all ("איפה?"). Mirror the same wiring here so a
+  // cache-only boot still shows a clickable chip.
+  if(activeScreener!=='commodities'){
+    const bPct = rated ? Math.round(up/rated*100) : 0;
+    const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--amber)':'var(--red)';
+    $('breadthDot').style.background = bCol;
+    $('breadthLabel').style.color    = bCol;
+    $('breadthLabel').textContent    = bPct+'% במגמת עלייה';
+    $('breadthChip').classList.add('show');
+    $('breadthChip').classList.toggle('has-sectors', Object.keys(sectorStrengthMap).length>0);
+  }
   _tableKey=''; _galleryKey='';
   render();
 }
@@ -2877,6 +2891,7 @@ async function scan(force=false){
       $('breadthLabel').style.color    = bCol;
       $('breadthLabel').textContent    = bPct+'% במגמת עלייה';
       $('breadthChip').classList.add('show');
+      $('breadthChip').classList.toggle('has-sectors', Object.keys(sectorStrengthMap).length>0);
     }
 
     allResults = applyFilters(universe, rsMap); _dataGen++;
