@@ -4049,6 +4049,18 @@ applyView();
 // applyView above); it just needs to be reached once at boot instead of only
 // on a click that assumes a now-invisible tab.
 if($('resultsPanel').style.display==='none' && watchlist.size>0) setMode('watch');
+// The mirror case: sepa_mode was persisted as 'watch' from an earlier
+// session (or another device's now-empty watchlist synced down), but the
+// watchlist is empty NOW. The fixup above never fires (its own guard is
+// watchlist.size>0), so #resultsPanel — and with it both tabs — stays
+// display:none, while applyView() above still put .wl-mode on #filterPanel
+// because mode really is 'watch', hiding the scan button/criteria too. Net
+// result: a blank-looking page with no scan button and no way back to the
+// tab that has one, recoverable only as a side effect of clicking a preset
+// button. setMode('screen') here removes .wl-mode and restores the normal
+// first-visit state (panel still hidden until a scan runs, which is correct
+// — there is nothing to show either way).
+else if(mode==='watch' && watchlist.size===0) setMode('screen');
 initAuth().then(loadDailyStatus);
 
 const _scrollTopBtn = $('scrollTopBtn');
