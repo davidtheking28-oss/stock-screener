@@ -1019,6 +1019,7 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field f-finviz"><label for="finvizVolMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="finvizVolMin" value="0.1" min="0" step="0.05" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">ממוצע 90 יום</span></div>
             <div class="field f-finviz"><label for="smaTrend50">מחיר מול SMA50</label><div class="field-combo"><input type="text" inputmode="none" id="smaTrend50" value="1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-finviz"><label for="smaTrend200">מחיר מול SMA200</label><div class="field-combo"><input type="text" inputmode="none" id="smaTrend200" value="1" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-finviz"><label for="finvizFromHigh">מהשיא (%) מקס&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="finvizFromHigh" value="25" min="0" max="100" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint">עד כמה % מהשיא 52ש&#8217; — "קרוב לשיא"</span></div>
             <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="text" inputmode="none" id="priceMin" value="10" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="priceHint">מסנן מניות אגורה</span></div>
             <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="text" inputmode="none" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="mcHint">סינון לפי קטגוריית גודל</span></div>
             <div class="field f-base f-liq"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="liqMin" value="20" min="0" oninput="updUnitHints()" readonly onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div><span class="hint" id="liqHint">נפח דולרי ממוצע 10 ימים</span></div>
@@ -1249,7 +1250,7 @@ const SCREENER_DEFAULTS = {
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100,consolWeeks:2},
   vcp:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3,move6Min:30,move3Min:20,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
-  finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1},
+  finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1,finvizFromHigh:25},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
   commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
 };
@@ -1257,7 +1258,11 @@ const COMMODITY_TICKERS = ['GLD','SLV','COPX','WEAT','CORN','UNG','PALL','PPLT',
 // Health Technology (biotech/pharma) is where a large share of the market's
 // fastest quarterly growers actually sit; leaving it out excluded them from the
 // one screener whose entire thesis is growth.
-const GROWTH_SECTORS = ['Technology Services','Electronic Technology','Consumer Durables','Consumer Non-Durables','Consumer Services','Retail Trade','Communications','Energy Minerals','Health Technology'];
+// 'Energy Minerals' (oil/gas/coal extraction — Exxon, Chevron, Equinor) removed:
+// a cyclical, commodity-price-driven sector, the near-opposite of "growth" —
+// live-confirmed by Icahn Enterprises (IEP) passing this screen at −18.5% EPS
+// YoY purely because its sector was on this allow-list.
+const GROWTH_SECTORS = ['Technology Services','Electronic Technology','Consumer Durables','Consumer Non-Durables','Consumer Services','Retail Trade','Communications','Health Technology'];
 // A stored key that no longer exists (the removed 'momentum' screener) would
 // make setScreener early-return, leaving the panel with no panel-* class and
 // every screener-specific field visible at once.
@@ -1745,7 +1750,18 @@ function _powerPlayOK(bars, runPct, minConsolBars=10){
   // The run is capped at 40 bars above, so both legs fit the 55-bar sample.
   if(w.length-1-best.iHigh<minConsolBars) return false;
   let postLow=best.high; for(let i=best.iHigh;i<w.length;i++){ if(w[i].l<postLow) postLow=w[i].l; }
-  return (best.high-postLow)/best.high*100<=25;   // tight consolidation ≤25%
+  if((best.high-postLow)/best.high*100>25) return false;   // tight consolidation ≤25%
+  // A Power Play consolidation is supposed to be quiet, not just shallow — a
+  // stock churning at the same 25%-drawdown depth on heavy volume is
+  // distribution, not a pause. Same volOf/dry-up comparison _vcp() already
+  // uses for its own base: consolidation average volume vs. the run's own.
+  // Missing volume data (some tickers/periods) keeps the row rather than
+  // failing it, same "unknown, not a fail" rule the rest of this file follows.
+  const runStart=Math.max(0,best.iHigh-40);
+  const volOf=(a,b)=>{ let s=0,c=0; for(let i=a;i<=b&&i<w.length;i++){ if(w[i].v!=null){s+=w[i].v;c++;} } return c?s/c:null; };
+  const runVol=volOf(runStart,best.iHigh), consolVol=volOf(best.iHigh,w.length-1);
+  if(runVol!=null && consolVol!=null && runVol>0 && consolVol>runVol) return false;
+  return true;
 }
 // Exact Qullamaggie checks from daily bars: ADR%20, distance to EMA10/20, 5-day change.
 // Returns false only on a definite fail; null (keep) when there isn't enough history.
@@ -2314,6 +2330,12 @@ function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var
 // (no badge) when no scan has populated sectorStrengthMap yet, rather than
 // showing a fabricated 0.
 function sectorBadgeHtml(sector){
+  // scan() never recomputes sectorStrengthMap for commodities (12 fixed
+  // ETFs, no meaningful "sector breadth" concept), but it also doesn't clear
+  // the map — so every commodity ETF was showing a stale badge left over
+  // from whichever equity screener last ran, tagged with TradingView's
+  // catch-all "Miscellaneous" sector. A gold/oil ETF has no real sector.
+  if(activeScreener==='commodities') return '';
   const pct = sectorStrengthMap[sector];
   if(pct==null) return '';
   const hi=pct>=80, mid=pct>=60;
@@ -2378,6 +2400,7 @@ const FIELD_PRESETS = {
   volSharesMin: [[0.1,'100K+'],[0.25,'250K+'],[0.5,'500K+ — קלאסי'],[1,'1M+'],[2,'2M+'],[5,'5M+']],
   perfYMin:     [[10,'10%'],[20,'20%'],[30,'30% — קלאסי'],[50,'50%'],[75,'75%'],[100,'100%'],[200,'200%']],
   finvizVolMin: [[0.1,'100K+ — קלאסי'],[0.25,'250K+'],[0.5,'500K+'],[1,'1M+'],[2,'2M+']],
+  finvizFromHigh: [[5,'5% — צמוד לשיא'],[8,'8%'],[10,'10%'],[12,'12%'],[15,'15%'],[20,'20%'],[25,'25% — קלאסי'],[35,'35%'],[50,'50%'],[75,'75%']],
   smaTrend50:  [[1,'מעל — קלאסי'],[0,'מתחת']],
   smaTrend200: [[1,'מעל — קלאסי'],[0,'מתחת']],
 };
@@ -3068,8 +3091,13 @@ function applyFilters(universe, rsMap, opts={}){
       const above50=num('smaTrend50')!==0, above200=num('smaTrend200')!==0;
       const trendOk=(above50?close>s50:close<s50) && (above200?close>s200:close<s200);
       const perfOk=perfY!=null && perfY>=num('perfYMin');
-      checks={volOk,trendOk,perfOk};
-      pass=volOk&&trendOk&&perfOk;
+      // The screen's own name ("מומנטום שנתי") and subtitle promise "קרוב
+      // לשיא" (near the high) — nothing enforced it, so a stock 60%+ off its
+      // 52-week high with strong yearly performance and price above both SMAs
+      // still passed. fromHighPct only affected the SCORE, never membership.
+      const nearHighOk=hi!=null && close>=hi*(1-num('finvizFromHigh')/100);
+      checks={volOk,trendOk,perfOk,nearHighOk};
+      pass=volOk&&trendOk&&perfOk&&nearHighOk;
     } else {
       const t1=close>s150&&close>s200, t2=s150>s200, t3=s50>s150&&s50>s200;
       // Minervini's real criterion #3 is "SMA200 itself has been trending up for

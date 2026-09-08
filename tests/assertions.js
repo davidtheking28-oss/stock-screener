@@ -42,6 +42,17 @@
   // Minervini's own 3-week reading leaves ~1 name on a live universe, so the
   // duration is a filter field. Both ends of it have to keep working.
   check('_powerPlayOK: duration threshold is configurable', _powerPlayOK(mk(good), 100, 25) === false && _powerPlayOK(mk(fresh), 100, 0) === true);
+  // Depth alone can't tell a real pause from distribution — a stock churning
+  // at the same shallow drawdown on RISING volume is being sold into, not
+  // consolidating quietly. mk()'s flat v:1000 (used by every case above)
+  // carries no volume signal either way, so it correctly doesn't fail on it —
+  // this is the one case built to actually carry a signal.
+  const mkVol = (closes, runVol, consolVol, splitAt) => closes.map((c, i) => (
+    { t: i * 86400, o: c, h: c * 1.01, l: c * 0.99, c, v: i < splitAt ? runVol : consolVol }));
+  check('_powerPlayOK: consolidation volume HEAVIER than the run → false (distribution, not a pause)',
+    _powerPlayOK(mkVol(good, 1000, 5000, 35), 100) === false);
+  check('_powerPlayOK: consolidation volume genuinely lighter than the run → still true',
+    _powerPlayOK(mkVol(good, 1000, 300, 35), 100) === true);
   {
     setScreener('power', true);
     check('Power Play default consolidation is 2 weeks', num('consolWeeks') === 2, 'got ' + num('consolWeeks'));
@@ -96,6 +107,26 @@
     ];
     const out = tickers(applyFilters(uni, {}));
     check('applyFilters growth: sector + EPS/Sales QoQ + cap gate', eqSet(out, ['GROWA']), 'got ' + JSON.stringify(out));
+    check('applyFilters growth: Energy Minerals is off the growth sector allow-list',
+      !GROWTH_SECTORS.includes('Energy Minerals'),
+      'a cyclical, commodity-driven sector let Icahn Enterprises (−18.5% EPS YoY) pass the growth screen');
+  }
+
+  // ── applyFilters: finviz ("מומנטום שנתי") enforces "near the high" ──
+  // The screen's own name/subtitle promise it, but nothing did until now —
+  // fromHighPct only fed the score, never membership, so a stock could pass
+  // 60%+ off its 52-week high with strong perf and price above both SMAs.
+  {
+    setScreener('finviz', true);
+    const base = { close: 100, SMA50: 90, SMA200: 80, price_52_week_high: 120, price_52_week_low: 60,
+      market_cap_basic: 5e9, average_volume_10d_calc: 5e6, average_volume_90d_calc: 5e6, volume: 5e6,
+      'Perf.Y': 40, description: 'x', exchange: 'NASDAQ' };
+    const uni = [
+      mkStock('F:NEARHI', { ...base, name: 'NEARHI' }),                                    // ~17% off high — passes
+      mkStock('F:FARHI', { ...base, name: 'FARHI', close: 60, SMA50: 55, SMA200: 50 }),     // 50% off high — fails
+    ];
+    const out = tickers(applyFilters(uni, { 'F:NEARHI': 80, 'F:FARHI': 80 }));
+    check('applyFilters finviz: a stock far from its 52w high now fails', eqSet(out, ['NEARHI']), 'got ' + JSON.stringify(out));
   }
 
   // ── applyFilters: Commodities fixed-ticker membership ──
