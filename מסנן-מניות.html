@@ -2389,9 +2389,12 @@ function sectorBadgeHtml(sector, withLabel){
   // sector name appears, so "100" alone read as an unexplained, untrustworthy
   // figure. withLabel puts the sector's first word ON the badge, same layout
   // as the RS badge's "RS" label, so the number is self-explaining without a
-  // hover.
+  // hover. The bare number ALSO sat right next to an RS badge that looks
+  // identical in shape (small pill, bold number, 0-99 range) — a "%" on this
+  // one, in both views, is what actually tells them apart at a glance instead
+  // of by memorizing which pill is which.
   const lbl = withLabel ? '<span class="gb-lbl">'+escHtml(String(sector).split(' ')[0])+'</span> ' : '';
-  return '<span class="gbadge" style="color:'+c+';background:'+bg+'" title="עוצמת סקטור: '+pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>'+pct+'</b></span>';
+  return '<span class="gbadge" style="color:'+c+';background:'+bg+'" title="עוצמת סקטור: '+pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>'+pct+'%</b></span>';
 }
 
 function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : m<1 ? '$'+Math.round(m*1000)+'K' : '$'+m+'M'; }
