@@ -1780,7 +1780,11 @@ function _qullaExactOK(bars, adrMin, emaDistMax, weekMax, move3Min, move6Min){
   if(adr<adrMin) return false;
   const ema=p=>{ const k=2/(p+1); let e=c[0]; for(let i=1;i<n;i++) e=c[i]*k+e*(1-k); return e; };
   const close=c[n-1];
-  const dist=Math.min(Math.abs(close/ema(10)-1)*100, Math.abs(close/ema(20)-1)*100);
+  // Same directional fix as the coarse pass above: price must be AT/ABOVE the
+  // ema, not just near it either way — a name below its 10/20ema is breaking
+  // down, not surfing it.
+  const above=v=>v>=0?v:Infinity;
+  const dist=Math.min(above((close/ema(10)-1)*100), above((close/ema(20)-1)*100));
   if(dist>emaDistMax) return false;
   const wk=(close/c[n-6]-1)*100;
   if(wk<-weekMax || wk>weekMax) return false;
@@ -3044,9 +3048,14 @@ function applyFilters(universe, rsMap, opts={}){
       const trendOk=close>s50 && (s200==null || (close>s200 && s50>s200));
       const move6Ok=perf6!=null && perf6>=num('move6Min');
       const move3Ok=perf3!=null && perf3>=num('move3Min');
+      // "Surfing the EMA" means hugging it from ABOVE — a name trading just
+      // below its 10/20ema is breaking down through it, not riding it. Math.abs
+      // used to pass both cases identically, so a breakdown scored the same
+      // proximity as a real uptrend.
+      const above=v=>v>=0?v:Infinity;
       const emaDist=Math.min(
-        ema10!=null?Math.abs(close/ema10-1)*100:Infinity,
-        ema20!=null?Math.abs(close/ema20-1)*100:Infinity);
+        ema10!=null?above((close/ema10-1)*100):Infinity,
+        ema20!=null?above((close/ema20-1)*100):Infinity);
       const surfOk=emaDist<=num('emaDistMax');
       const wMax=num('weekRangeMax');
       const tightOk=perfW!=null && perfW>=-wMax && perfW<=wMax;

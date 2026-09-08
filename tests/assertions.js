@@ -586,6 +586,24 @@
     check('qulla: too little history does not fail the 6M gate',
       _qullaExactOK(shortHist, 0, 100, 100, 0, 30) === true);
 
+    // "Surfing the ema" means hugging it from ABOVE — a name trading just
+    // below its 10/20ema is breaking down, not riding an uptrend. A flat
+    // 100 history gives ema(10)/ema(20) ≈ 100 by the last bar; a final
+    // close 2% below/above it, with a 3% max distance, used to pass
+    // identically either way under Math.abs().
+    const flatThenClose = finalPct => {
+      const out = [];
+      for (let i = 0; i < 129; i++) out.push({ t: i * 86400, o: 100, h: 102, l: 98, c: 100, v: 1000 });
+      const px = 100 * (1 + finalPct / 100);
+      out.push({ t: 129 * 86400, o: px, h: px * 1.02, l: px * 0.98, c: px, v: 1000 });
+      return out;
+    };
+    check('qulla: a name trading below its ema now fails the surf gate',
+      _qullaExactOK(flatThenClose(-2), 0, 3, 100, 0, 0) === false,
+      'was passing identically to a name above its ema before the directional fix');
+    check('qulla: a name trading above its ema still passes the surf gate',
+      _qullaExactOK(flatThenClose(2), 0, 3, 100, 0, 0) === true);
+
     // The coarse ADR slack. TradingView's column runs as low as 0.751x the
     // true 20-bar ADR, so a 0.9 gate rejects names that do qualify.
     setScreener('qulla', true);
