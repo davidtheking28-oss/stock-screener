@@ -1280,7 +1280,7 @@ const COL_DEFS = [
   {key:'vol',    label:'נפח',        defaultOn:false},
   {key:'liq',    label:'נזילות $',   defaultOn:false},
   {key:'mc',     label:'שווי שוק',   defaultOn:false},
-  {key:'sector', label:'סקטור',      defaultOn:false},
+  {key:'sector', label:'סקטור',      defaultOn:true},
   {key:'firstSeen', label:'נוסף למעקב', defaultOn:true},
 ];
 
@@ -1334,6 +1334,11 @@ let _scanToken = 0;
 // ran to completion first. Measured live: none were ever actually aborted.
 let _scanAbort = null;
 let _rawUniverse = null, _rawTime = 0, _rsMapMem = null;
+// ticker.sector -> 1-99 trend-strength percentage, computed alongside the
+// global breadth chip in scan() (same Trend Template test, bucketed by
+// sector instead of summed globally). Not persisted — recomputed fresh on
+// every real scan, same lifetime as _rawUniverse/the breadth numbers.
+let sectorStrengthMap = {};
 // Both render caches key on the SYMBOL LIST, not on the rows' contents, so a
 // rescan that returns the same tickers repainted nothing — prices, RS and
 // scores stayed on the previous scan's numbers while the clock updated. It
@@ -2299,6 +2304,19 @@ function _calcScoreRaw(r, scr='sepa'){
   return Math.round(clamp(rsS+epsS+revS+hiS+perfYS,0,100));
 }
 function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var(--text3)'; }
+// % of the sector's own stocks currently passing the Trend Template (see
+// scan()'s sectorAgg loop) — a genuine trend-strength signal, not the
+// active-filter pass-rate renderSectorStrength's chips show. Empty string
+// (no badge) when no scan has populated sectorStrengthMap yet, rather than
+// showing a fabricated 0.
+function sectorBadgeHtml(sector){
+  const pct = sectorStrengthMap[sector];
+  if(pct==null) return '';
+  const hi=pct>=80, mid=pct>=60;
+  const c = hi?'var(--green)':mid?'var(--amber)':'var(--text3)';
+  const bg = hi?'rgba(46,204,113,0.13)':mid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
+  return '<span class="gbadge" style="color:'+c+';background:'+bg+'" title="עוצמת סקטור: '+pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template"><b>'+pct+'</b></span>';
+}
 
 function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : m<1 ? '$'+Math.round(m*1000)+'K' : '$'+m+'M'; }
 function updUnitHints(){
@@ -2701,12 +2719,17 @@ async function scan(force=false){
     // recent IPOs with no SMA150/200 yet, and leaving them in understated breadth
     // by ~3pt (enough to flip the amber/red threshold).
     let up=0, rated=0;
+    const sectorAgg={};
     if(!isCommodities) for(const r of universe){
       const d=r.d,c=d[C.close],s50=d[C.SMA50],s150=d[C.SMA150],s200=d[C.SMA200];
       if(!(c&&s50&&s150&&s200)) continue;
       rated++;
-      if(c>s150&&c>s200&&s150>s200&&s50>s150&&c>s50) up++;
+      const sec=d[C.sector]; if(sec) (sectorAgg[sec] ??= {up:0,rated:0}).rated++;
+      if(c>s150&&c>s200&&s150>s200&&s50>s150&&c>s50){ up++; if(sec) sectorAgg[sec].up++; }
     }
+    if(!isCommodities) sectorStrengthMap = Object.fromEntries(
+      Object.entries(sectorAgg).map(([sec,{up,rated}])=>[sec, rated?Math.round(up/rated*100):0])
+    );
     const bPct = rated ? Math.round(up/rated*100) : 0;
     const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--amber)':'var(--red)';
     if(!isCommodities){
@@ -3481,7 +3504,7 @@ function renderTable(rows){
       +col('vol',    '<td>'+volEl+'</td>')
       +col('liq',    '<td><span class="mn">$'+fmtB(r.dollarVol)+'</span></td>')
       +col('mc',     '<td><span class="mn">'+fmtB(r.mc)+'</span></td>')
-      +col('sector', '<td><span class="sector-tag">'+escHtml(String(r.sector||'').split(' ').slice(0,2).join(' '))+'</span></td>')
+      +col('sector', '<td><span class="sector-tag">'+escHtml(String(r.sector||'').split(' ').slice(0,2).join(' '))+'</span> '+sectorBadgeHtml(r.sector)+'</td>')
       +col('firstSeen', '<td><span class="mn fs-val" style="color:var(--text3)">'+fmtFirstSeen(watchlistAddedAt.get(r.ticker))+'</span></td>')
       +'</tr>';
   });
@@ -3562,7 +3585,7 @@ function renderGallery(srcRows){
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
       +((earnB||ttB)?'<div class="gcard-tags">'+earnB+ttB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
-      +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span></div></div>'
+      +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span>'+sectorBadgeHtml(r.sector)+'</div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
