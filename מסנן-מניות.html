@@ -155,20 +155,6 @@ body {
   transition: border-color 0.15s;
 }
 .breadth-chip.show { display: flex; }
-.breadth-chip.has-sectors { cursor: pointer; }
-.sector-rank-panel {
-  position: fixed;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 14px; padding: 8px; z-index: 60;
-  display: none; flex-direction: column; gap: 2px;
-  min-width: 210px; max-height: 60vh; overflow-y: auto;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.5);
-}
-.sector-rank-panel.open { display: flex; }
-.sector-rank-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 8px; font-size: 12px; }
-.sector-rank-rank { color: var(--text3); font: 700 11px var(--mono-data); width: 18px; flex-shrink: 0; text-align: center; }
-.sector-rank-name { color: var(--text2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sector-rank-pct { font: 700 12px var(--mono-data); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .breadth-chip:has(.breadth-spark.show) { padding-left: 9px; }
 .breadth-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .breadth-spark { display: none; align-items: center; cursor: help; flex-shrink: 0; }
@@ -893,6 +879,7 @@ tbody tr:last-child td { border-bottom: none; }
 .ss-bar { position: absolute; right: 0; top: 0; bottom: 0; z-index: 0; border-radius: 7px 0 0 7px; transition: width .25s ease; }
 .ss-name, .ss-num { position: relative; z-index: 1; }
 .ss-num { font: 700 11.5px var(--mono-data); }
+.ss-dot { position: relative; z-index: 1; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
 .results-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 8px 18px; border-bottom: 1px solid var(--border); background: var(--bg2); font: 500 11px var(--sans); color: var(--text3); }
 .results-legend:empty { display: none; }
@@ -949,12 +936,11 @@ tbody tr:last-child td { border-bottom: none; }
 <div class="topbar">
   <div class="logo-mark">SEPA<em>.</em>screen</div>
   <div class="topbar-sep"></div>
-  <div class="breadth-chip" id="breadthChip" onclick="toggleSectorRanking(event)">
+  <div class="breadth-chip" id="breadthChip">
     <span class="breadth-dot" id="breadthDot"></span>
     <span id="breadthLabel"></span>
     <span class="breadth-spark" id="breadthSpark"></span>
   </div>
-  <div class="sector-rank-panel" id="sectorRankPanel"></div>
   <div id="statBar"></div>
   <div class="topbar-end">
     <span id="scanTime"></span>
@@ -1106,12 +1092,6 @@ tbody tr:last-child td { border-bottom: none; }
           <button class="btn-ghost" onclick="toggleColPicker(event)" title="בחר עמודות">עמודות &#8862;</button>
           <div class="col-picker-panel" id="colPickerPanel"></div>
         </div>
-        <!-- breadthChip (topbar) opens the same panel, but is display:none
-             below 420px — cramped mobile topbar, same rule that hides
-             .topbar-sep there. This row is the one place on the page that's
-             always visible regardless of width, so the ranking has a real
-             entry point on a phone too, not just on desktop. -->
-        <button class="btn-ghost" onclick="toggleSectorRanking(event)" title="דירוג סקטורים">דירוג סקטורים &#8862;</button>
         <button class="btn-ghost" onclick="exportTickers()" title="העתק כל הטיקרים לקליפבורד">העתק רשימה</button>
         <button class="btn-ghost" onclick="exportCSV()">ייצוא CSV</button>
         <span class="kbd-hint" id="kbdHint" title="ניווט מקלדת: j/k לזוז · Enter לפתוח גרף · w להוסיף/הסיר ממעקב · Esc לסגור">j/k/w &#8629;</span>
@@ -2401,10 +2381,32 @@ async function backfillSectorStrength(){
     $('breadthLabel').style.color    = bCol;
     $('breadthLabel').textContent    = bPct+'% במגמת עלייה';
     $('breadthChip').classList.add('show');
-    $('breadthChip').classList.toggle('has-sectors', Object.keys(sectorStrengthMap).length>0);
   }
   _tableKey=''; _galleryKey='';
   render();
+}
+
+// An absolute bar (Minervini's classic 80/60, then this app's own 50/35
+// breadth-chip bar) always paints EVERY sector the same word on a day the
+// whole market's breadth sits low — checked live, market-wide breadth was
+// 25% and all 21 sectors read "weak" either way. That answers "is the
+// market healthy", not "which sector to be in TODAY" — and there is always
+// a relative leader even in a weak tape. Rank sectors against each other
+// instead: top third leading, middle third mid, bottom third weak — this
+// always differentiates, regardless of the market's absolute level. Shared
+// by the per-card badge and the always-visible chip strip below, so both
+// surfaces agree on one ranking instead of drifting into two.
+function sectorRankTier(sector){
+  const pct = sectorStrengthMap[sector];
+  if(pct==null) return null;
+  const ranked = Object.entries(sectorStrengthMap).sort((a,b)=>b[1]-a[1]);
+  const rank = ranked.findIndex(([s])=>s===sector) + 1;
+  const total = ranked.length;
+  const top = rank <= Math.ceil(total/3), mid = !top && rank <= Math.ceil(total*2/3);
+  const c = top?'var(--green)':mid?'var(--amber)':'var(--text3)';
+  const bg = top?'rgba(46,204,113,0.13)':mid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
+  const word = top?'מוביל':mid?'בינוני':'חלש';
+  return {pct, rank, total, c, bg, word};
 }
 
 function sectorBadgeHtml(sector, withLabel){
@@ -2414,64 +2416,16 @@ function sectorBadgeHtml(sector, withLabel){
   // from whichever equity screener last ran, tagged with TradingView's
   // catch-all "Miscellaneous" sector. A gold/oil ETF has no real sector.
   if(activeScreener==='commodities') return '';
-  const pct = sectorStrengthMap[sector];
-  if(pct==null) return '';
-  // An absolute bar (Minervini's classic 80/60, then this app's own 50/35
-  // breadth-chip bar) always paints EVERY sector the same word on a day the
-  // whole market's breadth sits low — checked live, market-wide breadth was
-  // 25% and all 21 sectors read "weak" either way. That answers "is the
-  // market healthy", not "which sector to be in TODAY" — and there is always
-  // a relative leader even in a weak tape, which is what the badge is
-  // actually for. Rank sectors against each other instead: top third
-  // מוביל/leading, middle third בינוני, bottom third חלש — this always
-  // differentiates, regardless of the market's absolute level.
-  const ranked = Object.entries(sectorStrengthMap).sort((a,b)=>b[1]-a[1]);
-  const rank = ranked.findIndex(([s])=>s===sector) + 1;
-  const total = ranked.length;
-  const top = rank <= Math.ceil(total/3), mid = !top && rank <= Math.ceil(total*2/3);
-  const c = top?'var(--green)':mid?'var(--amber)':'var(--text3)';
-  const bg = top?'rgba(46,204,113,0.13)':mid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
+  const t = sectorRankTier(sector);
+  if(!t) return '';
   // A raw "37%" next to an "RS 94" pill needs an explanation of WHAT is 37% —
   // and a hover title can't give it on mobile, where the whole audience reads
   // this on a phone. Trading it for the plain word the color already encodes
   // removes the question entirely: "Finance מוביל" needs no legend. The
   // exact rank and percentage stay in the tooltip for anyone who does hover.
-  const word = top?'מוביל':mid?'בינוני':'חלש';
   const lbl = withLabel ? '<span class="gb-lbl">'+escHtml(String(sector).split(' ')[0])+'</span> ' : '';
-  return '<span class="gbadge" style="color:'+c+';background:'+bg+'" title="מקום '+rank+' מתוך '+total+' סקטורים — '+pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>'+word+'</b></span>';
+  return '<span class="gbadge" style="color:'+t.c+';background:'+t.bg+'" title="מקום '+t.rank+' מתוך '+t.total+' סקטורים — '+t.pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>'+t.word+'</b></span>';
 }
-
-// Per-card badges only ever show ONE sector's rank ("Finance מוביל") — "מי
-// הכי חזק, מי אחריו" needs the whole list side by side, which no single
-// card can show. Clicking the breadth chip opens the full ranking, reusing
-// the column-picker's fixed-position popover pattern (see toggleColPicker).
-function toggleSectorRanking(e){
-  e.stopPropagation();
-  if(activeScreener==='commodities') return;
-  const panel=$('sectorRankPanel'); if(!panel) return;
-  if(panel.classList.contains('open')){ panel.classList.remove('open'); return; }
-  const ranked = Object.entries(sectorStrengthMap).sort((a,b)=>b[1]-a[1]);
-  if(!ranked.length) return;
-  const total = ranked.length;
-  panel.innerHTML = ranked.map(([sec,pct],i)=>{
-    const rank=i+1;
-    const top = rank <= Math.ceil(total/3), mid = !top && rank <= Math.ceil(total*2/3);
-    const c = top?'var(--green)':mid?'var(--amber)':'var(--text3)';
-    return '<div class="sector-rank-row"><span class="sector-rank-rank">'+rank+'</span>'
-      +'<span class="sector-rank-name">'+escHtml(sec)+'</span>'
-      +'<span class="sector-rank-pct" style="color:'+c+'">'+pct+'%</span></div>';
-  }).join('');
-  const rect=e.currentTarget.getBoundingClientRect();
-  panel.style.top=(rect.bottom+6)+'px';
-  panel.style.left=rect.left+'px';
-  panel.classList.add('open');
-}
-document.addEventListener('click', e=>{
-  const panel=$('sectorRankPanel');
-  if(panel && !panel.contains(e.target) && e.target.id!=='breadthChip' && !e.target.closest('#breadthChip')) panel.classList.remove('open');
-});
-document.addEventListener('scroll', ()=>{ $('sectorRankPanel')?.classList.remove('open'); }, {passive:true, capture:true});
-window.addEventListener('resize', ()=>{ $('sectorRankPanel')?.classList.remove('open'); });
 
 function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : m<1 ? '$'+Math.round(m*1000)+'K' : '$'+m+'M'; }
 function updUnitHints(){
@@ -2898,7 +2852,6 @@ async function scan(force=false){
       $('breadthLabel').style.color    = bCol;
       $('breadthLabel').textContent    = bPct+'% במגמת עלייה';
       $('breadthChip').classList.add('show');
-      $('breadthChip').classList.toggle('has-sectors', Object.keys(sectorStrengthMap).length>0);
     }
 
     allResults = applyFilters(universe, rsMap); _dataGen++;
@@ -3321,8 +3274,18 @@ function renderSectorStrength(){
       const strong=pct>=maxPct*0.66;
       const barCol=strong?'rgba(46,204,113,0.20)':'rgba(79,131,255,0.16)';
       const numCol=strong?'var(--green)':'var(--accent2)';
+      // This row is "how much of THIS sector passes MY current filter" — a
+      // different question from "is this sector leading the whole market
+      // right now" (sectorStrengthMap, Trend Template breadth). Both are
+      // real and both belong here, so the market-wide rank rides along as a
+      // small dot instead of a second row elsewhere — a second click-through
+      // panel for the same-looking info was the actual complaint ("איפה",
+      // then "אי אפשר בצורה יותר טובה").
+      const tier = sectorRankTier(s);
+      const dot = tier ? '<span class="ss-dot" style="background:'+tier.c+'" title="דירוג שוק: מקום '+tier.rank+' מתוך '+tier.total+' — '+tier.word+' ('+tier.pct+'% מהמניות ב-Trend Template)"></span>' : '';
       return '<button class="ss-chip'+(on?' on':'')+(strong?' strong':'')+'" onclick="selectSector(\''+(on?'':esc(s))+'\')" title="'+esc(s)+' — '+n+' מתוך '+total+' מניות בסקטור עוברות את הסינון ('+pct.toFixed(1)+'%)">'
         +'<span class="ss-bar" style="width:'+barW+'%;background:'+barCol+'"></span>'
+        +dot
         +'<span class="ss-name">'+esc(s.split(' ').slice(0,2).join(' '))+'</span>'
         +'<span class="ss-num" style="color:'+numCol+'">'+pct.toFixed(1)+'%</span></button>';
     }).join('');
