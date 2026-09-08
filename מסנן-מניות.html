@@ -2092,7 +2092,7 @@ function saveUniverseCache(){
   clearTimeout(_saveUniverseCacheTimer);
   _saveUniverseCacheTimer=setTimeout(()=>{
     try {
-      localStorage.setItem(UNIVERSE_CACHE_KEY, JSON.stringify({data:ttUniverse, time:Date.now()}));
+      localStorage.setItem(UNIVERSE_CACHE_KEY, JSON.stringify({data:ttUniverse, sectorStrength:sectorStrengthMap, time:Date.now()}));
     } catch(e) {}
   }, 400);
 }
@@ -2101,9 +2101,10 @@ function loadUniverseCache(){
   try {
     const raw = localStorage.getItem(UNIVERSE_CACHE_KEY);
     if(!raw) return;
-    const {data, time} = JSON.parse(raw);
+    const {data, sectorStrength, time} = JSON.parse(raw);
     if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(UNIVERSE_CACHE_KEY); return; }
     ttUniverse = data;
+    if(sectorStrength) sectorStrengthMap = sectorStrength;
   } catch(e) {}
 }
 
