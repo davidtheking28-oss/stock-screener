@@ -98,7 +98,12 @@ html[data-theme="tj-light"] {
   /* accent2 is the emphasis step. On dark themes that means lighter than
      accent; on light it has to go the other way or it washes out as text. */
   --accent:#0284c7; --accent2:oklch(40% 0.13 245);
-  --green:#059669; --red:#e11d48; --amber:#d97706;
+  /* Measured live (canvas-rendered sRGB vs --bg): #059669 was 3.36:1 and
+     #e11d48 was 4.18:1 — both under the 4.5:1 AA minimum for the normal-size
+     text they color (perf%, EPS/rev YoY, net margin — .pos/.neg everywhere).
+     Darkened to clear it with margin (4.88:1 / 5.6:1); the dark theme's own
+     values pass comfortably already (8.18:1 / 4.68:1) and are untouched. */
+  --green:#047857; --red:#be123c; --amber:#d97706;
   /* text3 was #64748b, which lands under 4:1 on the light surfaces it is used
      on (table headers, legend, hints). Darkened to clear AA. */
   --text:#0f172a; --text2:#334155; --text3:oklch(37% 0.03 258);
@@ -786,7 +791,14 @@ tbody tr:last-child td { border-bottom: none; }
     background: var(--bg2);
   }
   thead th:nth-child(2), tbody td:nth-child(2) {
-    position: sticky; right: 28px; z-index: 3;
+    /* Column 1's rendered width: 7px td padding each side + the star button's
+       44px touch target (see the ≤640px block further down) = 58px. This was
+       28px, sized for the star button before it grew to 44px for the touch-
+       target rule — nobody had a reason to connect the two at the time.
+       Confirmed live at 390px: with the stale 28px, column 2's sticky edge
+       landed 30px INSIDE column 1's box, and the ticker symbol's last few
+       characters rendered underneath the star column's opaque background. */
+    position: sticky; right: 58px; z-index: 3;
     background: var(--bg2);
     box-shadow: -4px 0 10px rgba(0,0,0,0.35);
   }
