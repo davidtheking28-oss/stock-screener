@@ -3856,7 +3856,8 @@ async function loadUserData(){
   // loadResultsCache) ran before the server's watchlist had arrived, so it
   // found nothing to show. Only fires if the panel is still hidden — a user
   // already looking at a real scan's results must not get yanked onto מעקב.
-  else if($('resultsPanel').style.display==='none' && watchlist.size>0) setMode('watch');
+  // Same explicit-'screen'-choice exception as the boot-time check.
+  else if($('resultsPanel').style.display==='none' && watchlist.size>0 && localStorage.getItem('sepa_mode')!=='screen') setMode('watch');
 }
 
 function updateAuthUI(){
@@ -4091,7 +4092,12 @@ applyView();
 // itself already knows to show the panel for a non-empty watchlist (see
 // applyView above); it just needs to be reached once at boot instead of only
 // on a click that assumes a now-invisible tab.
-if($('resultsPanel').style.display==='none' && watchlist.size>0) setMode('watch');
+// Excludes an EXPLICIT last choice of 'screen' (a real localStorage value,
+// not just the in-memory default `mode` starts at) — a user who was last on
+// תוצאות סריקה must land back there, not get switched to מעקב just because
+// there happens to be no scan cache. First-ever visit (no sepa_mode key at
+// all) and an explicit last mode of 'watch' still auto-reveal as before.
+if($('resultsPanel').style.display==='none' && watchlist.size>0 && localStorage.getItem('sepa_mode')!=='screen') setMode('watch');
 // The mirror case: sepa_mode was persisted as 'watch' from an earlier
 // session (or another device's now-empty watchlist synced down), but the
 // watchlist is empty NOW. The fixup above never fires (its own guard is
