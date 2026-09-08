@@ -2384,17 +2384,15 @@ function sectorBadgeHtml(sector, withLabel){
   const hi=pct>=80, mid=pct>=60;
   const c = hi?'var(--green)':mid?'var(--amber)':'var(--text3)';
   const bg = hi?'rgba(46,204,113,0.13)':mid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
-  // The table already shows the sector name in its own .sector-tag cell, so
-  // its badge is just the number — but the gallery card has nowhere else the
-  // sector name appears, so "100" alone read as an unexplained, untrustworthy
-  // figure. withLabel puts the sector's first word ON the badge, same layout
-  // as the RS badge's "RS" label, so the number is self-explaining without a
-  // hover. The bare number ALSO sat right next to an RS badge that looks
-  // identical in shape (small pill, bold number, 0-99 range) — a "%" on this
-  // one, in both views, is what actually tells them apart at a glance instead
-  // of by memorizing which pill is which.
+  // A raw "37%" next to an "RS 94" pill needs an explanation of WHAT is 37% —
+  // and a hover title can't give it on mobile, where the whole audience reads
+  // this on a phone. Trading a percentage for the plain word the color
+  // already encodes (hi/mid/else) removes the question entirely: "Finance
+  // חזק" needs no legend. The exact number stays in the tooltip for anyone
+  // who does hover.
+  const word = hi?'חזק':mid?'בינוני':'חלש';
   const lbl = withLabel ? '<span class="gb-lbl">'+escHtml(String(sector).split(' ')[0])+'</span> ' : '';
-  return '<span class="gbadge" style="color:'+c+';background:'+bg+'" title="עוצמת סקטור: '+pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>'+pct+'%</b></span>';
+  return '<span class="gbadge" style="color:'+c+';background:'+bg+'" title="עוצמת סקטור: '+pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>'+word+'</b></span>';
 }
 
 function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : m<1 ? '$'+Math.round(m*1000)+'K' : '$'+m+'M'; }
