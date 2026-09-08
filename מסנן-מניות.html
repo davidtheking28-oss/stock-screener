@@ -2334,25 +2334,45 @@ function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var
 // that expires slower than 24h and just predates this) restores ttUniverse
 // with no sector-strength data at all — no scan runs on that boot (ttUniverse
 // is already non-empty), so the badge stayed missing until the user pressed
-// סרוק את השוק by hand. ttUniverse rows already carry ttPass (the Trend
-// Template gate) and sector per stock, so it can be rebuilt from the cache
-// itself with no network call.
-function backfillSectorStrength(){
+// סרוק את השוק by hand.
+//
+// A first attempt derived the map from ttUniverse itself (ticker/sector/ttPass
+// are all already on each row), but ttUniverse is the SEPA-filtered candidate
+// set (RS/from-high/from-low gates still apply under skipFund — only the
+// fundamental gates are zeroed, see applyFilters), not the raw market. Every
+// row in it already cleared a momentum bar, so "% of them in an uptrend" runs
+// systematically hot — a small, pre-selected sector showing 100% wasn't a
+// bug in the arithmetic, it just wasn't answering the question the badge
+// claims to answer ("what fraction of ALL sector stocks pass Trend
+// Template", same definition scan()'s breadth loop uses). Fetching the raw
+// universe once (the same single bulk request scan() itself makes) and
+// running the identical breadth loop keeps the number's meaning consistent
+// whether it came from a live scan or this quiet backfill.
+async function backfillSectorStrength(){
   if(Object.keys(sectorStrengthMap).length) return;
-  const rows = Object.values(ttUniverse);
-  if(!rows.length) return;
-  const agg={};
-  for(const r of rows){
-    if(r.ttPass===undefined || !r.sector) continue;
-    const a = agg[r.sector] ??= {up:0,rated:0};
-    a.rated++; if(r.ttPass) a.up++;
+  if(!Object.keys(ttUniverse).length) return;
+  let universe = _rawUniverse;
+  if(!universe || Date.now()-_rawTime >= UNIVERSE_TTL){
+    try{ universe = await fetchUniverse(); _rawUniverse=universe; _rawTime=Date.now(); }
+    catch(e){ return; }
+  }
+  const sectorAgg={};
+  for(const r of universe){
+    const d=r.d, c=d[C.close], s50=d[C.SMA50], s150=d[C.SMA150], s200=d[C.SMA200];
+    if(!(c&&s50&&s150&&s200)) continue;
+    const sec=d[C.sector]; if(!sec) continue;
+    const a = sectorAgg[sec] ??= {up:0,rated:0};
+    a.rated++;
+    if(c>s150&&c>s200&&s150>s200&&s50>s150&&c>s50) a.up++;
   }
   sectorStrengthMap = Object.fromEntries(
-    Object.entries(agg).map(([sec,{up,rated}])=>[sec, rated?Math.round(up/rated*100):0])
+    Object.entries(sectorAgg).map(([sec,{up,rated}])=>[sec, rated?Math.round(up/rated*100):0])
   );
+  _tableKey=''; _galleryKey='';
+  render();
 }
 
-function sectorBadgeHtml(sector){
+function sectorBadgeHtml(sector, withLabel){
   // scan() never recomputes sectorStrengthMap for commodities (12 fixed
   // ETFs, no meaningful "sector breadth" concept), but it also doesn't clear
   // the map — so every commodity ETF was showing a stale badge left over
@@ -2364,7 +2384,14 @@ function sectorBadgeHtml(sector){
   const hi=pct>=80, mid=pct>=60;
   const c = hi?'var(--green)':mid?'var(--amber)':'var(--text3)';
   const bg = hi?'rgba(46,204,113,0.13)':mid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
-  return '<span class="gbadge" style="color:'+c+';background:'+bg+'" title="עוצמת סקטור: '+pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template"><b>'+pct+'</b></span>';
+  // The table already shows the sector name in its own .sector-tag cell, so
+  // its badge is just the number — but the gallery card has nowhere else the
+  // sector name appears, so "100" alone read as an unexplained, untrustworthy
+  // figure. withLabel puts the sector's first word ON the badge, same layout
+  // as the RS badge's "RS" label, so the number is self-explaining without a
+  // hover.
+  const lbl = withLabel ? '<span class="gb-lbl">'+escHtml(String(sector).split(' ')[0])+'</span> ' : '';
+  return '<span class="gbadge" style="color:'+c+';background:'+bg+'" title="עוצמת סקטור: '+pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>'+pct+'</b></span>';
 }
 
 function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : m<1 ? '$'+Math.round(m*1000)+'K' : '$'+m+'M'; }
@@ -3650,7 +3677,7 @@ function renderGallery(srcRows){
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
       +((earnB||ttB)?'<div class="gcard-tags">'+earnB+ttB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
-      +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span>'+sectorBadgeHtml(r.sector)+'</div></div>'
+      +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span>'+sectorBadgeHtml(r.sector,true)+'</div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
