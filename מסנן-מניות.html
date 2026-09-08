@@ -3553,7 +3553,14 @@ function renderWatchlist(){
     return;
   }
   if(!Object.keys(ttUniverse).length){
-    $('tableView').innerHTML=emptyHtml('נתונים טרם נטענו','סרוק את השוק תחילה כדי לראות נתוני מעקב');
+    // .wl-mode (see applyView) hides the scan panel/button along with the rest
+    // of the scan criteria, so a user who reaches מעקב with no scan this
+    // session — the auto-boot-into-watchlist path added for a saved list with
+    // no cached scan — had this exact text telling them to scan with no scan
+    // control reachable anywhere on the page. scan() doesn't touch mode/wl
+    // state, so it can run straight from here and applyView()'s finalize
+    // redraws the watchlist once ttUniverse is populated.
+    $('tableView').innerHTML=emptyHtml('נתונים טרם נטענו','סרוק את השוק כדי לראות נתוני מעקב','<button class="btn-scan" style="margin-top:14px" onclick="scan()">סרוק את השוק</button>');
     return;
   }
   // Sorted, so clicking a column header actually reorders the watchlist — it
@@ -3563,7 +3570,7 @@ function renderWatchlist(){
     // Since the decouple a failing name is KEPT (tagged ttPass:false), so this
     // branch can only mean "no data for any of them" — not "they all failed".
     // The old text sent the user to the technical filters, which cannot help.
-    $('tableView').innerHTML=emptyHtml('אין נתונים למניות שברשימת המעקב','סרוק את השוק כדי למשוך נתונים עדכניים');
+    $('tableView').innerHTML=emptyHtml('אין נתונים למניות שברשימת המעקב','סרוק את השוק כדי למשוך נתונים עדכניים','<button class="btn-scan" style="margin-top:14px" onclick="scan()">סרוק את השוק</button>');
     return;
   }
   renderTable(wlRows);
@@ -3574,8 +3581,17 @@ function renderWatchlist(){
 // rows, just as cards instead of a table.
 function renderWatchlistGallery(){
   $('tableView').style.display='none'; $('galleryView').style.display='grid';
-  if(watchlist.size===0 || !Object.keys(ttUniverse).length){
+  if(watchlist.size===0){
     renderGallery([]);
+    return;
+  }
+  // Same distinction as renderWatchlist: a non-empty watchlist with no
+  // ttUniverse data yet is "not scanned", not "empty" — renderGallery([])
+  // used to collapse both into "רשימת המעקב ריקה", which told a user whose
+  // star click clearly worked (the tab count showed it) that the list was
+  // empty, with no scan control reachable to fix it (see renderWatchlist).
+  if(!Object.keys(ttUniverse).length){
+    _ohlcDisposeAll(); $('galleryView').innerHTML=emptyHtml('נתונים טרם נטענו','סרוק את השוק כדי לראות נתוני מעקב','<button class="btn-scan" style="margin-top:14px" onclick="scan()">סרוק את השוק</button>'); _galleryKey='';
     return;
   }
   const wlRows=sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean));
@@ -3711,8 +3727,8 @@ document.addEventListener('keydown', e=>{
 });
 
 const EMPTY_SVG='<svg class="empty-icon" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="22" cy="22" r="16" stroke="currentColor" stroke-width="1.5"/><circle cx="22" cy="22" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="22" y1="6" x2="22" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="22" y1="32" x2="22" y2="38" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="22" x2="12" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="32" y1="22" x2="38" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
-function emptyHtml(msg,hint){
-  return '<div class="empty">'+EMPTY_SVG+'<div class="empty-msg">'+msg+'</div><div class="empty-hint">'+(hint||'')+'</div></div>';
+function emptyHtml(msg,hint,actionHtml){
+  return '<div class="empty">'+EMPTY_SVG+'<div class="empty-msg">'+msg+'</div><div class="empty-hint">'+(hint||'')+'</div>'+(actionHtml||'')+'</div>';
 }
 
 /* ════════════════════════════════════
