@@ -701,6 +701,7 @@ tbody tr:last-child td { border-bottom: none; }
 #modalChart { flex: 1; min-height: 0; }
 
 /* ── Empty ── */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .empty { padding: 60px 24px; text-align: center; color: var(--text3); }
 .empty-icon { width: 44px; height: 44px; margin: 0 auto 14px; opacity: 0.35; }
 .empty-msg { font-size: 14px; color: var(--text2); margin-bottom: 5px; font-weight: 500; }
@@ -1150,6 +1151,7 @@ tbody tr:last-child td { border-bottom: none; }
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="rowStatus" class="sr-only" role="status" aria-live="polite"></div>
 <button class="scroll-top-btn" id="scrollTopBtn" title="חזרה למעלה" aria-label="חזרה למעלה">
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
 </button>
@@ -3757,6 +3759,14 @@ document.addEventListener('keydown', e=>{
     r.setAttribute('aria-selected',i===activeRow?'true':'false');
   });
   rows[activeRow]?.scrollIntoView({block:'nearest',behavior:'smooth'});
+  // j/k move a visual cursor only — no real DOM focus change (so the shortcut
+  // keeps working no matter where focus actually is, and doesn't yank a
+  // sighted keyboard user's focus away from what they were doing). That left
+  // screen-reader users with zero indication a row became "active": the
+  // aria-selected flip above is silent unless something with focus (or a
+  // live region) announces it. w and Enter already get feedback of their own
+  // (a toast, a modal); this covers the plain up/down case.
+  if(rows[activeRow]) $('rowStatus').textContent = (rows[activeRow].dataset.ticker||'')+' — שורה '+(activeRow+1)+' מתוך '+rows.length;
 });
 
 const EMPTY_SVG='<svg class="empty-icon" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="22" cy="22" r="16" stroke="currentColor" stroke-width="1.5"/><circle cx="22" cy="22" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="22" y1="6" x2="22" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="22" y1="32" x2="22" y2="38" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="22" x2="12" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="32" y1="22" x2="38" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
