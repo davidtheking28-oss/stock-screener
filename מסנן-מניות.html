@@ -2381,26 +2381,29 @@ function sectorBadgeHtml(sector, withLabel){
   if(activeScreener==='commodities') return '';
   const pct = sectorStrengthMap[sector];
   if(pct==null) return '';
-  // 80/60 (Minervini's classic advance-decline bar) sounds right but isn't —
-  // it's calibrated for a strong bull tape. Checked live: EVERY sector was
-  // under 50% market-wide breadth was 25% that day — so 80/60 painted all 21
-  // sectors "weak" with zero differentiation, which read as broken rather
-  // than as "the whole market is soft right now". $('breadthChip') already
-  // has a bar for this exact same c>s50>s150>s200 pass-rate (see scan(), a
-  // few lines above where sectorAgg is built) — 50/35 — reuse it instead of
-  // inventing a second, uncalibrated one for the same number.
-  const hi=pct>=50, mid=pct>=35;
-  const c = hi?'var(--green)':mid?'var(--amber)':'var(--text3)';
-  const bg = hi?'rgba(46,204,113,0.13)':mid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
+  // An absolute bar (Minervini's classic 80/60, then this app's own 50/35
+  // breadth-chip bar) always paints EVERY sector the same word on a day the
+  // whole market's breadth sits low — checked live, market-wide breadth was
+  // 25% and all 21 sectors read "weak" either way. That answers "is the
+  // market healthy", not "which sector to be in TODAY" — and there is always
+  // a relative leader even in a weak tape, which is what the badge is
+  // actually for. Rank sectors against each other instead: top third
+  // מוביל/leading, middle third בינוני, bottom third חלש — this always
+  // differentiates, regardless of the market's absolute level.
+  const ranked = Object.entries(sectorStrengthMap).sort((a,b)=>b[1]-a[1]);
+  const rank = ranked.findIndex(([s])=>s===sector) + 1;
+  const total = ranked.length;
+  const top = rank <= Math.ceil(total/3), mid = !top && rank <= Math.ceil(total*2/3);
+  const c = top?'var(--green)':mid?'var(--amber)':'var(--text3)';
+  const bg = top?'rgba(46,204,113,0.13)':mid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
   // A raw "37%" next to an "RS 94" pill needs an explanation of WHAT is 37% —
   // and a hover title can't give it on mobile, where the whole audience reads
-  // this on a phone. Trading a percentage for the plain word the color
-  // already encodes (hi/mid/else) removes the question entirely: "Finance
-  // חזק" needs no legend. The exact number stays in the tooltip for anyone
-  // who does hover.
-  const word = hi?'חזק':mid?'בינוני':'חלש';
+  // this on a phone. Trading it for the plain word the color already encodes
+  // removes the question entirely: "Finance מוביל" needs no legend. The
+  // exact rank and percentage stay in the tooltip for anyone who does hover.
+  const word = top?'מוביל':mid?'בינוני':'חלש';
   const lbl = withLabel ? '<span class="gb-lbl">'+escHtml(String(sector).split(' ')[0])+'</span> ' : '';
-  return '<span class="gbadge" style="color:'+c+';background:'+bg+'" title="עוצמת סקטור: '+pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>'+word+'</b></span>';
+  return '<span class="gbadge" style="color:'+c+';background:'+bg+'" title="מקום '+rank+' מתוך '+total+' סקטורים — '+pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>'+word+'</b></span>';
 }
 
 function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : m<1 ? '$'+Math.round(m*1000)+'K' : '$'+m+'M'; }
