@@ -1106,6 +1106,12 @@ tbody tr:last-child td { border-bottom: none; }
           <button class="btn-ghost" onclick="toggleColPicker(event)" title="בחר עמודות">עמודות &#8862;</button>
           <div class="col-picker-panel" id="colPickerPanel"></div>
         </div>
+        <!-- breadthChip (topbar) opens the same panel, but is display:none
+             below 420px — cramped mobile topbar, same rule that hides
+             .topbar-sep there. This row is the one place on the page that's
+             always visible regardless of width, so the ranking has a real
+             entry point on a phone too, not just on desktop. -->
+        <button class="btn-ghost" onclick="toggleSectorRanking(event)" title="דירוג סקטורים">דירוג סקטורים &#8862;</button>
         <button class="btn-ghost" onclick="exportTickers()" title="העתק כל הטיקרים לקליפבורד">העתק רשימה</button>
         <button class="btn-ghost" onclick="exportCSV()">ייצוא CSV</button>
         <span class="kbd-hint" id="kbdHint" title="ניווט מקלדת: j/k לזוז · Enter לפתוח גרף · w להוסיף/הסיר ממעקב · Esc לסגור">j/k/w &#8629;</span>
@@ -2441,6 +2447,7 @@ function sectorBadgeHtml(sector, withLabel){
 // the column-picker's fixed-position popover pattern (see toggleColPicker).
 function toggleSectorRanking(e){
   e.stopPropagation();
+  if(activeScreener==='commodities') return;
   const panel=$('sectorRankPanel'); if(!panel) return;
   if(panel.classList.contains('open')){ panel.classList.remove('open'); return; }
   const ranked = Object.entries(sectorStrengthMap).sort((a,b)=>b[1]-a[1]);
