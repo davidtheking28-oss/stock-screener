@@ -3792,6 +3792,12 @@ async function loadUserData(){
   // signed-in user landing on מעקב got the watchlist drawn inside a panel that
   // was still hidden — a blank page. This is the path the journal iframe takes.
   if(allResults.length || mode==='watch') applyView();
+  // A first sign-in on a device with no local watchlist and no scan this
+  // session: the boot-time version of this same check (right after
+  // loadResultsCache) ran before the server's watchlist had arrived, so it
+  // found nothing to show. Only fires if the panel is still hidden — a user
+  // already looking at a real scan's results must not get yanked onto מעקב.
+  else if($('resultsPanel').style.display==='none' && watchlist.size>0) setMode('watch');
 }
 
 function updateAuthUI(){
@@ -4020,6 +4026,13 @@ loadResultsCache();
 // tabs lied, .wl-mode was missing, and clicking the מעקב tab you appeared not
 // to be on did nothing.
 applyView();
+// The מעקב tab lives inside #resultsPanel, which starts (and, absent a cached
+// scan, stays) display:none — so a saved watchlist with no scan this session
+// had literally no button anywhere on the page that could reveal it. setMode
+// itself already knows to show the panel for a non-empty watchlist (see
+// applyView above); it just needs to be reached once at boot instead of only
+// on a click that assumes a now-invisible tab.
+if($('resultsPanel').style.display==='none' && watchlist.size>0) setMode('watch');
 initAuth().then(loadDailyStatus);
 
 const _scrollTopBtn = $('scrollTopBtn');
