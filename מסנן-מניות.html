@@ -2381,7 +2381,15 @@ function sectorBadgeHtml(sector, withLabel){
   if(activeScreener==='commodities') return '';
   const pct = sectorStrengthMap[sector];
   if(pct==null) return '';
-  const hi=pct>=80, mid=pct>=60;
+  // 80/60 (Minervini's classic advance-decline bar) sounds right but isn't —
+  // it's calibrated for a strong bull tape. Checked live: EVERY sector was
+  // under 50% market-wide breadth was 25% that day — so 80/60 painted all 21
+  // sectors "weak" with zero differentiation, which read as broken rather
+  // than as "the whole market is soft right now". $('breadthChip') already
+  // has a bar for this exact same c>s50>s150>s200 pass-rate (see scan(), a
+  // few lines above where sectorAgg is built) — 50/35 — reuse it instead of
+  // inventing a second, uncalibrated one for the same number.
+  const hi=pct>=50, mid=pct>=35;
   const c = hi?'var(--green)':mid?'var(--amber)':'var(--text3)';
   const bg = hi?'rgba(46,204,113,0.13)':mid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
   // A raw "37%" next to an "RS 94" pill needs an explanation of WHAT is 37% —
