@@ -2629,6 +2629,11 @@ function setScreener(key, applyDef=true){
   $('filterSections').classList.toggle('single', !cfg.fund);
   const sub=$('filterSub'); if(sub) sub.textContent=cfg.sub;
   const th=$('techHead'); if(th) th.textContent=SCREENER_HEADS[key];
+  // sr-only heading — the only page title AT users get. Stayed hardcoded on
+  // "SEPA" through every switch (live-confirmed): a screen-reader user never
+  // learns which screener is actually active from the one place that's
+  // supposed to announce it.
+  const h1=document.querySelector('h1'); if(h1) h1.textContent=cfg.name+' — '+cfg.sub;
   document.querySelectorAll('.screener-btn').forEach(b=>{ const on=b.dataset.screener===key; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
   if(applyDef){
     Object.entries(SCREENER_DEFAULTS[key]||{}).forEach(([k,v])=>{ setFieldValue($(k),v); });
