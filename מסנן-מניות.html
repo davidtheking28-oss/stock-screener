@@ -879,7 +879,6 @@ tbody tr:last-child td { border-bottom: none; }
 .ss-bar { position: absolute; right: 0; top: 0; bottom: 0; z-index: 0; border-radius: 7px 0 0 7px; transition: width .25s ease; }
 .ss-name, .ss-num { position: relative; z-index: 1; }
 .ss-num { font: 700 11.5px var(--mono-data); }
-.ss-dot { position: relative; z-index: 1; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
 .results-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 8px 18px; border-bottom: 1px solid var(--border); background: var(--bg2); font: 500 11px var(--sans); color: var(--text3); }
 .results-legend:empty { display: none; }
@@ -3259,35 +3258,32 @@ function selectSector(s){
 function renderSectorStrength(){
   const wrap=$('sectorStrength'); if(!wrap) return;
   if(!allResults.length || !_rawUniverse){ wrap.innerHTML=''; return; }
-  const passCounts={}, totalCounts={};
+  // Used to sort by "% of this sector that passes MY current filter" — a
+  // different, much noisier question (0.3%/1.9%/2.9% on a strict screener,
+  // since only a handful of names in any sector clear it) than "is this
+  // sector leading the market right now" (sectorRankTier / Trend Template
+  // breadth, the 13%-45% range the badges use). Reported unclear twice in a
+  // row, then explicitly: "מי הכי חזק לפי סדר של כל הסקטורים" — sort and
+  // label by the market-wide number instead; the count of matches in the
+  // current filter moves to a secondary line in the tooltip.
+  const passCounts={};
   allResults.forEach(r=>{ passCounts[r.sector]=(passCounts[r.sector]||0)+1; });
-  _rawUniverse.forEach(r=>{ const s=r.d[C.sector]; if(s) totalCounts[s]=(totalCounts[s]||0)+1; });
-  const ranked=Object.entries(passCounts)
-    .map(([s,n])=>{ const total=totalCounts[s]||n; return [s,n,total,n/total*100]; })
-    .sort((a,b)=>b[3]-a[3]);
-  const maxPct=ranked[0][3];
+  const ranked=[...new Set(allResults.map(r=>r.sector))]
+    .filter(Boolean)
+    .map(s=>({s, tier:sectorRankTier(s), n:passCounts[s]||0}))
+    .filter(x=>x.tier)
+    .sort((a,b)=>b.tier.pct-a.tier.pct);
+  if(!ranked.length){ wrap.innerHTML=''; return; }
+  const maxPct=ranked[0].tier.pct||1;
   const active=$('sectorFilter')?.value||'';
-  wrap.innerHTML='<span class="ss-title">עוצמת סקטורים</span>'
-    +ranked.slice(0,8).map(([s,n,total,pct])=>{
-      const barW=Math.round(pct/maxPct*100);
+  wrap.innerHTML='<span class="ss-title">עוצמת סקטורים — מהחזק לחלש</span>'
+    +ranked.map(({s,tier,n})=>{
+      const barW=Math.round(tier.pct/maxPct*100);
       const on=active===s;
-      const strong=pct>=maxPct*0.66;
-      const barCol=strong?'rgba(46,204,113,0.20)':'rgba(79,131,255,0.16)';
-      const numCol=strong?'var(--green)':'var(--accent2)';
-      // This row is "how much of THIS sector passes MY current filter" — a
-      // different question from "is this sector leading the whole market
-      // right now" (sectorStrengthMap, Trend Template breadth). Both are
-      // real and both belong here, so the market-wide rank rides along as a
-      // small dot instead of a second row elsewhere — a second click-through
-      // panel for the same-looking info was the actual complaint ("איפה",
-      // then "אי אפשר בצורה יותר טובה").
-      const tier = sectorRankTier(s);
-      const dot = tier ? '<span class="ss-dot" style="background:'+tier.c+'" title="דירוג שוק: מקום '+tier.rank+' מתוך '+tier.total+' — '+tier.word+' ('+tier.pct+'% מהמניות ב-Trend Template)"></span>' : '';
-      return '<button class="ss-chip'+(on?' on':'')+(strong?' strong':'')+'" onclick="selectSector(\''+(on?'':esc(s))+'\')" title="'+esc(s)+' — '+n+' מתוך '+total+' מניות בסקטור עוברות את הסינון ('+pct.toFixed(1)+'%)">'
-        +'<span class="ss-bar" style="width:'+barW+'%;background:'+barCol+'"></span>'
-        +dot
+      return '<button class="ss-chip'+(on?' on':'')+(tier.rank<=Math.ceil(tier.total/3)?' strong':'')+'" onclick="selectSector(\''+(on?'':esc(s))+'\')" title="מקום '+tier.rank+' מתוך '+tier.total+' סקטורים — '+tier.pct+'% מהמניות ב'+esc(s)+' עומדות ב-Trend Template · '+n+' תוצאות עוברות את הסינון הנוכחי">'
+        +'<span class="ss-bar" style="width:'+barW+'%;background:'+tier.bg+'"></span>'
         +'<span class="ss-name">'+esc(s.split(' ').slice(0,2).join(' '))+'</span>'
-        +'<span class="ss-num" style="color:'+numCol+'">'+pct.toFixed(1)+'%</span></button>';
+        +'<span class="ss-num" style="color:'+tier.c+'">'+tier.pct+'%</span></button>';
     }).join('');
 }
 
