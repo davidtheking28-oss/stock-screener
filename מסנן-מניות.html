@@ -2404,7 +2404,15 @@ function sectorRankTier(sector){
   const top = rank <= Math.ceil(total/3), mid = !top && rank <= Math.ceil(total*2/3);
   const c = top?'var(--green)':mid?'var(--amber)':'var(--text3)';
   const bg = top?'rgba(46,204,113,0.13)':mid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
-  const word = top?'מוביל':mid?'בינוני':'חלש';
+  // 'מוביל'/'בינוני'/'חלש' collapses 21 sectors into 3 buckets — every top-
+  // third sector reads identically as "leading" with no way to tell #1 from
+  // #7 without opening the strength row. A letter grade is the familiar
+  // "this ranks better than that" scale (report-card ordering, understood
+  // without a legend) at finer resolution — 7 bands instead of 3 — while the
+  // color still comes from the same top/mid split above, so it doesn't
+  // introduce a second, disagreeing color scheme.
+  const GRADES=['A+','A','B+','B','C','D','F'];
+  const word = GRADES[Math.min(GRADES.length-1, Math.floor((rank-1)/total*GRADES.length))];
   return {pct, rank, total, c, bg, word};
 }
 
