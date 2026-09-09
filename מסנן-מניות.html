@@ -103,7 +103,10 @@ html[data-theme="tj-light"] {
      text they color (perf%, EPS/rev YoY, net margin — .pos/.neg everywhere).
      Darkened to clear it with margin (4.88:1 / 5.6:1); the dark theme's own
      values pass comfortably already (8.18:1 / 4.68:1) and are untouched. */
-  --green:#047857; --red:#be123c; --amber:#d97706;
+  /* --amber wasn't covered by the pass above and measured 2.45-3.10:1 live
+     (RS/score badges, .ss-num) — darkened one more step (600->800) to clear
+     AA with margin (4.81-6.79:1); green/red/text3 above are untouched. */
+  --green:#047857; --red:#be123c; --amber:#92400e;
   /* text3 was #64748b, which lands under 4:1 on the light surfaces it is used
      on (table headers, legend, hints). Darkened to clear AA. */
   --text:#0f172a; --text2:#334155; --text3:oklch(37% 0.03 258);
