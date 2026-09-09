@@ -2404,30 +2404,25 @@ function sectorRankTier(sector){
   const ranked = Object.entries(sectorStrengthMap).sort((a,b)=>b[1]-a[1]);
   const rank = ranked.findIndex(([s])=>s===sector) + 1;
   const total = ranked.length;
-  const GRADES=['A+','A','B+','B','C','D','F'];
-  // Grading purely by RANK (top third = A/A+) meant a weak-breadth day — 6 of
-  // 21 sectors were A+/A while the whole market was 23% healthy — always
-  // hands out good-looking grades to whoever merely beats their equally weak
-  // peers, which is exactly what read as "most sectors are strong, that
-  // can't be right". Grade against TODAY's overall market breadth instead:
-  // a sector needs to actually be ~2x the market average for A+, roughly AT
-  // the average for a C. Verified live the day this was caught: overall
-  // breadth 23%, only Energy Minerals (47%, ratio 2.0) graded A+, most
-  // sectors landed B/C instead of the previous A+/A pileup. Rank is still
-  // used for ordering and the tooltip; grade no longer is, so a top-third
-  // sector on a genuinely weak day reads as the C/D it actually is.
+  // Color still needs a good/weak signal even though the badge itself now
+  // shows a plain rank number (#1, #2…) — a letter grade and a plain word
+  // both turned out not to mean anything at a glance ("B+ אני לא מבין",
+  // "מוביל זה כללי מידי"). Banding purely by RANK (top third = green) always
+  // colors the top third green even on a day the whole market is weak —
+  // verified live, 6 of 21 sectors colored "strong" while overall breadth
+  // was 23%. Band against TODAY's market breadth instead: needs to be
+  // meaningfully above the average to read as green, not just ahead of
+  // equally weak peers.
   let idx;
   if(_marketBreadthPct){
     const ratio = pct / _marketBreadthPct;
-    idx = ratio>=2 ? 0 : ratio>=1.5 ? 1 : ratio>=1.2 ? 2 : ratio>=0.9 ? 3 : ratio>=0.6 ? 4 : ratio>=0.3 ? 5 : 6;
+    idx = ratio>=1.5 ? 0 : ratio>=0.9 ? 1 : 2;
   } else {
-    idx = Math.min(GRADES.length-1, Math.floor((rank-1)/total*GRADES.length));
+    idx = rank <= Math.ceil(total/3) ? 0 : rank <= Math.ceil(total*2/3) ? 1 : 2;
   }
-  const word = GRADES[idx];
-  const top = idx<=1, mid = idx>=2 && idx<=4;
-  const c = top?'var(--green)':mid?'var(--amber)':'var(--text3)';
-  const bg = top?'rgba(46,204,113,0.13)':mid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
-  return {pct, rank, total, c, bg, word};
+  const c = idx===0?'var(--green)':idx===1?'var(--amber)':'var(--text3)';
+  const bg = idx===0?'rgba(46,204,113,0.13)':idx===1?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
+  return {pct, rank, total, c, bg};
 }
 
 function sectorBadgeHtml(sector, withLabel){
@@ -2439,13 +2434,15 @@ function sectorBadgeHtml(sector, withLabel){
   if(activeScreener==='commodities') return '';
   const t = sectorRankTier(sector);
   if(!t) return '';
-  // A raw "37%" next to an "RS 94" pill needs an explanation of WHAT is 37% —
-  // and a hover title can't give it on mobile, where the whole audience reads
-  // this on a phone. Trading it for the plain word the color already encodes
-  // removes the question entirely: "Finance מוביל" needs no legend. The
-  // exact rank and percentage stay in the tooltip for anyone who does hover.
+  // Tried a raw "37%" (needs an explanation of WHAT is 37%), then a plain
+  // word (מוביל collapsed 7 sectors into one bucket), then a letter grade
+  // ("B+ doesn't tell me anything") — every one of those needs the reader to
+  // already know a scale. A place number doesn't: "#1 מתוך 21" is literally
+  // the answer to "who's strongest, who's next" with nothing to interpret.
+  // Color still carries the same top/mid/bottom signal at a glance; the
+  // exact percentage stays in the tooltip for anyone who does hover.
   const lbl = withLabel ? '<span class="gb-lbl">'+escHtml(String(sector).split(' ')[0])+'</span> ' : '';
-  return '<span class="gbadge" style="color:'+t.c+';background:'+t.bg+'" title="מקום '+t.rank+' מתוך '+t.total+' סקטורים — '+t.pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>'+t.word+'</b></span>';
+  return '<span class="gbadge" style="color:'+t.c+';background:'+t.bg+'" title="מקום '+t.rank+' מתוך '+t.total+' סקטורים — '+t.pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>#'+t.rank+'</b></span>';
 }
 
 function fmtMoneyM(m){ return m>=1000 ? '$'+(m/1000).toFixed(m%1000?1:0)+'B' : m<1 ? '$'+Math.round(m*1000)+'K' : '$'+m+'M'; }
