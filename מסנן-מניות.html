@@ -2897,7 +2897,14 @@ async function scan(force=false){
       Object.entries(sectorAgg).map(([sec,{up,rated}])=>[sec, rated?Math.round(up/rated*100):0])
     );
     const bPct = rated ? Math.round(up/rated*100) : 0;
-    _marketBreadthPct = bPct;
+    // The breadth loop above is itself guarded by !isCommodities, so `rated`
+    // stays 0 on a commodities scan — writing _marketBreadthPct=0
+    // unconditionally here corrupted the tiering for a STALE sectorStrengthMap
+    // left over from the last equity scan (sectorRankTier's ratio math divides
+    // by this). Verified live: a commodities scan changed Materials' tier
+    // from gray/"weak" (correct, ratio 0.83) to amber/"mid" purely because
+    // breadth got zeroed by an unrelated screener.
+    if(!isCommodities) _marketBreadthPct = bPct;
     const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--amber)':'var(--red)';
     if(!isCommodities){
       $('breadthDot').style.background = bCol;
@@ -3310,7 +3317,13 @@ function selectSector(s){
 
 function renderSectorStrength(){
   const wrap=$('sectorStrength'); if(!wrap) return;
-  if(!allResults.length || !_rawUniverse){ wrap.innerHTML=''; return; }
+  // sectorBadgeHtml already refuses to render on commodities (12 fixed ETFs
+  // groupSector to 'Miscellaneous'->'Other', no real sector) — this row read
+  // the same 'Other' entry, but leftover from whatever equity screener last
+  // scanned, since scan() never clears sectorStrengthMap for commodities.
+  // Verified live: switching to commodities still showed an 'Other 16%'
+  // strength chip carried over from a prior SEPA scan.
+  if(!allResults.length || !_rawUniverse || activeScreener==='commodities'){ wrap.innerHTML=''; return; }
   // Used to sort by "% of this sector that passes MY current filter" — a
   // different, much noisier question (0.3%/1.9%/2.9% on a strict screener,
   // since only a handful of names in any sector clear it) than "is this
