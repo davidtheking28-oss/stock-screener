@@ -2437,22 +2437,16 @@ function sectorRankTier(sector){
   const ranked = Object.entries(sectorStrengthMap).sort((a,b)=>b[1]-a[1]);
   const rank = ranked.findIndex(([s])=>s===sector) + 1;
   const total = ranked.length;
-  // Color still needs a good/weak signal even though the badge itself now
-  // shows a plain rank number (#1, #2…) — a letter grade and a plain word
-  // both turned out not to mean anything at a glance ("B+ אני לא מבין",
-  // "מוביל זה כללי מידי"). Banding purely by RANK (top third = green) always
-  // colors the top third green even on a day the whole market is weak —
-  // verified live, 6 of 21 sectors colored "strong" while overall breadth
-  // was 23%. Band against TODAY's market breadth instead: needs to be
-  // meaningfully above the average to read as green, not just ahead of
-  // equally weak peers.
-  let idx;
-  if(_marketBreadthPct){
-    const ratio = pct / _marketBreadthPct;
-    idx = ratio>=1.5 ? 0 : ratio>=0.9 ? 1 : 2;
-  } else {
-    idx = rank <= Math.ceil(total/3) ? 0 : rank <= Math.ceil(total*2/3) ? 1 : 2;
-  }
+  // The market-ratio banding (needs 1.5x the market average to read green)
+  // made sense while the badge showed a letter grade — a grade implies "this
+  // is objectively good", which the top rank-third always was even on a weak
+  // day. Now that the badge is a plain "#2", that implication is gone: an
+  // ordinal never claimed "good", only "ahead of others" — so the color can
+  // go back to a clean, even rank split instead of a hard cutoff that put
+  // #1 in green and #2 in amber ("למה 2 זה כבר כתום") purely because #2's
+  // ratio missed 1.5x by a hair. Even thirds read as "in order" the way a
+  // strict cutoff didn't.
+  const idx = rank <= Math.ceil(total/3) ? 0 : rank <= Math.ceil(total*2/3) ? 1 : 2;
   const c = idx===0?'var(--green)':idx===1?'var(--amber)':'var(--text3)';
   const bg = idx===0?'rgba(46,204,113,0.13)':idx===1?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
   return {pct, rank, total, c, bg};
