@@ -1313,7 +1313,16 @@ const COL_DEFS = [
   {key:'firstSeen', label:'נוסף למעקב', defaultOn:true},
 ];
 
-const UNIVERSE_CACHE_KEY = 'sepa_universe_v1';
+// v2: SECTOR_GROUPS collapsed the raw 21-way sector field into ~11 groups —
+// a v1 cache saved before that landed still holds raw names in both
+// ttUniverse rows (r.sector) AND sectorStrength (its keys), independently of
+// each other. "Health Technology" and "Health Services" both truncate their
+// badge label to "Health" but keep separate, ungrouped ranks/percentages —
+// reads as one sector with two different, unexplainable numbers ("Health #6"
+// and "Health #8"). Verified by seeding a v1-shaped blob and reloading.
+// Renaming the key makes every old cache miss once and force a real
+// recompute, instead of asking users to clear localStorage by hand again.
+const UNIVERSE_CACHE_KEY = 'sepa_universe_v2';
 const RESULTS_CACHE_KEY  = 'sepa_scan_results_v1';
 const SCROLL_KEY = 'sepa_scroll_v1';
 
