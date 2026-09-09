@@ -1263,6 +1263,30 @@ const COMMODITY_TICKERS = ['GLD','SLV','COPX','WEAT','CORN','UNG','PALL','PPLT',
 // live-confirmed by Icahn Enterprises (IEP) passing this screen at −18.5% EPS
 // YoY purely because its sector was on this allow-list.
 const GROWTH_SECTORS = ['Technology Services','Electronic Technology','Consumer Durables','Consumer Non-Durables','Consumer Services','Retail Trade','Communications','Health Technology'];
+// TradingView's own 21-way sector field (Electronic Technology vs Technology
+// Services, Health Technology vs Health Services…) is a real classification,
+// just a much finer one than most people expect — "מה זה electronic, ויש
+// technology" was the actual report. Collapsed here into the familiar ~11
+// GICS-style sectors for every DISPLAY use (badges, sector tag, the strength
+// row, and the breadth aggregation that feeds them). GROWTH_SECTORS above
+// stays on the raw 21-way values on purpose — it's a curated allow-list
+// tuned to the fine-grained field, not a display concern.
+const SECTOR_GROUPS = {
+  'Electronic Technology':'Technology', 'Technology Services':'Technology',
+  'Communications':'Communication Services',
+  'Health Technology':'Healthcare', 'Health Services':'Healthcare',
+  'Finance':'Financials',
+  'Energy Minerals':'Energy',
+  'Non-Energy Minerals':'Materials', 'Process Industries':'Materials',
+  'Producer Manufacturing':'Industrials', 'Industrial Services':'Industrials',
+  'Transportation':'Industrials', 'Commercial Services':'Industrials', 'Distribution Services':'Industrials',
+  'Consumer Durables':'Consumer Discretionary', 'Consumer Services':'Consumer Discretionary', 'Retail Trade':'Consumer Discretionary',
+  'Consumer Non-Durables':'Consumer Staples',
+  'Utilities':'Utilities',
+  'Government':'Government',
+  'Miscellaneous':'Other',
+};
+function groupSector(raw){ return raw ? (SECTOR_GROUPS[raw]||raw) : raw; }
 // A stored key that no longer exists (the removed 'momentum' screener) would
 // make setScreener early-return, leaving the panel with no panel-* class and
 // every screener-specific field visible at once.
@@ -2364,7 +2388,7 @@ async function backfillSectorStrength(){
     const d=r.d, c=d[C.close], s50=d[C.SMA50], s150=d[C.SMA150], s200=d[C.SMA200];
     if(!(c&&s50&&s150&&s200)) continue;
     rated++;
-    const sec=d[C.sector]; if(sec) (sectorAgg[sec] ??= {up:0,rated:0}).rated++;
+    const sec=groupSector(d[C.sector]); if(sec) (sectorAgg[sec] ??= {up:0,rated:0}).rated++;
     if(c>s150&&c>s200&&s150>s200&&s50>s150&&c>s50){ up++; if(sec) sectorAgg[sec].up++; }
   }
   sectorStrengthMap = Object.fromEntries(
@@ -2857,7 +2881,7 @@ async function scan(force=false){
       const d=r.d,c=d[C.close],s50=d[C.SMA50],s150=d[C.SMA150],s200=d[C.SMA200];
       if(!(c&&s50&&s150&&s200)) continue;
       rated++;
-      const sec=d[C.sector]; if(sec) (sectorAgg[sec] ??= {up:0,rated:0}).rated++;
+      const sec=groupSector(d[C.sector]); if(sec) (sectorAgg[sec] ??= {up:0,rated:0}).rated++;
       if(c>s150&&c>s200&&s150>s200&&s50>s150&&c>s50){ up++; if(sec) sectorAgg[sec].up++; }
     }
     if(!isCommodities) sectorStrengthMap = Object.fromEntries(
@@ -3237,7 +3261,7 @@ function applyFilters(universe, rsMap, opts={}){
     out.push({
       ttPass:pass,
       sym:r.s, ticker:d[C.name], name:d[C.description]||'', exch:d[C.exchange],
-      close, rs, sector:d[C.sector]||'—', mc,
+      close, rs, sector:groupSector(d[C.sector])||'—', mc,
       vol, avgVol, dollarVol, earnIn,
       fromHighPct, fromLowPct:(close/lo-1)*100,
       rangePos:hi>lo?(close-lo)/(hi-lo):0.5, perfY, perf3, perf6, volD, volM, adrPct,
