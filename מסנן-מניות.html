@@ -1344,6 +1344,7 @@ let _rawUniverse = null, _rawTime = 0, _rsMapMem = null;
 // sector instead of summed globally). Not persisted — recomputed fresh on
 // every real scan, same lifetime as _rawUniverse/the breadth numbers.
 let sectorStrengthMap = {};
+let _marketBreadthPct = null;
 // Both render caches key on the SYMBOL LIST, not on the rows' contents, so a
 // rescan that returns the same tickers repainted nothing — prices, RS and
 // scores stayed on the previous scan's numbers while the clock updated. It
@@ -2092,7 +2093,7 @@ function saveUniverseCache(){
   clearTimeout(_saveUniverseCacheTimer);
   _saveUniverseCacheTimer=setTimeout(()=>{
     try {
-      localStorage.setItem(UNIVERSE_CACHE_KEY, JSON.stringify({data:ttUniverse, sectorStrength:sectorStrengthMap, time:Date.now()}));
+      localStorage.setItem(UNIVERSE_CACHE_KEY, JSON.stringify({data:ttUniverse, sectorStrength:sectorStrengthMap, breadthPct:_marketBreadthPct, time:Date.now()}));
     } catch(e) {}
   }, 400);
 }
@@ -2101,10 +2102,11 @@ function loadUniverseCache(){
   try {
     const raw = localStorage.getItem(UNIVERSE_CACHE_KEY);
     if(!raw) return;
-    const {data, sectorStrength, time} = JSON.parse(raw);
+    const {data, sectorStrength, breadthPct, time} = JSON.parse(raw);
     if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(UNIVERSE_CACHE_KEY); return; }
     ttUniverse = data;
     if(sectorStrength) sectorStrengthMap = sectorStrength;
+    if(breadthPct!=null) _marketBreadthPct = breadthPct;
   } catch(e) {}
 }
 
@@ -2375,6 +2377,7 @@ async function backfillSectorStrength(){
   // cache-only boot still shows a clickable chip.
   if(activeScreener!=='commodities'){
     const bPct = rated ? Math.round(up/rated*100) : 0;
+    _marketBreadthPct = bPct;
     const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--amber)':'var(--red)';
     $('breadthDot').style.background = bCol;
     $('breadthLabel').style.color    = bCol;
@@ -2401,18 +2404,29 @@ function sectorRankTier(sector){
   const ranked = Object.entries(sectorStrengthMap).sort((a,b)=>b[1]-a[1]);
   const rank = ranked.findIndex(([s])=>s===sector) + 1;
   const total = ranked.length;
-  const top = rank <= Math.ceil(total/3), mid = !top && rank <= Math.ceil(total*2/3);
+  const GRADES=['A+','A','B+','B','C','D','F'];
+  // Grading purely by RANK (top third = A/A+) meant a weak-breadth day — 6 of
+  // 21 sectors were A+/A while the whole market was 23% healthy — always
+  // hands out good-looking grades to whoever merely beats their equally weak
+  // peers, which is exactly what read as "most sectors are strong, that
+  // can't be right". Grade against TODAY's overall market breadth instead:
+  // a sector needs to actually be ~2x the market average for A+, roughly AT
+  // the average for a C. Verified live the day this was caught: overall
+  // breadth 23%, only Energy Minerals (47%, ratio 2.0) graded A+, most
+  // sectors landed B/C instead of the previous A+/A pileup. Rank is still
+  // used for ordering and the tooltip; grade no longer is, so a top-third
+  // sector on a genuinely weak day reads as the C/D it actually is.
+  let idx;
+  if(_marketBreadthPct){
+    const ratio = pct / _marketBreadthPct;
+    idx = ratio>=2 ? 0 : ratio>=1.5 ? 1 : ratio>=1.2 ? 2 : ratio>=0.9 ? 3 : ratio>=0.6 ? 4 : ratio>=0.3 ? 5 : 6;
+  } else {
+    idx = Math.min(GRADES.length-1, Math.floor((rank-1)/total*GRADES.length));
+  }
+  const word = GRADES[idx];
+  const top = idx<=1, mid = idx>=2 && idx<=4;
   const c = top?'var(--green)':mid?'var(--amber)':'var(--text3)';
   const bg = top?'rgba(46,204,113,0.13)':mid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
-  // 'מוביל'/'בינוני'/'חלש' collapses 21 sectors into 3 buckets — every top-
-  // third sector reads identically as "leading" with no way to tell #1 from
-  // #7 without opening the strength row. A letter grade is the familiar
-  // "this ranks better than that" scale (report-card ordering, understood
-  // without a legend) at finer resolution — 7 bands instead of 3 — while the
-  // color still comes from the same top/mid split above, so it doesn't
-  // introduce a second, disagreeing color scheme.
-  const GRADES=['A+','A','B+','B','C','D','F'];
-  const word = GRADES[Math.min(GRADES.length-1, Math.floor((rank-1)/total*GRADES.length))];
   return {pct, rank, total, c, bg, word};
 }
 
@@ -2853,6 +2867,7 @@ async function scan(force=false){
       Object.entries(sectorAgg).map(([sec,{up,rated}])=>[sec, rated?Math.round(up/rated*100):0])
     );
     const bPct = rated ? Math.round(up/rated*100) : 0;
+    _marketBreadthPct = bPct;
     const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--amber)':'var(--red)';
     if(!isCommodities){
       $('breadthDot').style.background = bCol;
