@@ -3570,7 +3570,12 @@ function arr(k){
 }
 function th(label,key,tip){
   const t=tip?' title="'+tip+'"':'';
-  return '<th class="'+(sortKey===key?'sorted':'')+'" onclick="setSort(\''+key+'\')\"'+t+'>'+label+' '+arr(key)+'</th>';
+  // Mouse-only sort — j/k/Enter/w's own keydown handler (below) never covers
+  // column headers, so a keyboard-only user had no way to sort the table at
+  // all. Same role/tabindex/onkeydown shape already used for .filter-header
+  // and .preset-x elsewhere in this file (better-interface audit, 2026-09-13).
+  const dir = sortKey===key ? (sortDir<0?'descending':'ascending') : 'none';
+  return '<th class="'+(sortKey===key?'sorted':'')+'" role="button" tabindex="0" aria-sort="'+dir+'" onclick="setSort(\''+key+'\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&event.target===this){event.preventDefault();setSort(\''+key+'\')}"'+t+'>'+label+' '+arr(key)+'</th>';
 }
 
 function renderTable(rows){
