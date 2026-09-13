@@ -2979,7 +2979,20 @@ async function scan(force=false){
     const rb=$('scanBtn'); if(rb) rb.style.display='';
 
     if(needsExact){
-      validateExact(allResults, activeScreener, null, myAbort.signal).then(v=>{
+      // Exact validation fetches a year of OHLC bars per candidate (20 at a
+      // time) before it drops the ones that fail — for a large candidate list
+      // that's genuinely a several-second wait, and onProgress was wired up
+      // to nothing, so the status bar sat on a static "מאמת..." the whole
+      // time with no sign anything was happening. Reported as "I scroll down
+      // and only some stocks update" — that's the card-level lazy chart
+      // loading (intentional, see _ohlcObserve above) doing its job while the
+      // list itself hadn't actually finished validating yet; a live counter
+      // at least makes the wait legible instead of looking stuck/broken.
+      const onExactProgress = (done, total) => {
+        if(myToken!==_scanToken || mode==='watch') return;
+        $('statBar').innerHTML='<span class="spinner"></span> מאמת מדויק מול OHLC… <b>'+done+'</b>/'+total;
+      };
+      validateExact(allResults, activeScreener, onExactProgress, myAbort.signal).then(v=>{
         if(myToken!==_scanToken) return;   // superseded by a newer scan
         allResults = v; _dataGen++;
         // Every term of the VCP score reads r.vcp, which only exists after the
