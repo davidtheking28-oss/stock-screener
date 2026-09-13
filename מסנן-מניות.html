@@ -81,7 +81,7 @@
   --accent2:  oklch(73% 0.16 258);
   --green:    oklch(72% 0.18 142);
   --red:      oklch(62% 0.22 25);
-  --amber:    oklch(78% 0.14 70);
+  --yellow:    oklch(78% 0.14 70);
   --text:     oklch(94% 0.018 252);
   --text2:    oklch(76% 0.04 252);
   --text3:    oklch(64% 0.04 252);
@@ -100,7 +100,7 @@ html[data-theme="tj"] {
   --fill:oklch(100% 0 0 / 0.05); --fill2:oklch(100% 0 0 / 0.09); --fill3:oklch(100% 0 0 / 0.15);
   --accent-solid:oklch(48% 0.17 277); --on-accent:oklch(99% 0.004 277);
   --accent:#818cf8; --accent2:#a5b4fc;
-  --green:#2dd4a0; --red:#ff6b8a; --amber:#fbbf24;
+  --green:#2dd4a0; --red:#ff6b8a; --yellow:#fbbf24;
   --text:#f1f5f9; --text2:#a8b8cc; --text3:oklch(70% 0.025 258);
   --chart-bg:oklch(17% 0.008 280);
   --sans:'Heebo',system-ui,sans-serif;
@@ -121,10 +121,10 @@ html[data-theme="tj-light"] {
      text they color (perf%, EPS/rev YoY, net margin — .pos/.neg everywhere).
      Darkened to clear it with margin (4.88:1 / 5.6:1); the dark theme's own
      values pass comfortably already (8.18:1 / 4.68:1) and are untouched. */
-  /* --amber wasn't covered by the pass above and measured 2.45-3.10:1 live
+  /* --yellow wasn't covered by the pass above and measured 2.45-3.10:1 live
      (RS/score badges, .ss-num) — darkened one more step (600->800) to clear
      AA with margin (4.81-6.79:1); green/red/text3 above are untouched. */
-  --green:#047857; --red:#be123c; --amber:#92400e;
+  --green:#047857; --red:#be123c; --yellow:#92400e;
   /* text3 was #64748b, which lands under 4:1 on the light surfaces it is used
      on (table headers, legend, hints). Darkened to clear AA. */
   --text:#0f172a; --text2:#334155; --text3:oklch(37% 0.03 258);
@@ -674,7 +674,7 @@ tbody tr:last-child td { border-bottom: none; }
    transient class never survives to paint — :active is the one state CSS can
    still catch on the press itself, no DOM persistence needed. */
 .star-btn:active { transform: scale(1.3); }
-.star-btn.on { color: var(--amber); }
+.star-btn.on { color: var(--yellow); }
 .star-btn.off { color: var(--text3); }
 
 /* ── Gallery ── */
@@ -879,7 +879,7 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 1px 5px; border-radius: 4px; letter-spacing: 0.3px;
   margin-right: 5px; vertical-align: middle;
 }
-.earn-badge.soon { color: var(--amber); background: rgba(245,185,74,0.12); border-color: rgba(245,185,74,0.3); }
+.earn-badge.soon { color: var(--yellow); background: rgba(245,185,74,0.12); border-color: rgba(245,185,74,0.3); }
 .wl-missing {
   padding: 9px 18px; border-top: 1px solid var(--border);
   font: 500 11px var(--sans); color: var(--text3); line-height: 1.7;
@@ -920,7 +920,7 @@ tbody tr:last-child td { border-bottom: none; }
 .lg-grp { display: inline-flex; align-items: center; gap: 6px; }
 .lg-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .lg-hi { background: var(--green); color: var(--green); }
-.lg-mid { background: var(--amber); color: var(--amber); }
+.lg-mid { background: var(--yellow); color: var(--yellow); }
 .lg-lo { background: var(--text3); color: var(--text3); }
 .lg-sep { width: 1px; height: 13px; background: var(--border); }
 .results-legend .earn-badge { margin: 0; }
@@ -2438,7 +2438,7 @@ function _calcScoreRaw(r, scr='sepa'){
   const perfYS = Math.min(clamp(r.perfY??0,0,300)/300,1)*10;
   return Math.round(clamp(rsS+epsS+revS+hiS+perfYS,0,100));
 }
-function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--amber)':'var(--text3)'; }
+function scoreColor(s)   { return s>=80?'var(--green)':s>=60?'var(--yellow)':'var(--text3)'; }
 // % of the sector's own stocks currently passing the Trend Template (see
 // scan()'s sectorAgg loop) — a genuine trend-strength signal, not the
 // active-filter pass-rate renderSectorStrength's chips show. Empty string
@@ -2490,7 +2490,7 @@ async function backfillSectorStrength(){
   if(activeScreener!=='commodities'){
     const bPct = rated ? Math.round(up/rated*100) : 0;
     _marketBreadthPct = bPct;
-    const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--amber)':'var(--red)';
+    const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--yellow)':'var(--red)';
     $('breadthDot').style.background = bCol;
     $('breadthLabel').style.color    = bCol;
     $('breadthLabel').textContent    = bPct+'% במגמת עלייה';
@@ -2526,7 +2526,7 @@ function sectorRankTier(sector){
   // ratio missed 1.5x by a hair. Even thirds read as "in order" the way a
   // strict cutoff didn't.
   const idx = rank <= Math.ceil(total/3) ? 0 : rank <= Math.ceil(total*2/3) ? 1 : 2;
-  const c = idx===0?'var(--green)':idx===1?'var(--amber)':'var(--text3)';
+  const c = idx===0?'var(--green)':idx===1?'var(--yellow)':'var(--text3)';
   const bg = idx===0?'rgba(46,204,113,0.13)':idx===1?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
   return {pct, rank, total, c, bg};
 }
@@ -2989,7 +2989,7 @@ async function scan(force=false){
     // from gray/"weak" (correct, ratio 0.83) to amber/"mid" purely because
     // breadth got zeroed by an unrelated screener.
     if(!isCommodities) _marketBreadthPct = bPct;
-    const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--amber)':'var(--red)';
+    const bCol = bPct>=50?'var(--green)':bPct>=35?'var(--yellow)':'var(--red)';
     if(!isCommodities){
       $('breadthDot').style.background = bCol;
       $('breadthLabel').style.color    = bCol;
@@ -3025,7 +3025,7 @@ async function scan(force=false){
         $('statBar').innerHTML='<span class="spinner"></span> <b>'+results.length+'</b> מועמדים \xb7 מאמת מדויק מול OHLC…';
       } else {
         const sparseMsg = !isCommodities && bPct<35 && allResults.length<20
-          ? ' \xb7 <span style="color:var(--amber);font-weight:500">שוק חלש — מעט הזדמנויות SEPA</span>' : '';
+          ? ' \xb7 <span style="color:var(--yellow);font-weight:500">שוק חלש — מעט הזדמנויות SEPA</span>' : '';
         _scanStatHtml='<b>'+results.length+'</b> מניות עברו \xb7 מתוך <b>'+universe.length.toLocaleString()+'</b> שנסרקו'+sparseMsg;
         // On the watchlist tab this must not overwrite the watchlist summary.
         if(mode!=='watch') $('statBar').innerHTML=_scanStatHtml;
@@ -3747,11 +3747,11 @@ function renderTable(rows){
       +'<span class="score-track"><span class="score-fill" style="width:'+clamp(sc,0,100)+'%;background:'+scoreColor(sc)+'"></span></span>'
       +'</div>';
 
-    const rsCol=r.rs>=80?'var(--green)':r.rs>=60?'var(--amber)':'var(--text3)';
+    const rsCol=r.rs>=80?'var(--green)':r.rs>=60?'var(--yellow)':'var(--text3)';
     const rsEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+r.rs+'%;background:'+rsCol+';color:'+rsCol+'"></div></div><span class="mn" style="color:'+rsCol+';font-weight:600">'+r.rs+'</span></div>';
 
     const rPos=clamp(r.rangePos*100,2,98);
-    const rCol=r.rangePos>0.7?'var(--green)':r.rangePos>0.4?'var(--amber)':'var(--red)';
+    const rCol=r.rangePos>0.7?'var(--green)':r.rangePos>0.4?'var(--yellow)':'var(--red)';
     const rngEl='<div class="mini-bar-wrap"><div class="range-track"><div class="range-dot" style="left:'+rPos+'%;background:'+rCol+'"></div></div><span class="mn" style="color:'+rCol+'">'+(r.rangePos*100).toFixed(0)+'%</span></div>';
 
     const vr=r.vol&&r.avgVol?r.vol/r.avgVol:null;
@@ -3784,11 +3784,11 @@ function renderTable(rows){
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
-      +col('adr',    (()=>{const a=r.adrPct??r.volD;const c=a==null?'var(--text3)':a>=5?'var(--green)':a>=3.5?'var(--amber)':'var(--text3)';return '<td><span class="mn" style="color:'+c+';font-weight:600">'+(a==null?'—':a.toFixed(1)+'%')+'</span></td>';})())
+      +col('adr',    (()=>{const a=r.adrPct??r.volD;const c=a==null?'var(--text3)':a>=5?'var(--green)':a>=3.5?'var(--yellow)':'var(--text3)';return '<td><span class="mn" style="color:'+c+';font-weight:600">'+(a==null?'—':a.toFixed(1)+'%')+'</span></td>';})())
       +col('rsline', (()=>{
           const l=r.rsLine;
           if(!l) return '<td><span class="mn" style="color:var(--text3)">—</span></td>';
-          const c=l.atHigh?'var(--green)':l.pctFromHigh>=-5?'var(--amber)':'var(--text3)';
+          const c=l.atHigh?'var(--green)':l.pctFromHigh>=-5?'var(--yellow)':'var(--text3)';
           const tip=l.atHigh?'קו ה-RS בשיא חדש מול SPY':'קו ה-RS '+Math.abs(l.pctFromHigh).toFixed(1)+'% מתחת לשיא מול SPY';
           return '<td title="'+tip+'"><span class="mn" style="color:'+c+';font-weight:600">'
             +(l.atHigh?'שיא':l.pctFromHigh.toFixed(1)+'%')+'</span></td>';
@@ -3877,7 +3877,7 @@ function renderGallery(srcRows){
     };
     const fhUp = r.fromHighPct>=-8;
     const rsHi=r.rs>=80, rsMid=r.rs>=60;
-    const rsC = rsHi?'var(--green)':rsMid?'var(--amber)':'var(--text3)';
+    const rsC = rsHi?'var(--green)':rsMid?'var(--yellow)':'var(--text3)';
     const rsBg = rsHi?'rgba(46,204,113,0.13)':rsMid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
     return '<div class="gcard" role="button" tabindex="0" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&event.target===this){event.preventDefault();openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')}">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
@@ -4275,7 +4275,7 @@ async function loadDailyStatus(){
     if(!ent.length && !ex.length && !perfBits.length) return;
     // Tickers come from the screener_daily row rather than the live scan, so
     // escape them like any other stored value before they reach innerHTML.
-    const mark=t=>watchlist.has(t)?'<b style="color:var(--amber)">★'+escHtml(t)+'</b>':escHtml(t);
+    const mark=t=>watchlist.has(t)?'<b style="color:var(--yellow)">★'+escHtml(t)+'</b>':escHtml(t);
     const fmt=a=>a.slice(0,12).map(mark).join(', ')+(a.length>12?' +'+(a.length-12):'');
     const dateHe=escHtml(String(scan_date).slice(5).split('-').reverse().join('/'));
     const el=$('dailyBanner');
@@ -4294,7 +4294,7 @@ function drawBreadthSpark(rows){
   const w=72,h=20,n=pts.length;
   const poly=pts.map((b,i)=>(1+(i/(n-1))*(w-2)).toFixed(1)+','+(h-1-clamp(b,0,100)/100*(h-2)).toFixed(1)).join(' ');
   const last=pts[n-1];
-  const col=last>=50?'var(--green)':last>=35?'var(--amber)':'var(--red)';
+  const col=last>=50?'var(--green)':last>=35?'var(--yellow)':'var(--red)';
   el.innerHTML='<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true"><polyline points="'+poly+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
   el.title='בריאות שוק — אחוז המניות במגמת עלייה, '+n+' סריקות לילה אחרונות (עדכני: '+last+'%)';
   el.classList.add('show');
