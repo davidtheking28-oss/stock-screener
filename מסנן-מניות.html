@@ -132,6 +132,12 @@ html[data-theme="tj-light"] {
   --sans:'Heebo',system-ui,sans-serif;
 }
 html[data-theme="tj-light"] .btn-scan { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); }
+/* .tech-head/.fund-head had no light-mode override at all — the dark-theme
+   blue/green measured 1.74-2.4:1 on the light bg (better-colors audit,
+   2026-09-13). Reusing the already-measured --accent2/--green tokens from
+   this same block rather than introducing a third pair. */
+html[data-theme="tj-light"] .filter-section h3.tech-head { color: var(--accent2); }
+html[data-theme="tj-light"] .filter-section h3.fund-head { color: var(--green); }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -1163,10 +1169,10 @@ tbody tr:last-child td { border-bottom: none; }
 </div>
 
 <!-- Auth Modal -->
-<div class="modal" id="authModal" onclick="if(event.target===this)closeAuthModal()">
+<div class="modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle" onclick="if(event.target===this)closeAuthModal()">
   <div class="modal-box" style="width:min(380px,94vw);height:auto">
     <div class="modal-head">
-      <div><div class="modal-ticker">כניסה</div><div class="modal-name">לסנכרון רשימת מעקב בין מכשירים</div></div>
+      <div><div class="modal-ticker" id="authModalTitle">כניסה</div><div class="modal-name">לסנכרון רשימת מעקב בין מכשירים</div></div>
       <button class="modal-close" onclick="closeAuthModal()">&#10005;</button>
     </div>
     <div id="authModalBody" style="padding:20px 24px 24px">
@@ -3961,8 +3967,20 @@ function renderWatchlistGallery(){
    MODAL
 ════════════════════════════════════ */
 let _modalReturnFocus=null;
+// aria-modal="true" on #modal/#authModal promises the rest of the page is
+// unreachable — without `inert`, a screen reader's browse-mode cursor (not
+// just Tab) can still land on content behind it (better-accessibility audit,
+// 2026-09-13). Keeps whichever modal is opening exempt; everything else at
+// body level gets inert while it's open.
+function _setBgInert(openModalId, on){
+  Array.prototype.forEach.call(document.body.children, function(el){
+    if(el.id===openModalId) return;
+    el.inert = on;
+  });
+}
 function openChart(sym, ticker, name){
   _modalReturnFocus=document.activeElement;
+  _setBgInert('modal', true);
   $('modalTitle').textContent=ticker; $('modalSub').textContent=name;
   const wrap=$('modalChart'); wrap.innerHTML='';
   const config=JSON.stringify({
@@ -3989,6 +4007,7 @@ function openChart(sym, ticker, name){
 }
 function closeModal(){
   $('modal').classList.remove('open'); $('modalChart').innerHTML='';
+  _setBgInert('modal', false);
   // Return focus to whatever opened the modal (a table row, a gallery card),
   // instead of leaving it on the now-hidden close button.
   if(_modalReturnFocus && document.contains(_modalReturnFocus)) _modalReturnFocus.focus();
@@ -4216,11 +4235,18 @@ async function signOut(){
 
 function toggleAuthModal(){
   if(!HAS_SUPABASE){ toast('כניסה זמינה רק בגרסה המקוונת'); return; }
+  _modalReturnFocus=document.activeElement;
+  _setBgInert('authModal', true);
   $('authForm').style.display=''; $('authSent').style.display='none';
   $('authModal').classList.add('open');
-  setTimeout(()=>$('authEmail')?.focus(), 100);
+  $('authEmail')?.focus();
 }
-function closeAuthModal(){ $('authModal').classList.remove('open'); }
+function closeAuthModal(){
+  $('authModal').classList.remove('open');
+  _setBgInert('authModal', false);
+  if(_modalReturnFocus && document.contains(_modalReturnFocus)) _modalReturnFocus.focus();
+  _modalReturnFocus=null;
+}
 
 async function loadDailyStatus(){
   if(!HAS_SUPABASE) return;
