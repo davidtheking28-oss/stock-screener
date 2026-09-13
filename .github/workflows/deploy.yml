@@ -47,6 +47,7 @@ jobs:
         run: |
           mkdir dist
           cp "מסנן-מניות.html" dist/index.html
+          cp "og-image.png" dist/og-image.png
           sed -i "s|__SUPABASE_ANON__|${{ secrets.SUPABASE_ANON }}|g" dist/index.html
           printf 'User-agent: *\nAllow: /\nSitemap: https://davidtheking28-oss.github.io/stock-screener/sitemap.xml\n' > dist/robots.txt
           printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://davidtheking28-oss.github.io/stock-screener/</loc></url></urlset>\n' > dist/sitemap.xml
