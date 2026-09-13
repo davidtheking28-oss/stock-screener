@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { serveCached } from "../_shared/market_cache.ts";
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -9,12 +10,14 @@ const mem = new Map<string, { bars: unknown; time: number }>();
 const MEM_TTL = 15 * 60 * 1000;      // 15min in-instance
 const DB_TTL = 45 * 60 * 1000;       // 45min persistent freshness (3mo bars)
 const DB_TTL_1Y = 6 * 60 * 60 * 1000; // 6h persistent freshness (1y bars — daily, finalize once/day)
+// Past the TTL but under this bound, serve the last bars immediately and
+// refresh behind the response instead of blocking the caller on Yahoo — see
+// _shared/market_cache.ts.
+const MAX_STALE = 3 * 60 * 60 * 1000;      // 3h (3mo bars)
+const MAX_STALE_1Y = 24 * 60 * 60 * 1000;  // 24h (1y bars)
 
 const _rate = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 400;   // one screener scan validates ~150 survivors from a single IP
-
-const SB_URL = Deno.env.get('SUPABASE_URL') || '';
-const SB_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 function mapSymbol(raw: string): string {
   const s = raw.includes(':') ? raw.split(':')[1] : raw;
@@ -22,34 +25,6 @@ function mapSymbol(raw: string): string {
   // BRK-B and USB-PP. Only the dot was translated, so every preferred share 404'd
   // and its chart fell back to whatever stale bars were already cached.
   return s.replace(/[./]/g, '-').toUpperCase().slice(0, 12);
-}
-
-async function dbGet(ckey: string): Promise<{ bars: unknown; age: number } | null> {
-  if (!SB_URL || !SB_KEY) return null;
-  try {
-    const r = await fetch(
-      `${SB_URL}/rest/v1/market_cache?cache_key=eq.${encodeURIComponent('ohlc:' + ckey)}&select=payload,refreshed_at`,
-      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } },
-    );
-    if (!r.ok) return null;
-    const rows = await r.json();
-    if (!Array.isArray(rows) || !rows.length) return null;
-    return { bars: rows[0].payload, age: Date.now() - new Date(rows[0].refreshed_at).getTime() };
-  } catch { return null; }
-}
-
-async function dbPut(ckey: string, bars: unknown): Promise<void> {
-  if (!SB_URL || !SB_KEY) return;
-  try {
-    await fetch(`${SB_URL}/rest/v1/market_cache`, {
-      method: 'POST',
-      headers: {
-        apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY,
-        'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates',
-      },
-      body: JSON.stringify({ cache_key: 'ohlc:' + ckey, payload: bars, refreshed_at: new Date().toISOString() }),
-    });
-  } catch { /* cache write is best-effort */ }
 }
 
 async function fetchYahoo(sym: string, range: string) {
@@ -171,21 +146,18 @@ Deno.serve(async (req: Request) => {
   const m = mem.get(ckey);
   if (m && Date.now() - m.time < MEM_TTL) return ok(sym, m.bars, 'MEM');
 
-  // 2. persistent DB cache (fresh)
-  const cached = await dbGet(ckey);
-  if (cached && cached.age < (range === '1y' ? DB_TTL_1Y : DB_TTL)) {
-    mem.set(ckey, { bars: cached.bars, time: Date.now() });
-    return ok(sym, cached.bars, 'DB');
-  }
-
-  // 3. fetch fresh; on failure serve stale DB data if available
+  // 2. persistent DB cache — fresh, stale-but-usable (background refresh), or
+  // a blocking live fetch past MAX_STALE
   try {
-    const bars = await fetchYahoo(sym, range);
+    const { data: bars, src } = await serveCached(
+      'ohlc:' + ckey,
+      range === '1y' ? DB_TTL_1Y : DB_TTL,
+      range === '1y' ? MAX_STALE_1Y : MAX_STALE,
+      () => fetchYahoo(sym, range),
+    );
     mem.set(ckey, { bars, time: Date.now() });
-    dbPut(ckey, bars);
-    return ok(sym, bars, 'LIVE');
+    return ok(sym, bars, src);
   } catch (e) {
-    if (cached) return ok(sym, cached.bars, 'STALE');
     return new Response(JSON.stringify({ error: (e as Error).message }), { status: 502, headers: { ...CORS, 'Content-Type': 'application/json' } });
   }
 });
