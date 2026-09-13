@@ -678,14 +678,14 @@ tbody tr:last-child td { border-bottom: none; }
 .gcard-tags { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
 .gcard-tags .earn-badge { margin: 0; }
 .gbadge { direction: ltr; display: inline-flex; align-items: baseline; gap: 5px; height: 23px; padding: 0 10px; border-radius: 6px; font: 700 10px var(--sans); letter-spacing: 0.2px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); white-space: nowrap; }
-// gb-lbl used opacity:0.75 to read as secondary next to the bold number —
-// but that dims the SAME color the badge sets (inherited from .gbadge's
-// inline style), which already sits right at AA's 4.5:1 floor for the
-// number. 0.75 opacity pushed the label to 3.24:1-4.42:1 across all three
-// tiers, failing AA (better-colors audit, canvas-rasterized against the
-// real rendered background). The number/label size gap (13px bold vs 10px)
-// already carries the hierarchy — full opacity keeps the label at the same
-// measured-passing contrast as the number, instead of alpha-diluting it.
+/* gb-lbl used opacity:0.75 to read as secondary next to the bold number —
+   but that dims the SAME color the badge sets (inherited from .gbadge's
+   inline style), which already sits right at AA's 4.5:1 floor for the
+   number. 0.75 opacity pushed the label to 3.24:1-4.42:1 across all three
+   tiers, failing AA (better-colors audit, canvas-rasterized against the
+   real rendered background). The number/label size gap (13px bold vs 10px)
+   already carries the hierarchy — full opacity keeps the label at the same
+   measured-passing contrast as the number, instead of alpha-diluting it. */
 .gbadge .gb-lbl { opacity: 1; }
 .gbadge b { font: 700 13px var(--mono-data); letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .gcard-chart { height: 200px; background: var(--chart-bg); position: relative; overflow: hidden; }
@@ -2507,7 +2507,13 @@ function sectorBadgeHtml(sector, withLabel){
   // the answer to "who's strongest, who's next" with nothing to interpret.
   // Color still carries the same top/mid/bottom signal at a glance; the
   // exact percentage stays in the tooltip for anyone who does hover.
-  const lbl = withLabel ? '<span class="gb-lbl">'+escHtml(String(sector).split(' ')[0])+'</span> ' : '';
+  // First-word truncation collapsed "Consumer Discretionary" and "Consumer
+  // Staples" — two distinct groupSector() buckets — into the same "Consumer"
+  // label (code-review finding, 2026-09-13). Same class of bug ce34ef9 fixed
+  // for Health Technology/Services; this one's a label collision, not a data
+  // merge, but the same "which sector is this actually" confusion for the user.
+  const shortSector = String(sector).startsWith('Consumer ') ? String(sector).replace('Consumer ', 'Cons. ') : String(sector).split(' ')[0];
+  const lbl = withLabel ? '<span class="gb-lbl">'+escHtml(shortSector)+'</span> ' : '';
   return '<span class="gbadge" style="color:'+t.c+';background:'+t.bg+'" title="מקום '+t.rank+' מתוך '+t.total+' סקטורים — '+t.pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>#'+t.rank+'</b></span>';
 }
 
