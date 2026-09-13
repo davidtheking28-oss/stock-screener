@@ -4290,7 +4290,7 @@ function drawBreadthSpark(rows){
   const poly=pts.map((b,i)=>(1+(i/(n-1))*(w-2)).toFixed(1)+','+(h-1-clamp(b,0,100)/100*(h-2)).toFixed(1)).join(' ');
   const last=pts[n-1];
   const col=last>=50?'var(--green)':last>=35?'var(--amber)':'var(--red)';
-  el.innerHTML='<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><polyline points="'+poly+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  el.innerHTML='<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true"><polyline points="'+poly+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
   el.title='בריאות שוק — אחוז המניות במגמת עלייה, '+n+' סריקות לילה אחרונות (עדכני: '+last+'%)';
   el.classList.add('show');
 }
