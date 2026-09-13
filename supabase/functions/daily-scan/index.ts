@@ -173,7 +173,11 @@ function applyClassicSEPA(universe: Row[], rsMap: Record<string, number>) {
       // Mirrors the client's epsPenalty: a zero-weight EPS term stops rewarding
       // collapsing earnings but never demotes them, and the non-EPS terms alone
       // reach 75 of 100 here. null is unknown, not bad.
-      sc: Math.round((rsS + epsS + revS + hiS + perfYS)
+      // The client rounds the raw 0-100 sum to an integer BEFORE multiplying by
+      // the penalty (calcScore does Math.round(_calcScoreRaw(...) * epsPenalty)
+      // on an already-rounded raw); rounding only once, after multiplying the
+      // unrounded terms, could land a point off on the same stock.
+      sc: Math.round(Math.round(rsS + epsS + revS + hiS + perfYS)
         * (eps == null ? 1 : Math.min(Math.max(1 - 0.35 * Math.min(Math.max(-eps, 0), 100) / 100, 0.65), 1))),
       c: close, sec: (d[C.sector] as string) || '—',
     });
