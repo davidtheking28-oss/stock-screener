@@ -1477,6 +1477,25 @@ let _ohlcLd = 0, _ohlcIO = null, _ohlcKeepIO = null; const _ohlcQ = [];
 // scrolls away — a gallery rebuild (search, sort, re-scan) clears the lot.
 const _ohlcCharts = new Map();
 const _OHLC_SPINNER = '<div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div>';
+// lightweight-charts reads devicePixelRatio once, when a chart is created, to
+// size its canvas backing store — it does not notice a later change on its
+// own. Dragging the window to a monitor with a different DPI/scale (or an OS
+// scale change) leaves every already-drawn chart's bars rendered at the old
+// ratio: soft/blurry on the new screen, correct again only once the card is
+// far enough off-screen for _ohlcKeepIO to dispose it and a fresh one gets
+// drawn. matchMedia's `resolution` query is the standard way to hear about
+// that — it only fires once per crossing, so it has to be re-armed with the
+// new ratio on every firing, not just bound once.
+function _armDprWatch(){
+  const mql = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+  mql.addEventListener('change', () => {
+    for (const {chart, box} of _ohlcCharts.values()){
+      try{ chart.resize(box.clientWidth, box.clientHeight, true); }catch(e){}
+    }
+    _armDprWatch();
+  }, { once: true });
+}
+_armDprWatch();
 function _ohlcDisposeAll(){
   _ohlcCharts.forEach(({chart,ro})=>{ try{ro.disconnect();}catch(e){} try{chart.remove();}catch(e){} });
   _ohlcCharts.clear();
@@ -1657,7 +1676,7 @@ async function _ohlcDraw(el){
     // observer never hears about it and a few cards end up short of the edge.
     requestAnimationFrame(()=>{ try{ _fitChart(chart, bars.length); }catch(e){} });
     if(!_ohlcWanted.has(el)){ try{ro.disconnect();}catch(e){} try{chart.remove();}catch(e){} el.innerHTML=_OHLC_SPINNER; return; }
-    _ohlcCharts.set(el,{chart,ro});
+    _ohlcCharts.set(el,{chart,ro,box});
   }catch(e){ _ohlcMsg(el,'<span>שגיאה</span> <button onclick="event.stopPropagation();_ohlcRetry(this)" style="margin-right:6px;background: var(--fill2);border:1px solid rgba(255,255,255,0.1);color:var(--text2);border-radius:5px;padding:2px 8px;font:600 11px var(--sans);cursor:pointer">↻</button>'); }
 }
 function _ohlcRetry(btn){
