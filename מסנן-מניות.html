@@ -1638,8 +1638,16 @@ async function _ohlcDraw(el){
     box.addEventListener('pointerdown', e=>e.stopPropagation());
     const _cv=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
     const isLight=document.documentElement.dataset.theme==='tj-light';
-    const gridCol=isLight?'rgba(14,14,18,0.05)':'rgba(255,255,255,0.035)';
-    const axisCol=isLight?'rgba(14,14,18,0.10)':'rgba(255,255,255,0.06)';
+    // No API exposes a monitor's actual brightness/calibration (nor should
+    // one — that's a fingerprinting vector), so this can't auto-adapt to "the
+    // screen looks dim" in general. `prefers-contrast: more` is the one
+    // signal the platform does expose automatically, no control of our own
+    // needed: it reflects the OS-level "increase contrast" accessibility
+    // setting. Grid lines and the axis border are the two genuinely faint
+    // elements here (bars are already pure white, the max there is).
+    const hiContrast = matchMedia('(prefers-contrast: more)').matches;
+    const gridCol=isLight?(hiContrast?'rgba(14,14,18,0.14)':'rgba(14,14,18,0.05)'):(hiContrast?'rgba(255,255,255,0.14)':'rgba(255,255,255,0.035)');
+    const axisCol=isLight?(hiContrast?'rgba(14,14,18,0.24)':'rgba(14,14,18,0.10)'):(hiContrast?'rgba(255,255,255,0.22)':'rgba(255,255,255,0.06)');
     const chart=LightweightCharts.createChart(box,{
       width:box.clientWidth||el.clientWidth, height:200,
       layout:{background:{color:_cv('--chart-bg')||'#0a1120'},textColor:_cv('--chart-txt')||'#5b6b85',fontSize:10,fontFamily:'JetBrains Mono, monospace',attributionLogo:false},
@@ -1657,7 +1665,8 @@ async function _ohlcDraw(el){
     bs.setData(bars.map(b=>({time:toTime(b.t),open:b.o,high:b.h,low:b.l,close:b.c})));
     const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:''});
     vs.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
-    vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:_cv('--chart-vol')||'rgba(255,255,255,0.25)'})));
+    const volCol = hiContrast ? (isLight?'rgba(51,65,85,0.45)':'rgba(255,255,255,0.5)') : (_cv('--chart-vol')||'rgba(255,255,255,0.25)');
+    vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:volCol})));
     _fitChart(chart, bars.length);
     // Re-fit on every resize, not just re-width. fitContent ran once against
     // whatever width the box had at creation, and lightweight-charts keeps the
