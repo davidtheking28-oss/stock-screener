@@ -10,7 +10,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Gate for the deploy: without this, a broken edge function only surfaces
+  # once it's live and something calls it — deploy-functions had no test at
+  # all before this, unlike deploy.yml's client suite. Mirrors the journal's
+  # own Deno test job (deploy.yml there).
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v2.x
+
+      - name: Run edge function unit tests
+        run: deno test --allow-net supabase/functions/_shared/ supabase/functions/daily-scan/
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

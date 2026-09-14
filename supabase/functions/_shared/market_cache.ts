@@ -8,15 +8,20 @@
 // missing one) still blocks on a real fetch, because past that bound the data
 // is too old to show.
 
-const SB_URL = Deno.env.get('SUPABASE_URL') || '';
-const SB_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+// Read lazily, not at module load: a test that only exercises serveCached()
+// via an injected io never calls these, and should not need --allow-env just
+// because this module happens to be imported.
+function sbEnv() {
+  return { url: Deno.env.get('SUPABASE_URL') || '', key: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '' };
+}
 
 export async function dbGet<T>(key: string): Promise<{ data: T; age: number } | null> {
-  if (!SB_URL || !SB_KEY) return null;
+  const { url, key: apiKey } = sbEnv();
+  if (!url || !apiKey) return null;
   try {
     const r = await fetch(
-      `${SB_URL}/rest/v1/market_cache?cache_key=eq.${encodeURIComponent(key)}&select=payload,refreshed_at`,
-      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } },
+      `${url}/rest/v1/market_cache?cache_key=eq.${encodeURIComponent(key)}&select=payload,refreshed_at`,
+      { headers: { apikey: apiKey, Authorization: 'Bearer ' + apiKey } },
     );
     if (!r.ok) return null;
     const rows = await r.json();
@@ -26,12 +31,13 @@ export async function dbGet<T>(key: string): Promise<{ data: T; age: number } | 
 }
 
 export async function dbPut(key: string, data: unknown): Promise<void> {
-  if (!SB_URL || !SB_KEY) return;
+  const { url, key: apiKey } = sbEnv();
+  if (!url || !apiKey) return;
   try {
-    await fetch(`${SB_URL}/rest/v1/market_cache`, {
+    await fetch(`${url}/rest/v1/market_cache`, {
       method: 'POST',
       headers: {
-        apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY,
+        apikey: apiKey, Authorization: 'Bearer ' + apiKey,
         'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates',
       },
       body: JSON.stringify({ cache_key: key, payload: data, refreshed_at: new Date().toISOString() }),
@@ -39,13 +45,17 @@ export async function dbPut(key: string, data: unknown): Promise<void> {
   } catch { /* best-effort */ }
 }
 
+// `io` defaults to the real market_cache table but takes an injected
+// get/put pair in tests, so the SWR contract can be verified without a
+// live Supabase project or network access.
 export async function serveCached<T>(
   key: string,
   ttlMs: number,
   maxStaleMs: number,
   refresh: () => Promise<T>,
+  io: { get: (key: string) => Promise<{ data: T; age: number } | null>; put: (key: string, data: T) => Promise<void> } = { get: dbGet, put: dbPut },
 ): Promise<{ data: T; src: 'DB' | 'STALE' | 'LIVE' }> {
-  const cached = await dbGet<T>(key);
+  const cached = await io.get(key);
   if (cached && cached.age < ttlMs) return { data: cached.data, src: 'DB' };
 
   if (cached && cached.age < maxStaleMs) {
@@ -53,7 +63,7 @@ export async function serveCached<T>(
     // without the caller waiting on it. A failure here is not the caller's
     // problem — they already have a usable payload.
     const p = refresh()
-      .then((fresh) => { dbPut(key, fresh); })
+      .then((fresh) => io.put(key, fresh))
       .catch((e) => { console.error(`[${key}] background refresh failed:`, e); });
     (globalThis as any).EdgeRuntime?.waitUntil?.(p);
     return { data: cached.data, src: 'STALE' };
@@ -61,7 +71,7 @@ export async function serveCached<T>(
 
   try {
     const fresh = await refresh();
-    dbPut(key, fresh);
+    io.put(key, fresh);
     return { data: fresh, src: 'LIVE' };
   } catch (e) {
     if (cached) return { data: cached.data, src: 'STALE' };
