@@ -1119,7 +1119,7 @@ tbody tr:last-child td { border-bottom: none; }
           <button class="view-tab active" id="tabTable" onclick="setLayout('table')">טבלה</button>
           <button class="view-tab" id="tabGallery" onclick="setLayout('gallery')">גרפים</button>
         </div>
-        <input type="search" id="tickerSearch" class="ticker-search" placeholder="חיפוש מניה..."
+        <input type="search" id="tickerSearch" class="ticker-search" placeholder="חיפוש מניה..." aria-label="חיפוש מניה"
           oninput="_searchInput(this.value)"
           onkeydown="if(event.key==='Escape'){this.value='';_searchInput('',true);}event.stopPropagation()">
         <div class="col-picker" id="colPickerWrap" style="display:none">
@@ -1185,8 +1185,8 @@ tbody tr:last-child td { border-bottom: none; }
           <span style="flex:1;height:1px;background:var(--border2)"></span>או באימייל<span style="flex:1;height:1px;background:var(--border2)"></span>
         </div>
         <div class="field" style="margin-bottom:14px">
-          <label style="margin-bottom:6px;display:block">אימייל</label>
-          <input type="email" id="authEmail" placeholder="you@example.com" style="direction:ltr;width:100%" onkeydown="if(event.key==='Enter')sendMagicLink()">
+          <label for="authEmail" style="margin-bottom:6px;display:block">אימייל</label>
+          <input type="email" id="authEmail" autocomplete="email" inputmode="email" placeholder="you@example.com" style="direction:ltr;width:100%" onkeydown="if(event.key==='Enter')sendMagicLink()">
         </div>
         <button class="btn-scan" onclick="sendMagicLink()" style="width:100%">שלח קישור כניסה</button>
         <p style="font-size:11px;color:var(--text3);margin-top:12px;text-align:center;line-height:1.6">קישור כניסה חד-פעמי יישלח לאימייל שלך · ללא סיסמה</p>
