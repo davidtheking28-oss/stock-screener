@@ -2818,12 +2818,6 @@ function setScreener(key, applyDef=true){
   if(applyDef && mode==='watch') setMode('screen');
   const prevScreener=activeScreener, switching=applyDef && prevScreener!==key;
   activeScreener=key;
-  // Reports every screener actually shown — including the one restored on
-  // load, not just an explicit click — so the journal's tracking widget can
-  // tell "opened the tab" from "looked at this filter" (opening the tab
-  // alone used to mark the whole day as screened, even on a day the user
-  // never went past the default screener).
-  if(IN_JOURNAL) try{ window.parent.postMessage({type:'tj:screener-used', key}, JOURNAL_ORIGIN); }catch(e){}
   if(switching){
     // RESULTS_CACHE_KEY only ever holds ONE screener's scan at a time, so
     // switching screeners almost never has anything to restore instantly —
@@ -4490,6 +4484,30 @@ _scrollTopBtn.onclick = () => {
   window.scrollTo({top: 0, behavior: 'smooth'});
   $('tableView').scrollTo({top: 0, behavior: 'smooth'});
 };
+
+// Reports a screener as actually reviewed only once the user has scrolled to
+// the bottom of its results — switching to it (the old trigger) marked a day
+// "screened" even for a filter the user glanced at and left. Table layout
+// streams rows in chunks (_tableMore), so "scrolled to the visible bottom"
+// isn't enough on its own; _tableAt>=_tableRows.length confirms every row
+// that will ever load has already loaded. Gallery renders everything at
+// once, so the page-level check alone is enough there. Below the ~680px
+// breakpoint .table-wrap becomes its own scrollport instead of the page.
+const _reportedScreenerKeys = new Set();
+function _maybeReportScreenerReviewed(){
+  if(!IN_JOURNAL || mode!=='screen' || !results.length) return;
+  if(_reportedScreenerKeys.has(activeScreener)) return;
+  const tv=$('tableView');
+  const tableScrolls = layout==='table' && tv && tv.scrollHeight > tv.clientHeight+8;
+  const atBottom = tableScrolls
+    ? (tv.scrollTop+tv.clientHeight > tv.scrollHeight-40 && _tableAt>=_tableRows.length)
+    : (window.scrollY+window.innerHeight >= document.documentElement.scrollHeight-40);
+  if(!atBottom) return;
+  _reportedScreenerKeys.add(activeScreener);
+  try{ window.parent.postMessage({type:'tj:screener-used', key:activeScreener}, JOURNAL_ORIGIN); }catch(e){}
+}
+window.addEventListener('scroll', _maybeReportScreenerReviewed, {passive:true});
+$('tableView').addEventListener('scroll', _maybeReportScreenerReviewed, {passive:true});
 </script>
 </body>
 </html>
