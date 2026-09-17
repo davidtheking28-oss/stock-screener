@@ -2818,6 +2818,12 @@ function setScreener(key, applyDef=true){
   if(applyDef && mode==='watch') setMode('screen');
   const prevScreener=activeScreener, switching=applyDef && prevScreener!==key;
   activeScreener=key;
+  // Reports every screener actually shown — including the one restored on
+  // load, not just an explicit click — so the journal's tracking widget can
+  // tell "opened the tab" from "looked at this filter" (opening the tab
+  // alone used to mark the whole day as screened, even on a day the user
+  // never went past the default screener).
+  if(IN_JOURNAL) try{ window.parent.postMessage({type:'tj:screener-used', key}, JOURNAL_ORIGIN); }catch(e){}
   if(switching){
     // RESULTS_CACHE_KEY only ever holds ONE screener's scan at a time, so
     // switching screeners almost never has anything to restore instantly —
