@@ -56,9 +56,27 @@ async function sendEmails(scanDate: string, entries: string[], exits: string[], 
   if (!RESEND_KEY) return { sent: 0, reason: 'no RESEND_API_KEY' };
   const usersRes = await sb('/auth/v1/admin/users?per_page=200');
   if (!usersRes.ok) return { sent: 0, reason: 'admin users ' + usersRes.status };
-  const users: { id: string; email: string }[] = ((await usersRes.json()).users || []).filter((u: { email?: string }) => u.email);
+  const allUsers: { id: string; email: string }[] = ((await usersRes.json()).users || []).filter((u: { email?: string }) => u.email);
   const wlRes = await sb('/rest/v1/screener_watchlist?select=user_id,ticker');
   const wlRows: { user_id: string; ticker: string }[] = wlRes.ok ? await wlRes.json() : [];
+  // auth.users is shared across every app on this Supabase project (this
+  // screener AND the sibling trading-journal), so mailing every signed-in
+  // user sent nightly SEPA scan results to journal-only accounts that never
+  // opened the screener. Scope to users with an actual screener footprint —
+  // any row in a screener-specific table proves real usage, so this is a
+  // fact check, not a preference call. wlRows is already fetched above.
+  const [prefsRes, histRes, visitRes] = await Promise.all([
+    sb('/rest/v1/screener_prefs?select=user_id'),
+    sb('/rest/v1/screener_history?select=user_id'),
+    sb('/rest/v1/screener_type_visits?select=user_id'),
+  ]);
+  const screenerUserIds = new Set<string>([
+    ...wlRows.map(w => w.user_id),
+    ...(prefsRes.ok ? (await prefsRes.json()) as { user_id: string }[] : []).map(r => r.user_id),
+    ...(histRes.ok ? (await histRes.json()) as { user_id: string }[] : []).map(r => r.user_id),
+    ...(visitRes.ok ? (await visitRes.json()) as { user_id: string }[] : []).map(r => r.user_id),
+  ]);
+  const users = allUsers.filter(u => screenerUserIds.has(u.id));
   const top = results.slice(0, 10);
   let sent = 0;
   for (const u of users) {
