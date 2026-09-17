@@ -1983,7 +1983,7 @@ async function validateExact(list, scr, onProgress, signal){
   const adrMin=num('adrMin')||3, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
   const move3Min=num('move3Min')||0, move6Min=num('move6Min')||0;
   const reqVcp=!!$('requireVCP')?.checked, reqRsLine=!!$('requireRSLine')?.checked;
-  const vcpOpts={minC:num('vcpContractions')||2, maxDepth:num('vcpDepthMax')||12,
+  const vcpOpts={minC:num('vcpContractions')||3, maxDepth:num('vcpDepthMax')||12,
                  maxBelow:num('pivotBelow')||10, reqDryUp:!!$('vcpDryUp')?.checked};
   const consolBars=(num('consolWeeks')||2)*5;
   // One benchmark fetch for the whole pass — the RS line is price/SPY.
@@ -2011,7 +2011,13 @@ async function validateExact(list, scr, onProgress, signal){
         } else if(scr==='qulla'){
           if(_qullaExactOK(bars, adrMin, emaDistMax, weekMax, move3Min, move6Min)===false) r._exactFail=true;
         } else {
-          if(bars){ if(_powerPlayOK(bars,runMin,consolBars)===false) r._exactFail=true; }
+          // _fetchBars1y returns [] (truthy, not null) when the upstream OHLC
+          // response has no bars, and deliberately doesn't cache that empty
+          // result — so an empty array must be treated the same as a missing
+          // one here, or it silently "passes" _powerPlayOK's length<45 guard
+          // (which returns null, meaning unvalidated) instead of running the
+          // documented no-bars fallback below.
+          if(bars && bars.length){ if(_powerPlayOK(bars,runMin,consolBars)===false) r._exactFail=true; }
           else {
             const runOld=(r.perf3!=null&&r.perf3>=runMin)||(r.perf6!=null&&r.perf6>=runMin);
             const tight=r.volD!=null&&r.volM!=null&&r.volD<r.volM;
@@ -2903,6 +2909,12 @@ async function checkAndSaveHistory(tickers){
   // NOW instead of the one these tickers actually belong to would silently
   // mislabel dates the same way the ticker-only cache key used to.
   const scr = activeScreener;
+  // Same guard scan() uses elsewhere: this function awaits a Supabase read, and
+  // the user can switch screener type while it's in flight. scan() resets
+  // newToday for the NEW screener the instant it starts, so an add() landing
+  // after that reset — from a stale call for the screener the user just left —
+  // would tag the new screener's results with the old one's "חדש" badges.
+  const myToken = _scanToken;
   const today = new Date().toISOString().slice(0,10);
   const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
   const currentSet = new Set(tickers);
@@ -2918,8 +2930,9 @@ async function checkAndSaveHistory(tickers){
     if(exits.length) toast('יצאו מהסינון: '+exits.join(', '), 6000);
   }
   const fresh = tickers.filter(t=>!known.has(t));
-  fresh.forEach(t=>{ newToday.add(t); firstSeenByTicker.set(_fsKey(scr,t),today); });
-  tickers.forEach(t=>{ if(known.get(t)?.first_seen===today) newToday.add(t); });
+  const stillCurrent = myToken===_scanToken;
+  fresh.forEach(t=>{ if(stillCurrent) newToday.add(t); firstSeenByTicker.set(_fsKey(scr,t),today); });
+  tickers.forEach(t=>{ if(stillCurrent && known.get(t)?.first_seen===today) newToday.add(t); });
   // upsert with ignoreDuplicates, not insert: two scans racing (e.g. the
   // screener open both as a journal iframe and its own tab) can both read
   // the same "not seen yet" snapshot and both try to insert the same
@@ -3379,9 +3392,13 @@ function applyFilters(universe, rsMap, opts={}){
       fromHighPct, fromLowPct:(close/lo-1)*100,
       rangePos:hi>lo?(close-lo)/(hi-lo):0.5, perfY, perf3, perf6, volD, volM, adrPct,
       perfW:d[C['Perf.W']],
+      // One-sided, matching the qulla gate's `above()` helper (surfOk above and
+      // _qullaExactOK): a stock trading below its EMA is breaking down, not
+      // "close to it" in a good way, so a negative distance is Infinity, not
+      // its absolute value.
       emaDist:Math.min(
-        d[C.EMA10]!=null?Math.abs(close/d[C.EMA10]-1)*100:Infinity,
-        d[C.EMA20]!=null?Math.abs(close/d[C.EMA20]-1)*100:Infinity),
+        d[C.EMA10]!=null?(v=>v>=0?v:Infinity)((close/d[C.EMA10]-1)*100):Infinity,
+        d[C.EMA20]!=null?(v=>v>=0?v:Infinity)((close/d[C.EMA20]-1)*100):Infinity),
       eps, epsQoq, rev, revQoq, roe, nm, nmFy, epsFwdGrowth, score:0, checks
     });
   }
@@ -3692,12 +3709,12 @@ function renderTable(rows){
   _tableKey=_tKey;
   const scHeadLbl = scKind==='sepa' ? 'ציון SEPA' : 'ציון';
   const scHeadTip = scKind==='sepa'
-    ? 'ציון מורכב 0–100: RS (40%) + EPS (25%) + הכנסות (20%) + קרבה לשיא (15%)'
+    ? 'ציון מורכב 0–100: RS (35%) + EPS (25%) + הכנסות (15%) + קרבה לשיא (15%) + ביצוע שנתי (10%)'
     : scKind==='growth'
-    ? 'ציון צמיחה 0–100: EPS QoQ (50%) + מכירות QoQ (50%)'
+    ? 'ציון צמיחה 0–100: EPS QoQ (30%) + מכירות QoQ (25%) + RS (15%) + ביצוע שנתי (15%) + EPS YoY (15%)'
     : scKind==='qulla'
-    ? 'ציון Qullamaggie 0–100: מהלך 6ח׳ (40%) + ADR (20%) + צמידות ל-EMA (20%) + הידוק שבועי (20%)'
-    : 'ציון מומנטום 0–100: RS (50%) + קרבה לשיא (25%) + ביצוע 3-6ח׳ (25%)';
+    ? 'ציון Qullamaggie 0–100: מהלך 6ח׳ (20%) + EPS (15%) + ביצוע שנתי (15%) + צמידות ל-EMA (15%) + ADR (10%) + הידוק שבועי (10%) + RS (10%) + הכנסות (5%)'
+    : 'ציון מומנטום 0–100: RS (30%) + EPS (20%) + קרבה לשיא (15%) + ביצוע 3-6ח׳ (15%) + ביצוע שנתי (15%) + הכנסות (5%)';
   const head='<tr>'
     +'<th style="width:30px"></th>'
     +th('מניה','ticker')
@@ -3723,24 +3740,60 @@ function renderTable(rows){
   const bodyRows=rows.map(r=>{
     const wl=watchlist.has(r.ticker), sc=r.score;
 
+    // Every branch below mirrors _calcScoreRaw's actual current weights for
+    // that scoreKind exactly (they had drifted from it) and also folds in
+    // calcScore's epsPenalty multiplier — applied to the raw score for every
+    // screener except commodities — since that penalty is what makes the
+    // final `sc` differ from the sum of the raw weighted terms. The last term
+    // in each branch is taken as sc minus the others (like the existing
+    // pattern here already did for growth/power) so the displayed parts
+    // always sum exactly to the score shown, rounding included.
     let scTip;
+    const penalty=epsPenalty(r.eps);
     if(r.scoreKind==='growth'){
-      const epsS=Math.round(Math.min(Math.max(r.epsQoq??0,0),100)/100*50);
-      const revS=sc-epsS;
-      scTip='ציון צמיחה: '+sc+'/100\nEPS QoQ: '+epsS+'/50\nמכירות QoQ: '+revS+'/50';
+      const epsS=Math.round(Math.min(Math.max(r.epsQoq??0,0),100)/100*30*penalty);
+      const revS=Math.round(Math.min(Math.max(r.revQoq??0,0),150)/150*25*penalty);
+      const rsS=Math.round(clamp(r.rs,0,99)/99*15*penalty);
+      const perfYS=Math.round(Math.min(clamp(r.perfY??0,0,300)/300,1)*15*penalty);
+      const epsYoyS=sc-epsS-revS-rsS-perfYS;
+      scTip='ציון צמיחה: '+sc+'/100\nEPS QoQ: '+epsS+'/30\nמכירות QoQ: '+revS+'/25\nRS: '+rsS+'/15\nביצוע שנתי: '+perfYS+'/15\nEPS YoY: '+epsYoyS+'/15';
     } else if(r.scoreKind==='qulla'){
-      scTip='ציון Qullamaggie: '+sc+'/100\nמהלך 6ח׳: '+pct(r.perf6)+'\nADR: '+pct(r.adrPct??r.volD)+'\nמרחק מ-EMA10/20: '+(isFinite(r.emaDist)&&r.emaDist!=null?r.emaDist.toFixed(1)+'%':'—')+'\nשינוי שבועי: '+pct(r.perfW);
-    } else if(r.scoreKind==='power'||r.scoreKind==='commodities'){
-      const rsS=Math.round(clamp(r.rs,0,99)/99*50);
-      const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*25);
-      const perfS=sc-rsS-hiS;
-      scTip='ציון מומנטום: '+sc+'/100\nRS: '+rsS+'/50\nקרבה לשיא: '+hiS+'/25\nביצוע 3-6ח׳: '+perfS+'/25';
-    } else {
+      const emaMax = num('emaDistMax'); const emaMaxUsed = Number.isNaN(emaMax) ? 3.5 : emaMax;
+      const wkMax  = num('weekRangeMax'); const wkMaxUsed  = Number.isNaN(wkMax) ? 7 : wkMax;
+      const moveS=Math.round(Math.min(clamp(r.perf6??0,0,150)/150,1)*20*penalty);
+      const adrS=Math.round(Math.min(clamp(r.adrPct??r.volD??0,0,8)/8,1)*10*penalty);
+      const emaRaw=(r.emaDist==null||!isFinite(r.emaDist))?0: emaMaxUsed>0 ? clamp(1-r.emaDist/emaMaxUsed,0,1)*15 : 15;
+      const emaS=Math.round(emaRaw*penalty);
+      const tightRaw=r.perfW==null?0: wkMaxUsed>0 ? clamp(1-Math.abs(r.perfW)/wkMaxUsed,0,1)*10 : 10;
+      const tightS=Math.round(tightRaw*penalty);
+      const epsS=Math.round(epsScore(r.eps,15)*penalty);
+      const perfYS=Math.round(Math.min(clamp(r.perfY??0,0,300)/300,1)*15*penalty);
+      const rsS=Math.round(clamp(r.rs,0,99)/99*10*penalty);
+      const revS=sc-moveS-adrS-emaS-tightS-epsS-perfYS-rsS;
+      scTip='ציון Qullamaggie: '+sc+'/100\nמהלך 6ח׳: '+moveS+'/20\nEPS: '+epsS+'/15\nביצוע שנתי: '+perfYS+'/15\nקרבה ל-EMA: '+emaS+'/15\nADR: '+adrS+'/10\nהידוק שבועי: '+tightS+'/10\nRS: '+rsS+'/10\nהכנסות: '+revS+'/5';
+    } else if(r.scoreKind==='commodities'){
       const rsS=Math.round(clamp(r.rs,0,99)/99*40);
-      const epsS=Math.round(Math.min(clamp(r.eps??0,0,300)/300,1)*25);
-      const revS=Math.round(Math.min(clamp(r.rev??0,0,200)/200,1)*20);
-      const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15);
-      scTip='ציון SEPA: '+sc+'/100\nRS: '+rsS+'/40\nEPS: '+epsS+'/25\nהכנסות: '+revS+'/20\nקרבה לשיא: '+hiS+'/15';
+      const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*20);
+      const pf=Math.max(r.perf3??0,(r.perf6??0)/2);
+      const perfS=Math.round(Math.min(clamp(pf,0,150)/150,1)*20);
+      const perfYS=sc-rsS-hiS-perfS;
+      scTip='ציון מומנטום: '+sc+'/100\nRS: '+rsS+'/40\nקרבה לשיא: '+hiS+'/20\nביצוע 3-6ח׳: '+perfS+'/20\nביצוע שנתי: '+perfYS+'/20';
+    } else if(r.scoreKind==='power'){
+      const rsS=Math.round(clamp(r.rs,0,99)/99*30*penalty);
+      const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15*penalty);
+      const pf=Math.max(r.perf3??0,(r.perf6??0)/2);
+      const perfS=Math.round(Math.min(clamp(pf,0,150)/150,1)*15*penalty);
+      const epsS=Math.round(epsScore(r.eps,20)*penalty);
+      const perfYS=Math.round(Math.min(clamp(r.perfY??0,0,300)/300,1)*15*penalty);
+      const revS=sc-rsS-hiS-perfS-epsS-perfYS;
+      scTip='ציון מומנטום: '+sc+'/100\nRS: '+rsS+'/30\nEPS: '+epsS+'/20\nקרבה לשיא: '+hiS+'/15\nביצוע 3-6ח׳: '+perfS+'/15\nביצוע שנתי: '+perfYS+'/15\nהכנסות: '+revS+'/5';
+    } else {
+      const rsS=Math.round(clamp(r.rs,0,99)/99*35*penalty);
+      const epsS=Math.round(epsScore(r.eps,25)*penalty);
+      const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15*penalty);
+      const perfYS=Math.round(Math.min(clamp(r.perfY??0,0,300)/300,1)*10*penalty);
+      const revS=sc-rsS-epsS-hiS-perfYS;
+      scTip='ציון SEPA: '+sc+'/100\nRS: '+rsS+'/35\nEPS: '+epsS+'/25\nהכנסות: '+revS+'/15\nקרבה לשיא: '+hiS+'/15\nביצוע שנתי: '+perfYS+'/10';
     }
     const scEl='<div class="score-cell" title="'+scTip+'">'
       +'<span class="score-val" style="color:'+scoreColor(sc)+'">'+sc+'</span>'
