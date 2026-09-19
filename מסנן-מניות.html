@@ -968,8 +968,8 @@ tbody tr:last-child td { border-bottom: none; }
 
 <!-- Topbar -->
 <div class="topbar">
-  <div class="logo-mark">SEPA<em>.</em>screen</div>
-  <div class="topbar-sep"></div>
+  <div class="logo-mark" id="topbarLogo">SEPA<em>.</em>screen</div>
+  <div class="topbar-sep" id="topbarLogoSep"></div>
   <div class="breadth-chip" id="breadthChip">
     <span class="breadth-dot" id="breadthDot"></span>
     <span id="breadthLabel"></span>
@@ -1228,6 +1228,13 @@ const _sb = HAS_SUPABASE ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : 
    replies with tj:session, and this calls setSession with them. */
 const IN_JOURNAL = (() => { try { return window.parent && window.parent !== window; } catch (e) { return false; } })();
 const JOURNAL_ORIGIN = location.origin;
+// The journal's own header already carries its branding — this app's own
+// logo in the topbar is redundant (and a second, unrelated brand name) once
+// embedded. Same reasoning as hiding authChip in updateAuthUI() below.
+if (IN_JOURNAL) {
+  document.getElementById('topbarLogo')?.style.setProperty('display', 'none');
+  document.getElementById('topbarLogoSep')?.style.setProperty('display', 'none');
+}
 // The journal re-sends tj:session on its own SIGNED_IN/TOKEN_REFRESHED events
 // (a real token refresh happens periodically for as long as the tab stays
 // open), and setSession() fires this app's own onAuthStateChange as a fresh
