@@ -4265,6 +4265,12 @@ async function loadUserData(){
 
 function updateAuthUI(){
   const chip=$('authChip'); if(!chip) return;
+  // Embedded in the journal, sign-in is handed down invisibly via SSO
+  // (see the IN_JOURNAL comment above) — showing a manual login/logout
+  // chip here is redundant with the journal's own header and its "יציאה"
+  // only signs out of this iframe's own session, not the journal's,
+  // which is confusing rather than useful. Standalone visits still need it.
+  if(IN_JOURNAL){ chip.style.display='none'; return; }
   if(_currentUser){
     chip.innerHTML='<div class="auth-user"><span class="auth-email" title="'+_currentUser.email+'">'+_currentUser.email+'</span>'
       +'<button class="auth-logout" onclick="signOut()">יציאה</button></div>';
