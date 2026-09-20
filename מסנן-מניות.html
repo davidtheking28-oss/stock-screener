@@ -1348,6 +1348,18 @@ function groupSector(raw){ return raw ? (SECTOR_GROUPS[raw]||raw) : raw; }
 // every screener-specific field visible at once.
 function _validScreener(key){ return SCREENERS[key] ? key : 'sepa'; }
 let activeScreener = _validScreener(localStorage.getItem('sepa_screener') || 'sepa');
+// When there's nothing to scroll (short table, or gallery that fits in one
+// screen), "at bottom" is trivially true the instant it renders — fine for a
+// real 'scroll' event (nothing left to prove), but _maybeReportScreenerReviewed's
+// fromSwitch check fires on every filter switch regardless of whether the user
+// looked at anything, so that same trivial-true wrongly credited a filter
+// clicked through in under a second. A dwell-time floor only applies to that
+// path (see _maybeReportScreenerReviewed) — a genuine scroll-to-bottom on a
+// long list still counts instantly, same as before. Declared here (not next
+// to _maybeReportScreenerReviewed further down) because setScreener — which
+// reads and writes it — can run during boot, before the rest of the script
+// has executed.
+let _screenerActiveSince = Date.now();
 
 const COL_DEFS = [
   {key:'price',  label:'מחיר',       defaultOn:true},
@@ -2838,8 +2850,9 @@ function setScreener(key, applyDef=true){
   // review either gets attributed to the wrong key or silently dropped.
   // Checking synchronously here, while the DOM/scroll position still belong
   // to prevScreener, catches exactly that case.
-  if(switching) _maybeReportScreenerReviewed();
+  if(switching) _maybeReportScreenerReviewed(true);
   activeScreener=key;
+  _screenerActiveSince=Date.now();
   if(switching){
     // RESULTS_CACHE_KEY only ever holds ONE screener's scan at a time, so
     // switching screeners almost never has anything to restore instantly —
@@ -4569,7 +4582,7 @@ _scrollTopBtn.onclick = () => {
 // once, so the page-level check alone is enough there. Below the ~680px
 // breakpoint .table-wrap becomes its own scrollport instead of the page.
 const _reportedScreenerKeys = new Set();
-function _maybeReportScreenerReviewed(){
+function _maybeReportScreenerReviewed(fromSwitch){
   if(!IN_JOURNAL || mode!=='screen' || !results.length) return;
   if(_reportedScreenerKeys.has(activeScreener)) return;
   const tv=$('tableView');
@@ -4578,11 +4591,12 @@ function _maybeReportScreenerReviewed(){
     ? (tv.scrollTop+tv.clientHeight > tv.scrollHeight-40 && _tableAt>=_tableRows.length)
     : (window.scrollY+window.innerHeight >= document.documentElement.scrollHeight-40);
   if(!atBottom) return;
+  if(fromSwitch && !tableScrolls && Date.now()-_screenerActiveSince < 2000) return;
   _reportedScreenerKeys.add(activeScreener);
   try{ window.parent.postMessage({type:'tj:screener-used', key:activeScreener}, JOURNAL_ORIGIN); }catch(e){}
 }
-window.addEventListener('scroll', _maybeReportScreenerReviewed, {passive:true});
-$('tableView').addEventListener('scroll', _maybeReportScreenerReviewed, {passive:true});
+window.addEventListener('scroll', () => _maybeReportScreenerReviewed(false), {passive:true});
+$('tableView').addEventListener('scroll', () => _maybeReportScreenerReviewed(false), {passive:true});
 </script>
 </body>
 </html>
