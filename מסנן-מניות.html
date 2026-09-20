@@ -2830,6 +2830,15 @@ function setScreener(key, applyDef=true){
   // which must not yank a user who opened straight onto the watchlist.
   if(applyDef && mode==='watch') setMode('screen');
   const prevScreener=activeScreener, switching=applyDef && prevScreener!==key;
+  // A user who scrolls to the bottom of a filter's results and immediately
+  // switches to the next one (the normal fast workflow) can beat the
+  // 'scroll' listener: the passive scroll event that would have reported
+  // prevScreener is still queued/throttled when this runs, and by the time
+  // it fires activeScreener already points at the NEW screener — so the
+  // review either gets attributed to the wrong key or silently dropped.
+  // Checking synchronously here, while the DOM/scroll position still belong
+  // to prevScreener, catches exactly that case.
+  if(switching) _maybeReportScreenerReviewed();
   activeScreener=key;
   if(switching){
     // RESULTS_CACHE_KEY only ever holds ONE screener's scan at a time, so
