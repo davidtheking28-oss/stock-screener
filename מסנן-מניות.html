@@ -440,8 +440,16 @@ body {
 .field:has(.sector-lock-tags) .hint { grid-row: 3; }
 /* A threshold of 0 means "not filtering on this". Showing a bare 0 read as a
    real limit; this states the state and steps the value back visually. */
-.field.is-off .field-combo input { color: var(--text3); }
+/* JetBrains Mono has no Hebrew glyphs, so "כבוי" silently fell back to
+   whatever the browser picks next — a different, heavier-looking font than
+   the "20%"/"50%" values right beside it in every other field. The mono font
+   is only meaningful for the numeric values anyway, not this one text word. */
+.field.is-off .field-combo input { color: var(--text3); font-family: var(--sans); font-weight: 500; }
 .field.is-off .hint { color: var(--text3); opacity: 0.85; }
+/* #consolWeeks and #earnDays never show a bare digit — every option is
+   Hebrew text or a number glued to a Hebrew unit ("5 ימים", "2 שבועות"),
+   so they get the same fix as the .is-off case above, unconditionally. */
+#consolWeeks, #earnDays { font-family: var(--sans); font-weight: 500; }
 .field .hint b { color: var(--text2); font-weight: 700; font-style: normal; }
 
 .field-combo input, select {
