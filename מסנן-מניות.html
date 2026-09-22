@@ -979,6 +979,7 @@ tbody tr:last-child td { border-bottom: none; }
   <div class="topbar-end">
     <span id="scanTime"></span>
     <button class="btn-rescan" id="scanBtn" onclick="if(mode==='watch')setMode('screen');scan(true)" style="display:none">&#8635; סרוק שנית</button>
+    <button class="btn-ghost" id="wlTopbarBtn" style="font-size:12px" onclick="setMode('watch')" title="רשימת מעקב">&#9733; מעקב</button>
     <div id="authChip"><button class="btn-ghost" style="font-size:12px" onclick="toggleAuthModal()">כניסה</button></div>
   </div>
 </div>
@@ -1257,7 +1258,28 @@ if (IN_JOURNAL && _sb) {
       if (allResults.length) checkAndSaveHistory(allResults.map(r => r.ticker)).then(() => render());
     });
   });
-  window.addEventListener('load', () => window.parent.postMessage({ type: 'tj:screener-ready' }, JOURNAL_ORIGIN));
+  // A single ping on `load` is a one-shot handshake with no recovery if it's
+  // ever lost — and on a tablet/phone it routinely is: Safari restores a
+  // backgrounded tab from the bfcache (switching apps, locking the screen)
+  // without firing `load` again, so the ping that would re-establish the
+  // session simply never happens. The whole tab then sits authenticated-less
+  // for the rest of that session — watchlist stars fall back to localStorage
+  // only (never reach the server) and screener-type tracking no-ops in the
+  // journal (it checks _currentUser there, which this handshake never set).
+  // Retrying until _ssoApplied flips covers both the ordinary load path and a
+  // bfcache restore, with no server-side change needed — the journal already
+  // replies to tj:screener-ready whenever it arrives.
+  const _pingScreenerReady = () => {
+    if (_ssoApplied) return;
+    window.parent.postMessage({ type: 'tj:screener-ready' }, JOURNAL_ORIGIN);
+  };
+  window.addEventListener('load', _pingScreenerReady);
+  window.addEventListener('pageshow', _pingScreenerReady);
+  let _ssoRetries = 0;
+  const _ssoRetryTimer = setInterval(() => {
+    if (_ssoApplied || ++_ssoRetries > 20) { clearInterval(_ssoRetryTimer); return; }
+    _pingScreenerReady();
+  }, 1000);
 }
 
 /* ════════════════════════════════════
@@ -2171,6 +2193,13 @@ async function saveWL(ticker, adding){
     }
   } else {
     localStorage.setItem('sepa_wl', JSON.stringify([...watchlist]));
+    // Embedded in the journal but with no session applied means the SSO
+    // handshake hasn't gone through yet (or was lost) — the star still lights
+    // up, but it's only on THIS device until that resolves. A standalone,
+    // signed-out visit is a normal, expected use of the tool, so this only
+    // warns for the embedded case, where the user has every reason to expect
+    // it's synced.
+    if (IN_JOURNAL) toast('נשמר במכשיר הזה בלבד — הסנכרון עם היומן עוד לא התחבר, נסה שוב בעוד רגע');
   }
 }
 
@@ -3627,7 +3656,7 @@ function applyView(){
   const cpw=$('colPickerWrap'); if(cpw) cpw.style.display=(layout==='gallery'||!allResults.length)?'none':'';
   // Everything in this list describes the SCAN, not a saved list.
   ['dailyBanner','sectorWrap','sectorStrength'].forEach(id=>$(id)?.classList.toggle('scan-only-hidden', isWl));
-  if(isWl && watchlist.size>0) $('resultsPanel').style.display='block';
+  if(isWl) $('resultsPanel').style.display='block';
   // The watchlist is a saved list, not a scan — the preset row stays
   // reachable (.wl-mode CSS), but the actual scan criteria/button collapse
   // and no preset shows as "active" while here.
