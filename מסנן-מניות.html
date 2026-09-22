@@ -2293,7 +2293,7 @@ function loadResultsCache(){
     allResults = ar; _dataGen++;
     if(Array.isArray(nt) && new Date(time).toDateString()===new Date().toDateString()) newToday = new Set(nt);
     applySectorFilter(); sortResults();
-    $('resultsPanel').style.display='block';
+    $('resultsPanel').style.display='block'; _syncWlTopbarBtn();
     $('colPickerWrap').style.display='';
     buildSectorFilter();
     applyView();
@@ -2950,7 +2950,7 @@ function _setScanLoading(on){
 
 function showSkeleton(){
   const tv=$('tableView'); if(!tv) return;
-  $('resultsPanel').style.display='block';
+  $('resultsPanel').style.display='block'; _syncWlTopbarBtn();
   const skRow='<tr class="skel-row">'
     +'<td><div class="skel" style="width:22px;height:22px;border-radius:50%"></div></td>'
     +'<td><div class="skel" style="width:72px;height:13px;margin-bottom:5px"></div><div class="skel" style="width:110px;height:10px"></div></td>'
@@ -3096,7 +3096,7 @@ async function scan(force=false){
       saveUniverseCache();
     }
     if(!wasResultsVisible) $('filterPanel')?.classList.remove('open');
-    $('resultsPanel').style.display='block';
+    $('resultsPanel').style.display='block'; _syncWlTopbarBtn();
     $('colPickerWrap').style.display='';
     const now=new Date(isCommodities?_commTime:_rawTime);
     $('scanTime').textContent='עודכן '+now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
@@ -3658,6 +3658,14 @@ function setLayout(l){
   try{ localStorage.setItem('sepa_layout', l); }catch(e){}
   applyView();
 }
+// The topbar button exists only to reach מעקב BEFORE resultsPanel has ever
+// shown itself (its own tab bar lives inside that panel, which starts
+// display:none). Once the panel is visible — a scan finished, or the user is
+// already on מעקב — the tab is reachable on its own, so leaving the topbar
+// button up too just shows two "מעקב" buttons doing the same thing.
+function _syncWlTopbarBtn(){
+  const wtb=$('wlTopbarBtn'); if(wtb) wtb.style.display = $('resultsPanel').style.display==='none' ? '' : 'none';
+}
 function applyView(){
   const isWl = mode==='watch';
   _restoreSortForMode(); sortResults();
@@ -3674,6 +3682,7 @@ function applyView(){
   // Everything in this list describes the SCAN, not a saved list.
   ['dailyBanner','sectorWrap','sectorStrength'].forEach(id=>$(id)?.classList.toggle('scan-only-hidden', isWl));
   if(isWl) $('resultsPanel').style.display='block';
+  _syncWlTopbarBtn();
   // The watchlist is a saved list, not a scan — the preset row stays
   // reachable (.wl-mode CSS), but the actual scan criteria/button collapse
   // and no preset shows as "active" while here.
