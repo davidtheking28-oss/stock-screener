@@ -421,8 +421,7 @@ body {
   display: grid;
   grid-column: span 3;
   grid-template-columns: subgrid;
-  grid-template-rows: auto auto;
-  row-gap: 2px;
+  grid-template-rows: auto;
 }
 .field label {
   grid-column: 1; grid-row: 1; align-self: center; text-align: right;
@@ -432,16 +431,11 @@ body {
 .field .hint {
   grid-column: 1 / -1; grid-row: 2;
   font-size: 11px; color: var(--text3); line-height: 1.4;
-  min-height: 1.4em;   /* reserve the row even when a field has no hint */
-}
-.field:not(:has(.hint))::after {
-  content: ''; grid-column: 1 / -1; grid-row: 2;
-  font-size: 11px; line-height: 1.4; min-height: 1.4em;
 }
 /* The two locked-list fields (sectors, commodities) swap the value box for a
    full-width tag row — give it its own row instead of squeezing into the
    76px value column. */
-.field:has(.sector-lock-tags) { grid-template-rows: auto auto auto; }
+.field:has(.sector-lock-tags) { grid-template-rows: auto auto auto; row-gap: 2px; }
 .field .sector-lock-tags { grid-column: 1 / -1; grid-row: 2; }
 .field:has(.sector-lock-tags) .hint { grid-row: 3; }
 /* A threshold of 0 means "not filtering on this". Showing a bare 0 read as a
