@@ -2932,6 +2932,17 @@ function setScreener(key, applyDef=true){
 /* ════════════════════════════════════
    SCAN
 ════════════════════════════════════ */
+// applyFilters/computeRS run a plain O(universe) loop each — a few tens of ms,
+// not heavy enough to justify porting them into a Web Worker (they read the
+// DOM and a dozen module-level constants directly; duplicating that surface
+// into a worker context risked it quietly drifting from this already
+// heavily-hardened logic). Back-to-back on one frame they were still enough
+// to freeze input and the loading text's own repaint on a slower device. This
+// just gives the browser a frame between each blocking step so it can paint
+// and stay responsive — no filter/scoring logic changes.
+function _yieldToMain(){
+  return new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
+}
 function _setScanLoading(on){
   const panel=$('scanBtnPanel'); if(panel){panel.disabled=on;panel.textContent=on?'סורק...':'סרוק את השוק';}
   const top=$('scanBtn'); if(top) top.disabled=on;
@@ -3034,7 +3045,10 @@ async function scan(force=false){
       else { _rawUniverse=universe; _rawTime=Date.now(); _rsMapMem=null; }
     }
     $('statBar').innerHTML='<span class="spinner"></span> מחשב RS Rating ומסנן...';
+    await _yieldToMain();
     const rsMap = isCommodities ? computeRS(universe) : (_rsMapMem ?? (_rsMapMem = computeRS(universe)));
+    if(myToken!==_scanToken) return;
+    await _yieldToMain();
 
     // denominator counts only names with a full MA set — ~8% of the universe are
     // recent IPOs with no SMA150/200 yet, and leaving them in understated breadth
@@ -3071,8 +3085,11 @@ async function scan(force=false){
     allResults = applyFilters(universe, rsMap); _dataGen++;
     allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
     const needsExact = activeScreener==='sepa' || activeScreener==='power' || activeScreener==='qulla' || activeScreener==='vcp';
+    if(myToken!==_scanToken) return;
 
     if(!isCommodities){
+      await _yieldToMain();
+      if(myToken!==_scanToken) return;
       ttUniverse = {};
       applyFilters(universe, rsMap, {skipFund:true, forceTickers:watchlist}).forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
       _wlDataGen++;
