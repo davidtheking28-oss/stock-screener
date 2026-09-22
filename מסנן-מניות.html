@@ -4639,6 +4639,26 @@ function _maybeReportScreenerReviewed(fromSwitch){
   if(!atBottom) return;
   if(fromSwitch && !tableScrolls && Date.now()-_screenerActiveSince < 2000) return;
   _reportedScreenerKeys.add(activeScreener);
+  // postMessage alone depends on the journal's own listener catching it (origin
+  // check, frame.contentWindow identity, its own script having run) — any link
+  // in that chain silently drops the report, with nothing to see on either
+  // side: no error, no row. screener_type_visits lives in this same Supabase
+  // project (confirmed: SUPABASE_URL matches the journal's), so once the SSO
+  // handoff has given this page a session, it can just write the row itself —
+  // one fewer hop that can go missing. The postMessage stays too, since it's
+  // what makes the journal's own badge update live without a reload.
+  if(_currentUser && _sb){
+    const d=new Date();
+    const today=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    _sb.from('screener_type_visits')
+      .upsert({user_id:_currentUser.id, visit_date:today, screener_key:activeScreener},
+        {onConflict:'user_id,visit_date,screener_key', ignoreDuplicates:true})
+      .then(({error})=>{ if(error) console.error('[screener_type_visits]', error); });
+  } else if(IN_JOURNAL){
+    // Same SSO-not-connected-yet case as the watchlist fallback above — surface
+    // it instead of the review silently not counting anywhere.
+    toast('הסינון לא נספר — הסנכרון עם היומן עוד לא התחבר, נסה לגלול שוב בעוד רגע');
+  }
   try{ window.parent.postMessage({type:'tj:screener-used', key:activeScreener}, JOURNAL_ORIGIN); }catch(e){}
 }
 window.addEventListener('scroll', () => _maybeReportScreenerReviewed(false), {passive:true});
