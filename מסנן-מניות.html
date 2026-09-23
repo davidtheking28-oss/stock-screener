@@ -1218,6 +1218,41 @@ const SUPABASE_ANON = '__SUPABASE_ANON__';
 const HAS_SUPABASE  = !SUPABASE_ANON.startsWith('__');
 const _sb = HAS_SUPABASE ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : null;
 
+// Client-side error capture, mirroring the journal's own _reportClientError
+// (client_errors already has an RLS policy allowing an anonymous or
+// self-scoped insert). This screener had NO error-reporting path at all until
+// now — every JS error here, including a silently-lost SSO handshake or a
+// failed watchlist/review write, was invisible outside a user's own devtools.
+// That is exactly what made the tablet-sync investigation slow: no error, no
+// row, nothing to look at from either side. Throttled to one insert per
+// distinct message per page load, same as the journal.
+const _reportedErrors = new Set();
+function _reportClientError(kind, message, extra = {}){
+  if(!_sb) return;
+  try {
+    const key = kind + ':' + String(message).slice(0, 200);
+    if (_reportedErrors.has(key)) return;
+    _reportedErrors.add(key);
+    _sb.from('client_errors').insert({
+      user_id: _currentUser?.id ?? null,
+      kind, message: String(message).slice(0, 2000), app: 'screener',
+      ua: navigator.userAgent, ...extra,
+    }).then(() => {}, () => {});
+  } catch(e) {}
+}
+window.addEventListener('error', (e) => {
+  _reportClientError('error', e.message, {
+    source: e.filename || null, lineno: e.lineno || null, colno: e.colno || null,
+    stack: e.error?.stack ? String(e.error.stack).slice(0, 4000) : null,
+  });
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const reason = e.reason;
+  _reportClientError('unhandledrejection', reason?.message || String(reason), {
+    stack: reason?.stack ? String(reason.stack).slice(0, 4000) : null,
+  });
+});
+
 /* ── Journal SSO ──
    The screener has its own separate Supabase auth (Google/email) — signing
    into the journal does not carry over, since browser storage is per-origin
@@ -2191,6 +2226,7 @@ async function saveWL(ticker, adding){
       if(adding) watchlist.delete(ticker); else watchlist.add(ticker);
       watchlistAddedAt.delete(ticker);
       toast('שמירת רשימת המעקב נכשלה');
+      _reportClientError('watchlist_write', error.message||String(error), {stack:JSON.stringify({adding, code:error.code}).slice(0,2000)});
       render();
     }
   } else {
@@ -2201,7 +2237,10 @@ async function saveWL(ticker, adding){
     // signed-out visit is a normal, expected use of the tool, so this only
     // warns for the embedded case, where the user has every reason to expect
     // it's synced.
-    if (IN_JOURNAL) toast('נשמר במכשיר הזה בלבד — הסנכרון עם היומן עוד לא התחבר, נסה שוב בעוד רגע');
+    if (IN_JOURNAL){
+      toast('נשמר במכשיר הזה בלבד — הסנכרון עם היומן עוד לא התחבר, נסה שוב בעוד רגע');
+      _reportClientError('watchlist_local_fallback', 'saveWL fell back to localStorage while IN_JOURNAL', {stack:JSON.stringify({adding}).slice(0,2000)});
+    }
   }
 }
 
@@ -2993,7 +3032,7 @@ async function checkAndSaveHistory(tickers){
     .select('ticker,first_seen,last_seen').eq('user_id',_currentUser.id).eq('screener',scr);
   // A failed read used to look identical to "no history": every ticker was
   // flagged חדש and the whole list was re-inserted as duplicates.
-  if(histErr){ console.error('[screener_history]', histErr); return; }
+  if(histErr){ console.error('[screener_history]', histErr); _reportClientError('screener_history_read', histErr.message||String(histErr)); return; }
   const known = new Map((prev||[]).map(h=>[h.ticker,h]));
   known.forEach((h,t)=>firstSeenByTicker.set(_fsKey(scr,t),h.first_seen));
   if(watchlist.size > 0 && prev){
@@ -4664,7 +4703,7 @@ function _maybeReportScreenerReviewed(fromSwitch){
     _sb.from('screener_type_visits')
       .upsert({user_id:_currentUser.id, visit_date:today, screener_key:activeScreener},
         {onConflict:'user_id,visit_date,screener_key', ignoreDuplicates:true})
-      .then(({error})=>{ if(error) console.error('[screener_type_visits]', error); });
+      .then(({error})=>{ if(error){ console.error('[screener_type_visits]', error); _reportClientError('screener_type_visits_write', error.message||String(error)); } });
   } else if(IN_JOURNAL){
     // Same SSO-not-connected-yet case as the watchlist fallback above — surface
     // it instead of the review silently not counting anywhere.
