@@ -657,6 +657,32 @@
       'without these the 3M/6M gates silently never run');
   }
 
+  // 2026-09-23: a screener that matches ZERO stocks has nothing to scroll to,
+  // so the scroll/switch-based review tracker could never mark it reviewed —
+  // a user who genuinely reviewed all 7 types only got 1/7 counted, because 6
+  // of them happened to find nothing that day. IN_JOURNAL is false in this
+  // test harness (the page isn't iframed), so _maybeReportEmptyScreenerReviewed's
+  // own IN_JOURNAL gate can't be exercised behaviourally here — these check
+  // the two things that actually can be: the write path it calls into works
+  // when reached, and it is wired into both of scan()'s real completion points.
+  {
+    const beforeSize = _reportedScreenerKeys.size;
+    _recordScreenerReviewed('__test_key__');
+    check('_recordScreenerReviewed adds the key so a repeat call is a no-op',
+      _reportedScreenerKeys.has('__test_key__') && _reportedScreenerKeys.size === beforeSize + 1);
+    _reportedScreenerKeys.delete('__test_key__');
+
+    const esrc = _maybeReportEmptyScreenerReviewed.toString();
+    check('_maybeReportEmptyScreenerReviewed gates on EMPTY results, not truthy results',
+      /results\.length\)\s*return/.test(esrc) && /_recordScreenerReviewed\(activeScreener\)/.test(esrc),
+      'must return when results.length is truthy, and record when it is not');
+
+    const scsrc = scan.toString();
+    const calls = (scsrc.match(/_maybeReportEmptyScreenerReviewed\(\)/g) || []).length;
+    check('scan() calls _maybeReportEmptyScreenerReviewed at both its true completion points',
+      calls >= 3, 'needsExact branch (success + catch) and the non-exact branch — found ' + calls);
+  }
+
   setScreener('sepa', true); // restore
   return R;
 })()

@@ -3191,10 +3191,12 @@ async function scan(force=false){
         saveResultsCache(); finalize(false);
         checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken){ saveResultsCache(); render(); } });
         toast('נמצאו '+results.length+' מניות');
-      }).catch(()=>{ if(myToken===_scanToken) finalize(false); });
+        _maybeReportEmptyScreenerReviewed();
+      }).catch(()=>{ if(myToken===_scanToken){ finalize(false); _maybeReportEmptyScreenerReviewed(); } });
     } else {
       checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken){ saveResultsCache(); render(); } });
       toast('נמצאו '+results.length+' מניות');
+      _maybeReportEmptyScreenerReviewed();
     }
   }catch(e){
     console.error(e);
@@ -4678,17 +4680,12 @@ _scrollTopBtn.onclick = () => {
 // once, so the page-level check alone is enough there. Below the ~680px
 // breakpoint .table-wrap becomes its own scrollport instead of the page.
 const _reportedScreenerKeys = new Set();
-function _maybeReportScreenerReviewed(fromSwitch){
-  if(!IN_JOURNAL || mode!=='screen' || !results.length) return;
-  if(_reportedScreenerKeys.has(activeScreener)) return;
-  const tv=$('tableView');
-  const tableScrolls = layout==='table' && tv && tv.scrollHeight > tv.clientHeight+8;
-  const atBottom = tableScrolls
-    ? (tv.scrollTop+tv.clientHeight > tv.scrollHeight-40 && _tableAt>=_tableRows.length)
-    : (window.scrollY+window.innerHeight >= document.documentElement.scrollHeight-40);
-  if(!atBottom) return;
-  if(fromSwitch && !tableScrolls && Date.now()-_screenerActiveSince < 2000) return;
-  _reportedScreenerKeys.add(activeScreener);
+// Shared by both the scroll/switch path below and the zero-results path in
+// scan() — writing the row and the SSO-not-connected fallback toast must stay
+// identical for both, so this is the one place either of them touches _sb.
+function _recordScreenerReviewed(key){
+  if(_reportedScreenerKeys.has(key)) return;
+  _reportedScreenerKeys.add(key);
   // postMessage alone depends on the journal's own listener catching it (origin
   // check, frame.contentWindow identity, its own script having run) — any link
   // in that chain silently drops the report, with nothing to see on either
@@ -4701,7 +4698,7 @@ function _maybeReportScreenerReviewed(fromSwitch){
     const d=new Date();
     const today=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     _sb.from('screener_type_visits')
-      .upsert({user_id:_currentUser.id, visit_date:today, screener_key:activeScreener},
+      .upsert({user_id:_currentUser.id, visit_date:today, screener_key:key},
         {onConflict:'user_id,visit_date,screener_key', ignoreDuplicates:true})
       .then(({error})=>{ if(error){ console.error('[screener_type_visits]', error); _reportClientError('screener_type_visits_write', error.message||String(error)); } });
   } else if(IN_JOURNAL){
@@ -4709,10 +4706,33 @@ function _maybeReportScreenerReviewed(fromSwitch){
     // it instead of the review silently not counting anywhere.
     toast('הסינון לא נספר — הסנכרון עם היומן עוד לא התחבר, נסה לגלול שוב בעוד רגע');
   }
-  try{ window.parent.postMessage({type:'tj:screener-used', key:activeScreener}, JOURNAL_ORIGIN); }catch(e){}
+  try{ window.parent.postMessage({type:'tj:screener-used', key}, JOURNAL_ORIGIN); }catch(e){}
+}
+function _maybeReportScreenerReviewed(fromSwitch){
+  if(!IN_JOURNAL || mode!=='screen' || !results.length) return;
+  if(_reportedScreenerKeys.has(activeScreener)) return;
+  const tv=$('tableView');
+  const tableScrolls = layout==='table' && tv && tv.scrollHeight > tv.clientHeight+8;
+  const atBottom = tableScrolls
+    ? (tv.scrollTop+tv.clientHeight > tv.scrollHeight-40 && _tableAt>=_tableRows.length)
+    : (window.scrollY+window.innerHeight >= document.documentElement.scrollHeight-40);
+  if(!atBottom) return;
+  if(fromSwitch && !tableScrolls && Date.now()-_screenerActiveSince < 2000) return;
+  _recordScreenerReviewed(activeScreener);
 }
 window.addEventListener('scroll', () => _maybeReportScreenerReviewed(false), {passive:true});
 $('tableView').addEventListener('scroll', () => _maybeReportScreenerReviewed(false), {passive:true});
+// A scan that finds ZERO matches has nothing to scroll to — the two checks
+// above both gate on results.length and so can never fire for it, no matter
+// how long the user looks at the empty state or how they navigate away. Found
+// 2026-09-23: a user who genuinely reviewed all 7 screener types only got 1/7
+// counted, because 6 of them happened to match nothing that day. Finishing a
+// scan IS the review when there is nothing left to display — call this once
+// scan() knows its final (post-validation, where applicable) result count.
+function _maybeReportEmptyScreenerReviewed(){
+  if(!IN_JOURNAL || mode!=='screen' || results.length) return;
+  _recordScreenerReviewed(activeScreener);
+}
 </script>
 </body>
 </html>
