@@ -4667,6 +4667,10 @@ $('tableView').addEventListener('scroll', () => {
   if(tv.scrollTop+tv.clientHeight > tv.scrollHeight-3000) _tableMore();
 }, {passive: true});
 _scrollTopBtn.onclick = () => {
+  // The button only appears after scrolling well down the results, so using it
+  // is itself a clear sign the filter was read — counts even if the user
+  // stopped a few rows short of the last one.
+  if(IN_JOURNAL && mode==='screen' && results.length) _recordScreenerReviewed(activeScreener);
   window.scrollTo({top: 0, behavior: 'smooth'});
   $('tableView').scrollTo({top: 0, behavior: 'smooth'});
 };
@@ -4680,6 +4684,7 @@ _scrollTopBtn.onclick = () => {
 // once, so the page-level check alone is enough there. Below the ~680px
 // breakpoint .table-wrap becomes its own scrollport instead of the page.
 const _reportedScreenerKeys = new Set();
+function _resultsEndVisible(resultsBottom, viewportHeight){ return resultsBottom <= viewportHeight + 40; }
 // Shared by both the scroll/switch path below and the zero-results path in
 // scan() — writing the row and the SSO-not-connected fallback toast must stay
 // identical for both, so this is the one place either of them touches _sb.
@@ -4713,9 +4718,13 @@ function _maybeReportScreenerReviewed(fromSwitch){
   if(_reportedScreenerKeys.has(activeScreener)) return;
   const tv=$('tableView');
   const tableScrolls = layout==='table' && tv && tv.scrollHeight > tv.clientHeight+8;
+  // The page bottom sits below the SEPA explainer and the footer, so measuring
+  // against it meant a user who scrolled to the last stock and clicked "back to
+  // top" was never counted. Measure the end of the results themselves.
+  const resultsEl = layout==='table' ? tv : $('galleryView');
   const atBottom = tableScrolls
     ? (tv.scrollTop+tv.clientHeight > tv.scrollHeight-40 && _tableAt>=_tableRows.length)
-    : (window.scrollY+window.innerHeight >= document.documentElement.scrollHeight-40);
+    : ((layout!=='table' || _tableAt>=_tableRows.length) && _resultsEndVisible(resultsEl.getBoundingClientRect().bottom, window.innerHeight));
   if(!atBottom) return;
   if(fromSwitch && !tableScrolls && Date.now()-_screenerActiveSince < 2000) return;
   _recordScreenerReviewed(activeScreener);

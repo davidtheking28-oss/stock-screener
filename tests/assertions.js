@@ -683,6 +683,25 @@
       calls >= 3, 'needsExact branch (success + catch) and the non-exact branch — found ' + calls);
   }
 
+  // 2026-09-24: "reached the bottom" was measured against the bottom of the
+  // whole PAGE, which sits below a SEPA explainer <details> and the footer. A
+  // user who scrolled to the last stock and hit "back to top" never got there,
+  // so most filters went uncounted (2/7 after reviewing most of them).
+  {
+    check('_resultsEndVisible: last row on screen counts even with page content below it',
+      _resultsEndVisible(900, 950) === true);
+    check('_resultsEndVisible: within the 40px tolerance counts',
+      _resultsEndVisible(985, 950) === true);
+    check('_resultsEndVisible: results still running off-screen does not count',
+      _resultsEndVisible(2400, 950) === false);
+    check('_maybeReportScreenerReviewed no longer measures against the document bottom',
+      !/documentElement\.scrollHeight/.test(_maybeReportScreenerReviewed.toString()),
+      'the page bottom is below the explainer and footer, not the results');
+    check('the back-to-top button counts as a review of the current filter',
+      /_recordScreenerReviewed\(activeScreener\)/.test(_scrollTopBtn.onclick.toString()),
+      'clicking it is only possible after scrolling down through the results');
+  }
+
   setScreener('sepa', true); // restore
   return R;
 })()
