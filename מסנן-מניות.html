@@ -1047,9 +1047,9 @@ tbody tr:last-child td { border-bottom: none; }
                 <label class="toggle"><input type="checkbox" id="vcpDryUp" checked> נפח מתייבש בהתכווצות האחרונה</label>
               </div>
             </div>
-            <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="adrMin" value="3" min="0" step="0.5" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="adrMin" value="4" min="0" step="0.5" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move6Min" value="30" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
-            <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move3Min" value="20" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move3Min" value="30" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="emaDistMax">מרחק מ-EMA10/20 מקס&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="emaDistMax" value="3.5" min="0" step="0.5" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="weekRangeMax">דשדוש 5 ימים מקס&#8217; (&#177;%)</label><div class="field-combo"><input type="text" inputmode="none" id="weekRangeMax" value="7" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="volSharesMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="volSharesMin" value="0.5" min="0" step="0.1" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
@@ -1364,7 +1364,7 @@ const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100,consolWeeks:2},
   vcp:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
-  qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:3,move6Min:30,move3Min:20,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
+  qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:4,move6Min:30,move3Min:30,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1,finvizFromHigh:25},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
   commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
@@ -2058,7 +2058,7 @@ function _vcpExactFail(r, bars, opts={}){
 async function validateExact(list, scr, onProgress, signal){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
-  const adrMin=num('adrMin')||3, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
+  const adrMin=num('adrMin')||4, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
   const move3Min=num('move3Min')||0, move6Min=num('move6Min')||0;
   const reqVcp=!!$('requireVCP')?.checked, reqRsLine=!!$('requireRSLine')?.checked;
   const vcpOpts={minC:num('vcpContractions')||3, maxDepth:num('vcpDepthMax')||12,
@@ -4533,7 +4533,7 @@ function dismissDaily(d){
 // the "only migrate the old default" guards forever, silently clobbering a
 // deliberate value that happened to match a past default (e.g. epsMin=25 on
 // purpose, not left over).
-const FILTERS_VERSION = 5;
+const FILTERS_VERSION = 6;
 function saveFilterPrefs(){
   try {
     localStorage.setItem('sepa_filters', JSON.stringify({
@@ -4574,6 +4574,10 @@ function loadFilterPrefs(){
     // for names that already made a big move (30%+), not any move at all. Same
     // only-migrate-the-old-default rule: 20/10 move, leave anything else alone.
     if((p.v||0)<5){ if(p.move6Min===20) p.move6Min=30; if(p.move3Min===10) p.move3Min=20; p.v=5; }
+    // v6: still looser than his own setup — he wants ADR of 4-5%+ and a 30%+
+    // move within 1-3 months. Measured on the live scan 2026-09-25: 49 names at
+    // ADR 3 / 3M 20 (slow large caps like PSX, VEEV), 21 at ADR 4 / 3M 30.
+    if((p.v||0)<6){ if(p.adrMin===3) p.adrMin=4; if(p.move3Min===20) p.move3Min=30; p.v=6; }
     try{ localStorage.setItem('sepa_filters', JSON.stringify(p)); }catch(e){}
     const set=(id,v)=>{ if(v!=null) setFieldValue($(id),v); };
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);

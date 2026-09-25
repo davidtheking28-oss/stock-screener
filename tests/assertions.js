@@ -350,7 +350,7 @@
     setScreener('qulla', true);
     const m = { move3Min: num('move3Min'), move6Min: num('move6Min'), adrMin: num('adrMin') };
     check('Qullamaggie defaults require a real prior move',
-      m.move3Min === 20 && m.move6Min === 30 && m.adrMin === 3, 'got ' + JSON.stringify(m));
+      m.move3Min === 30 && m.move6Min === 30 && m.adrMin === 4, 'got ' + JSON.stringify(m));
   }
 
   // Criterion #3 (SMA200 rising). validateExact runs the real slope check via
@@ -700,6 +700,30 @@
     check('the back-to-top button counts as a review of the current filter',
       /_recordScreenerReviewed\(activeScreener\)/.test(_scrollTopBtn.onclick.toString()),
       'clicking it is only possible after scrolling down through the results');
+  }
+
+  // 2026-09-25: Qullamaggie wants ADR ≥ ~4-5% and a prior move of 30%+ within
+  // 1-3 months. At ADR 3 / 3M 20 the live scan returned 49 names (PSX, VEEV,
+  // ANET — slow large caps); ADR 4 / 3M 30 returned 21, all real momentum names.
+  {
+    check('qulla defaults: ADR ≥ 4 and a 30% 3-month move',
+      SCREENER_DEFAULTS.qulla.adrMin === 4 && SCREENER_DEFAULTS.qulla.move3Min === 30,
+      'got adrMin ' + SCREENER_DEFAULTS.qulla.adrMin + ', move3Min ' + SCREENER_DEFAULTS.qulla.move3Min);
+    const saved = localStorage.getItem('sepa_filters');
+    try {
+      localStorage.setItem('sepa_filters', JSON.stringify({ v: 5, adrMin: 3, move3Min: 20 }));
+      loadFilterPrefs();
+      check('v6 migration moves a saved old qulla default to the new one',
+        num('adrMin') === 4 && num('move3Min') === 30,
+        'got adrMin ' + num('adrMin') + ', move3Min ' + num('move3Min'));
+      localStorage.setItem('sepa_filters', JSON.stringify({ v: 5, adrMin: 3.5, move3Min: 25 }));
+      loadFilterPrefs();
+      check('v6 migration leaves a deliberately chosen qulla value alone',
+        num('adrMin') === 3.5 && num('move3Min') === 25,
+        'got adrMin ' + num('adrMin') + ', move3Min ' + num('move3Min'));
+    } finally {
+      if (saved == null) localStorage.removeItem('sepa_filters'); else localStorage.setItem('sepa_filters', saved);
+    }
   }
 
   setScreener('sepa', true); // restore
