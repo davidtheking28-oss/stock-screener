@@ -185,6 +185,79 @@
     const straight = _vcp(mkv(leg(100, 180, 80)));
     check('_vcp: uninterrupted advance → no real contractions',
       straight && straight.contractions === 0, 'got ' + JSON.stringify(straight));
+    check('_vcp: no real contraction → weakDownCandles null (nothing to judge)',
+      straight.weakDownCandles === null, 'got ' + JSON.stringify(straight));
+
+    // "Weak" down days: light volume, closing in the upper half of their own
+    // range — supply drying up in the candle shape itself, not just in the
+    // leg's average volume (which volDryUp already covers). "Strong" down
+    // days: heavy volume, closing near the low — real selling pressure.
+    // Down-day h/l offsets are deliberately tiny (~0.2% total range) so they
+    // cannot alter the swing-high/depth measurement that _vcpExactFail's OWN
+    // gate reads from the same bars — only closePos and volume differ,
+    // exactly the two things weakDownCandles is defined on. Same closes
+    // (same depths/contractions) either way.
+    const buildDown = (closes, weak) => {
+      let prev = closes[0];
+      return closes.map((c, i) => {
+        const isDown = i > 0 && c < prev;
+        const bar = isDown && weak
+          ? { t: i * 86400, o: prev, h: c * 1.0006, l: c * 0.9985, c, v: 400 }
+          : isDown
+          ? { t: i * 86400, o: prev, h: c * 1.0015, l: c * 0.9994, c, v: 6000 }
+          : { t: i * 86400, o: prev, h: c * 1.01, l: c * 0.99, c, v: 3000 };
+        prev = c;
+        return bar;
+      });
+    };
+    const weakV = _vcp(buildDown(vcpCloses, true));
+    const strongV = _vcp(buildDown(vcpCloses, false));
+    check('_vcp: light-volume down days closing high in range → weakDownCandles true',
+      weakV && weakV.weakDownCandles === true, 'got ' + JSON.stringify(weakV));
+    check('_vcp: heavy-volume down days closing low in range → weakDownCandles false',
+      strongV && strongV.weakDownCandles === false, 'got ' + JSON.stringify(strongV));
+  }
+
+  // ── _cleanbaseExactFail: _vcpExactFail's gate, plus weak down-candles ──
+  {
+    const leg = (from, to, len) => Array.from({ length: len }, (_, i) => from + (to - from) * (i / (len - 1)));
+    const vcpCloses = [].concat(
+      leg(100, 140, 30), leg(140, 112, 12), leg(112, 138, 12),
+      leg(138, 121, 10), leg(121, 139, 10), leg(139, 131, 8)
+    );
+    const buildDown = (closes, weak) => {
+      let prev = closes[0];
+      return closes.map((c, i) => {
+        const isDown = i > 0 && c < prev;
+        const bar = isDown && weak
+          ? { t: i * 86400, o: prev, h: c * 1.0006, l: c * 0.9985, c, v: 400 }
+          : isDown
+          ? { t: i * 86400, o: prev, h: c * 1.0015, l: c * 0.9994, c, v: 6000 }
+          : { t: i * 86400, o: prev, h: c * 1.01, l: c * 0.99, c, v: 3000 };
+        prev = c;
+        return bar;
+      });
+    };
+    const weakBars = buildDown(vcpCloses, true), strongBars = buildDown(vcpCloses, false);
+    const rWeak = { perf6: 30, vcp: _vcp(weakBars) }, rStrong = { perf6: 30, vcp: _vcp(strongBars) };
+    check('_cleanbaseExactFail: passes the VCP gate AND has weak down-candles → false (accepted)',
+      _cleanbaseExactFail(rWeak, weakBars) === false, 'got ' + JSON.stringify(rWeak.vcp));
+    check('_cleanbaseExactFail: passes the VCP gate but down-candles are strong → true (rejected)',
+      _cleanbaseExactFail(rStrong, strongBars) === true, 'got ' + JSON.stringify(rStrong.vcp));
+    const tooFewBars = leg(100, 110, 20).map((c, i) => ({ t: i * 86400, o: c, h: c * 1.005, l: c * 0.995, c, v: 1000 }));
+    check('_cleanbaseExactFail: fails the underlying VCP gate too → true regardless of candles',
+      _cleanbaseExactFail({ perf6: 30, vcp: _vcp(tooFewBars) }, tooFewBars) === true);
+  }
+
+  // ── cleanbase is registered like every other screener ──
+  {
+    check('SCREENERS.cleanbase is registered', !!SCREENERS.cleanbase);
+    check('SCREENER_DEFAULTS.cleanbase is registered', !!SCREENER_DEFAULTS.cleanbase);
+    check('SCREENER_HEADS.cleanbase is registered', !!SCREENER_HEADS.cleanbase);
+    setScreener('cleanbase', true);
+    check('setScreener(cleanbase) switches panel class', document.getElementById('filterPanel').classList.contains('panel-cleanbase'));
+    check('cleanbase shares the VCP fields (vcpContractions visible)', num('vcpContractions') === (SCREENER_DEFAULTS.cleanbase.vcpContractions ?? 3));
+    setScreener('sepa', true);
   }
 
   // ── _rsLine ──

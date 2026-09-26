@@ -302,21 +302,21 @@ body {
 .filter-panel.wl-mode .screener-btn.active {
   background: var(--fill); border-color: var(--border); color: var(--text2);
 }
-#filterPanel.panel-power .f-sepa, #filterPanel.panel-growth .f-sepa, #filterPanel.panel-commodities .f-sepa, #filterPanel.panel-qulla .f-sepa, #filterPanel.panel-finviz .f-sepa { display: none; }
-#filterPanel.panel-sepa .f-power, #filterPanel.panel-growth .f-power, #filterPanel.panel-commodities .f-power, #filterPanel.panel-qulla .f-power, #filterPanel.panel-finviz .f-power { display: none; }
+#filterPanel.panel-power .f-sepa, #filterPanel.panel-growth .f-sepa, #filterPanel.panel-commodities .f-sepa, #filterPanel.panel-qulla .f-sepa, #filterPanel.panel-finviz .f-sepa, #filterPanel.panel-cleanbase .f-sepa { display: none; }
+#filterPanel.panel-sepa .f-power, #filterPanel.panel-growth .f-power, #filterPanel.panel-commodities .f-power, #filterPanel.panel-qulla .f-power, #filterPanel.panel-finviz .f-power, #filterPanel.panel-cleanbase .f-power { display: none; }
 #filterPanel.panel-growth .f-tech, #filterPanel.panel-commodities .f-tech, #filterPanel.panel-qulla .f-tech, #filterPanel.panel-finviz .f-tech { display: none; }
-#filterPanel.panel-sepa .f-growth, #filterPanel.panel-power .f-growth, #filterPanel.panel-commodities .f-growth, #filterPanel.panel-qulla .f-growth, #filterPanel.panel-finviz .f-growth { display: none; }
+#filterPanel.panel-sepa .f-growth, #filterPanel.panel-power .f-growth, #filterPanel.panel-commodities .f-growth, #filterPanel.panel-qulla .f-growth, #filterPanel.panel-finviz .f-growth, #filterPanel.panel-cleanbase .f-growth { display: none; }
 #filterPanel.panel-commodities .f-base { display: none; }
 #filterPanel.panel-finviz .f-liq { display: none; }
-#filterPanel.panel-sepa .f-commodities, #filterPanel.panel-power .f-commodities, #filterPanel.panel-growth .f-commodities, #filterPanel.panel-qulla .f-commodities, #filterPanel.panel-finviz .f-commodities { display: none; }
-#filterPanel.panel-sepa .f-qulla, #filterPanel.panel-power .f-qulla, #filterPanel.panel-growth .f-qulla, #filterPanel.panel-commodities .f-qulla, #filterPanel.panel-finviz .f-qulla { display: none; }
-#filterPanel.panel-sepa .f-finviz, #filterPanel.panel-power .f-finviz, #filterPanel.panel-growth .f-finviz, #filterPanel.panel-commodities .f-finviz, #filterPanel.panel-qulla .f-finviz { display: none; }
+#filterPanel.panel-sepa .f-commodities, #filterPanel.panel-power .f-commodities, #filterPanel.panel-growth .f-commodities, #filterPanel.panel-qulla .f-commodities, #filterPanel.panel-finviz .f-commodities, #filterPanel.panel-cleanbase .f-commodities { display: none; }
+#filterPanel.panel-sepa .f-qulla, #filterPanel.panel-power .f-qulla, #filterPanel.panel-growth .f-qulla, #filterPanel.panel-commodities .f-qulla, #filterPanel.panel-finviz .f-qulla, #filterPanel.panel-cleanbase .f-qulla { display: none; }
+#filterPanel.panel-sepa .f-finviz, #filterPanel.panel-power .f-finviz, #filterPanel.panel-growth .f-finviz, #filterPanel.panel-commodities .f-finviz, #filterPanel.panel-qulla .f-finviz, #filterPanel.panel-cleanbase .f-finviz { display: none; }
 /* The rules above enumerate every panel by name, so a new screener would be
    invisible in all of them until it is appended to each line. These two are
    written the other way round — negated — so the VCP fields hide everywhere
    except their own panel without touching seven existing selectors. */
-#filterPanel:not(.panel-vcp) .f-vcp { display: none; }
-#filterPanel.panel-vcp .f-sepa, #filterPanel.panel-vcp .f-power, #filterPanel.panel-vcp .f-growth, #filterPanel.panel-vcp .f-commodities, #filterPanel.panel-vcp .f-qulla, #filterPanel.panel-vcp .f-finviz { display: none; }
+#filterPanel:not(.panel-vcp):not(.panel-cleanbase) .f-vcp { display: none; }
+#filterPanel.panel-vcp .f-sepa, #filterPanel.panel-vcp .f-power, #filterPanel.panel-vcp .f-growth, #filterPanel.panel-vcp .f-commodities, #filterPanel.panel-vcp .f-qulla, #filterPanel.panel-vcp .f-finviz, #filterPanel.panel-cleanbase .f-sepa, #filterPanel.panel-cleanbase .f-power, #filterPanel.panel-cleanbase .f-growth, #filterPanel.panel-cleanbase .f-commodities, #filterPanel.panel-cleanbase .f-qulla, #filterPanel.panel-cleanbase .f-finviz { display: none; }
 .filter-sections.single { grid-template-columns: 1fr; }
 .preset-btn {
   height: var(--ctl-h); padding: 0 13px; border-radius: var(--r2);
@@ -1004,6 +1004,7 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="screener-btn active" aria-pressed="true" data-screener="sepa" onclick="setScreener('sepa')">Minervini SEPA</button>
         <button class="screener-btn" aria-pressed="false" data-screener="power" onclick="setScreener('power')">Power Play</button>
         <button class="screener-btn" aria-pressed="false" data-screener="vcp" onclick="setScreener('vcp')">VCP / פריצה</button>
+        <button class="screener-btn" aria-pressed="false" data-screener="cleanbase" onclick="setScreener('cleanbase')">בסיס נקי</button>
         <button class="screener-btn" aria-pressed="false" data-screener="qulla" onclick="setScreener('qulla')">Qullamaggie</button>
         <button class="screener-btn" aria-pressed="false" data-screener="finviz" onclick="setScreener('finviz')">מומנטום שנתי</button>
         <button class="screener-btn" aria-pressed="false" data-screener="growth" onclick="setScreener('growth')">מסנן פונדמנטלי</button>
@@ -1355,6 +1356,7 @@ const SCREENERS = {
   sepa:     {name:'Minervini SEPA',      sub:'Trend Template + SEPA',  fund:true,  presets:true},
   power:    {name:'Power Play',           sub:'ריצה נפיצה + דשדוש הדוק', fund:false, presets:false},
   vcp:      {name:'VCP / פריצה',        sub:'בסיס VCP מתהדק + מחיר צמוד לנקודת הפריצה', fund:false, presets:false},
+  cleanbase: {name:'בסיס נקי',           sub:'VCP + נרות ירידה חלשים בהתכווצות האחרונה', fund:false, presets:false},
   qulla:    {name:'Qullamaggie',          sub:'Breakout — מהלך גדול + דשדוש צמוד ל-EMA', fund:false, presets:false},
   finviz:   {name:'מומנטום שנתי',         sub:'שנה +30% · מעל SMA50/200 · קרוב לשיא', fund:false, presets:false},
   growth:   {name:'מסנן פונדמנטלי',      sub:'סקטורים נבחרים + צמיחה רבעונית', fund:false, presets:false},
@@ -1364,6 +1366,7 @@ const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100,consolWeeks:2},
   vcp:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
+  cleanbase: {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:4,move6Min:30,move3Min:30,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1,finvizFromHigh:25},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
@@ -1875,7 +1878,7 @@ function _vcp(bars, lookback=90){
   }
   const last=w[n-1].c;
   if(!highs.length) return {contractions:0, lastDepth:null, tighteningOK:false,
-                            volDryUp:null, pivot:null, distToPivot:null};
+                            volDryUp:null, pivot:null, distToPivot:null, weakDownCandles:null};
   // Depth of each pullback: swing high → lowest low before the next swing high.
   // The final leg runs to the last bar, so an in-progress pullback still counts.
   const legs=[];
@@ -1889,7 +1892,7 @@ function _vcp(bars, lookback=90){
   const pivot=w[highs[highs.length-1]].h;           // the level a breakout clears
   const distToPivot=(last/pivot-1)*100;
   if(real.length<2) return {contractions:real.length, lastDepth:real.length?real[real.length-1].depth:null,
-                            tighteningOK:false, volDryUp:null, pivot, distToPivot};
+                            tighteningOK:false, volDryUp:null, pivot, distToPivot, weakDownCandles:null};
   const tighteningOK=real[real.length-1].depth<real[real.length-2].depth;
   // Volume across the newest contraction vs the rest of the base — Minervini
   // wants it drying up as the pattern tightens.
@@ -1897,13 +1900,34 @@ function _vcp(bars, lookback=90){
   const at=real[real.length-1].at;
   const recentVol=volOf(at,n-1), baseVol=volOf(0,at);
   const volDryUp=(recentVol==null||baseVol==null||baseVol===0)?null:recentVol<baseVol;
+  // Minervini also reads supply drying up in the SHAPE of the individual down
+  // candles inside the newest contraction, not just their average volume
+  // (which volDryUp above already covers against the whole base): a real
+  // pullback trades a narrow range on light volume and closes off its low,
+  // while distribution sells off hard on a wide range and closes near it.
+  // Judged only against days that actually closed down within this leg, and
+  // only when there are at least two of them — one down day is too little to
+  // call either way. Up-day volume is measured across the WHOLE window, not
+  // just this leg: a clean final contraction can be (and often is) a smooth,
+  // near-monotonic slide with no up days of its own to compare against, so
+  // the baseline has to come from the base's normal up-day volume instead.
+  const downDays=[], upVols=[];
+  for(let i=1;i<n;i++){
+    if(w[i].v==null) continue;
+    if(i>at && w[i].c<w[i-1].c) downDays.push(w[i]);
+    else if(w[i].c>w[i-1].c) upVols.push(w[i].v);
+  }
+  const avg=arr=>arr.reduce((a,b)=>a+b,0)/arr.length;
+  const weakDownCandles = (downDays.length<2 || !upVols.length) ? null :
+    (avg(downDays.map(b=>b.v)) < avg(upVols)) &&
+    (avg(downDays.map(b=>b.h>b.l ? (b.c-b.l)/(b.h-b.l) : 0.5)) > 0.5);
   // depths is what lets a caller judge the WHOLE sequence. tighteningOK only
   // compares the last two legs, which is enough as one narrowing gate stacked
   // on the Trend Template but far too loose as a screener's primary test — a
   // noisy mega-cap drift produces 8-10 legs and passes on whichever two happen
   // to shrink at the end (measured live: GOOG, XOM, WELL all did).
   return {contractions:real.length, lastDepth:real[real.length-1].depth, tighteningOK, volDryUp, pivot, distToPivot,
-          depths:real.map(l=>+l.depth.toFixed(2))};
+          weakDownCandles, depths:real.map(l=>+l.depth.toFixed(2))};
 }
 // Relative-strength line = price / benchmark. Minervini and IBD both read the
 // RS line making a new high *before* price clears its own pivot as the strongest
@@ -2055,8 +2079,17 @@ function _vcpExactFail(r, bars, opts={}){
   if(v.distToPivot < -(opts.maxBelow ?? 10)) return true;
   return false;
 }
+// "בסיס נקי" — the same VCP gate above, plus the newest contraction's down
+// days must read as weak (r.vcp.weakDownCandles, computed in _vcp) rather
+// than just tightening on average. A separate screener rather than a checkbox
+// on VCP itself, per the user's own choice — it belongs beside the other
+// seven, not folded into one of them.
+function _cleanbaseExactFail(r, bars, opts={}){
+  if(_vcpExactFail(r, bars, opts)) return true;
+  return r.vcp?.weakDownCandles !== true;
+}
 async function validateExact(list, scr, onProgress, signal){
-  if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp')||!HAS_SUPABASE||!list.length) return list;
+  if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp'&&scr!=='cleanbase')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   const adrMin=num('adrMin')||4, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
   const move3Min=num('move3Min')||0, move6Min=num('move6Min')||0;
@@ -2086,6 +2119,8 @@ async function validateExact(list, scr, onProgress, signal){
           if(_sepaExactFail(r, bars, {reqVcp, reqRsLine})) r._exactFail=true;
         } else if(scr==='vcp'){
           if(_vcpExactFail(r, bars, vcpOpts)) r._exactFail=true;
+        } else if(scr==='cleanbase'){
+          if(_cleanbaseExactFail(r, bars, vcpOpts)) r._exactFail=true;
         } else if(scr==='qulla'){
           if(_qullaExactOK(bars, adrMin, emaDistMax, weekMax, move3Min, move6Min)===false) r._exactFail=true;
         } else {
@@ -2477,11 +2512,14 @@ function _calcScoreRaw(r, scr='sepa'){
     const revS  = Math.min(clamp(r.rev??0,0,200)/200,1)*5;
     return Math.round(clamp(moveS+adrS+emaS+tightS+epsS+perfYS+rsS+revS,0,100));
   }
-  if(scr==='vcp'){
+  if(scr==='vcp'||scr==='cleanbase'){
     // Ranked on actionability, not on strength: every row here already passed
     // the base gate, so what separates them is how tight the last contraction
     // is and how close price sits to the pivot. r.vcp is filled by
     // validateExact, so scan() rescores this screener after that pass.
+    // cleanbase reuses this scoring as-is — every row here already passed the
+    // extra weak-down-candle gate to be in the list at all, so there's
+    // nothing left to weight it by.
     const v=r.vcp;
     const tightS = v?.lastDepth==null?0:clamp(1-v.lastDepth/15,0,1)*25;
     const pivotS = v?.distToPivot==null?0:clamp(1-Math.abs(v.distToPivot)/10,0,1)*20;
@@ -2902,7 +2940,7 @@ function _toggleFilterPanel(headerEl){
   if(open && mode==='watch') setMode('screen');
 }
 
-const SCREENER_HEADS = {sepa:'טכני — Trend Template', power:'טכני — Power Play', vcp:'טכני — בסיס VCP', qulla:'טכני — Qullamaggie Breakout', finviz:'טכני — מומנטום שנתי', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
+const SCREENER_HEADS = {sepa:'טכני — Trend Template', power:'טכני — Power Play', vcp:'טכני — בסיס VCP', cleanbase:'טכני — בסיס נקי', qulla:'טכני — Qullamaggie Breakout', finviz:'טכני — מומנטום שנתי', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
 function setScreener(key, applyDef=true){
   if(!SCREENERS[key]) return;
   // Picking a screener means "show me this screen", so it leaves the watchlist.
@@ -3125,7 +3163,7 @@ async function scan(force=false){
 
     allResults = applyFilters(universe, rsMap); _dataGen++;
     allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
-    const needsExact = activeScreener==='sepa' || activeScreener==='power' || activeScreener==='qulla' || activeScreener==='vcp';
+    const needsExact = activeScreener==='sepa' || activeScreener==='power' || activeScreener==='qulla' || activeScreener==='vcp' || activeScreener==='cleanbase';
     if(myToken!==_scanToken) return;
 
     if(!isCommodities){
@@ -3187,7 +3225,7 @@ async function scan(force=false){
         // Every term of the VCP score reads r.vcp, which only exists after the
         // pass above annotated the row — scoring before it leaves the whole
         // screener ranked on RS and EPS alone.
-        if(activeScreener==='vcp') allResults.forEach(x=>{ x.score=calcScore(x,'vcp'); });
+        if(activeScreener==='vcp'||activeScreener==='cleanbase') allResults.forEach(x=>{ x.score=calcScore(x,activeScreener); });
         saveResultsCache(); finalize(false);
         checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken){ saveResultsCache(); render(); } });
         toast('נמצאו '+results.length+' מניות');
@@ -3413,13 +3451,15 @@ function applyFilters(universe, rsMap, opts={}){
       const strong=rs>=rsMin;
       checks={run,near,up,strong};
       pass=run&&near&&up&&strong;
-    } else if(scr==='vcp'){
+    } else if(scr==='vcp'||scr==='cleanbase'){
       // A VCP only forms inside a stage-2 uptrend, so the coarse pass is the
       // Trend Template's alignment — the base itself is measured from OHLC bars
-      // in _vcpExactFail. close>s50 is deliberately NOT required: the last
-      // contraction of a real VCP routinely undercuts the 50-day for a few days
-      // right before the pivot, which is the tightest and most actionable point
-      // in the pattern.
+      // in _vcpExactFail/_cleanbaseExactFail. close>s50 is deliberately NOT
+      // required: the last contraction of a real VCP routinely undercuts the
+      // 50-day for a few days right before the pivot, which is the tightest
+      // and most actionable point in the pattern. cleanbase shares this exact
+      // coarse gate — only the fine gate (validateExact) differs, requiring
+      // weak down-candles on top.
       const trend=close>s150 && close>s200 && s150>s200 && s50>s200;
       const near=fromHighPct>=-num('fromHigh');
       const above=close>=lo*(1+flPct);
@@ -3603,6 +3643,9 @@ const SORTS={
            return v.contractions*10 + (v.tighteningOK?50:0) + (v.volDryUp?25:0)
                   + (v.distToPivot==null?0:Math.max(-20,v.distToPivot)); },
   rsline:r=>r.rsLine?(r.rsLine.atHigh?0:r.rsLine.pctFromHigh):-1e9,
+  // Same ranking as vcp: every row here already passed the extra weak-down-
+  // candle gate, so there's nothing left for this sort to distinguish on.
+  get cleanbase(){ return this.vcp; },
   // 'YYYY-MM-DD' strings sort chronologically as plain strings — no Date
   // parsing needed. Missing (not yet resolved by checkAndSaveHistory) sorts
   // first under ascending, last under descending, either way grouped rather
