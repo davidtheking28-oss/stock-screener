@@ -2086,7 +2086,23 @@ function _vcpExactFail(r, bars, opts={}){
 // seven, not folded into one of them.
 function _cleanbaseExactFail(r, bars, opts={}){
   if(_vcpExactFail(r, bars, opts)) return true;
-  return r.vcp?.weakDownCandles !== true;
+  const v=r.vcp;
+  if(v?.weakDownCandles !== true) return true;
+  // _vcpExactFail's own structural check only requires the LAST minC legs
+  // (default 3) to shrink, so a noisy name with many legs passes on whichever
+  // few happen to tighten at the end — its own comment names GOOG/XOM/WELL as
+  // real examples. That is loose enough for a general VCP scan, but it is not
+  // the handful-of-clean-legs base the screenshots this screener was built
+  // from actually showed. Verified live 2026-09-26: IESC (10 legs, depths
+  // swinging 8%→28%→8%→25%…→9%), DIOD and CBL (6-7 legs, similarly chaotic)
+  // all passed the existing gate and had real weakDownCandles — but none of
+  // them look like a textbook base. cleanbase requires the WHOLE sequence to
+  // tighten, and caps the leg count, on top of everything _vcpExactFail
+  // already checks.
+  const maxLegs = opts.maxLegs ?? 5;
+  if(!Array.isArray(v.depths) || v.depths.length > maxLegs) return true;
+  if(v.depths.some((d,i)=>i>0 && d>=v.depths[i-1])) return true;
+  return false;
 }
 async function validateExact(list, scr, onProgress, signal){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp'&&scr!=='cleanbase')||!HAS_SUPABASE||!list.length) return list;

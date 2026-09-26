@@ -585,6 +585,26 @@
       && _vcpExactFail(withDepths([4, 12, 9, 6]), rising, { ...g, minC: 4 }) === true);
     check('vcp: a flat (non-shrinking) leg is not a contraction',
       _vcpExactFail(withDepths([10, 6, 6]), rising, { ...g, minC: 3 }) === true);
+    // cleanbase layers one more requirement on top of _vcpExactFail's own
+    // last-minC check: the user wants ONLY clean, few-leg bases like the ones
+    // they hand-picked (2-4 legs, tightening the whole way), not a name whose
+    // early legs are chaotic and only the tail happens to shrink — verified
+    // live 2026-09-26 that real universe names (IESC, DIOD, CBL) pass the
+    // existing gate with real weakDownCandles yet look nothing like a
+    // textbook base once their full depths sequence is inspected.
+    const cleanRow = (ds, weak) => ({ perf6: 30, vcp: { ...withDepths(ds).vcp, weakDownCandles: weak } });
+    check('cleanbase: a clean 3-leg tightening base with weak down-candles passes',
+      _cleanbaseExactFail(cleanRow([12, 8, 4], true), rising, { ...g, minC: 3 }) === false);
+    check('cleanbase: the same clean base WITHOUT weak down-candles still fails',
+      _cleanbaseExactFail(cleanRow([12, 8, 4], false), rising, { ...g, minC: 3 }) === true);
+    check('cleanbase: only the tail tightens (chaotic early legs) → dropped even with weak down-candles',
+      _cleanbaseExactFail(cleanRow([8, 28, 8, 25, 14, 9, 7], true), rising, { ...g, minC: 3 }) === true,
+      'IESC-shaped depths should not pass cleanbase');
+    check('cleanbase: too many legs is dropped even when the whole sequence tightens',
+      _cleanbaseExactFail(cleanRow([30, 24, 18, 12, 8, 4], true), rising, { ...g, minC: 3 }) === true,
+      '6 legs, all monotonic, should still fail the leg-count cap');
+    check('cleanbase: the leg cap is a configurable field, not a constant',
+      _cleanbaseExactFail(cleanRow([30, 24, 18, 12, 8, 4], true), rising, { ...g, minC: 3, maxLegs: 6 }) === false);
     // Rows restored from an older results cache predate the depths array.
     check('vcp: falls back to tighteningOK when depths are absent',
       _vcpExactFail({ perf6: 30, vcp: { contractions: 3, lastDepth: 4, tighteningOK: true, volDryUp: true, pivot: 100, distToPivot: -2 } }, rising, { ...g, minC: 3 }) === false
