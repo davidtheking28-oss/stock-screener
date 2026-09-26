@@ -257,6 +257,19 @@
     setScreener('cleanbase', true);
     check('setScreener(cleanbase) switches panel class', document.getElementById('filterPanel').classList.contains('panel-cleanbase'));
     check('cleanbase shares the VCP fields (vcpContractions visible)', num('vcpContractions') === (SCREENER_DEFAULTS.cleanbase.vcpContractions ?? 3));
+    // The full-sequence-tightening/leg-cap gate is a user-facing field, not a
+    // hidden constant — same pattern as vcpContractions/vcpDepthMax/pivotBelow
+    // and Power Play's consolWeeks: a strict literal criterion can legitimately
+    // leave 0 results on a given day, and the user decides whether to loosen
+    // it rather than me picking a threshold for them (2026-09-26).
+    check('cleanbase has its own maxLegs field, defaulting to 5', num('cleanbaseMaxLegs') === 5,
+      'got ' + num('cleanbaseMaxLegs'));
+    check("cleanbaseMaxLegs is hidden on VCP's own panel", (() => {
+      setScreener('vcp', true);
+      const hidden = getComputedStyle($('cleanbaseMaxLegs').closest('.field')).display === 'none';
+      setScreener('cleanbase', true);
+      return hidden;
+    })());
     setScreener('sepa', true);
   }
 

@@ -316,6 +316,7 @@ body {
    written the other way round — negated — so the VCP fields hide everywhere
    except their own panel without touching seven existing selectors. */
 #filterPanel:not(.panel-vcp):not(.panel-cleanbase) .f-vcp { display: none; }
+#filterPanel:not(.panel-cleanbase) .f-cleanbase { display: none; }
 #filterPanel.panel-vcp .f-sepa, #filterPanel.panel-vcp .f-power, #filterPanel.panel-vcp .f-growth, #filterPanel.panel-vcp .f-commodities, #filterPanel.panel-vcp .f-qulla, #filterPanel.panel-vcp .f-finviz, #filterPanel.panel-cleanbase .f-sepa, #filterPanel.panel-cleanbase .f-power, #filterPanel.panel-cleanbase .f-growth, #filterPanel.panel-cleanbase .f-commodities, #filterPanel.panel-cleanbase .f-qulla, #filterPanel.panel-cleanbase .f-finviz { display: none; }
 .filter-sections.single { grid-template-columns: 1fr; }
 .preset-btn {
@@ -1048,6 +1049,7 @@ tbody tr:last-child td { border-bottom: none; }
                 <label class="toggle"><input type="checkbox" id="vcpDryUp" checked> נפח מתייבש בהתכווצות האחרונה</label>
               </div>
             </div>
+            <div class="field f-cleanbase"><label for="cleanbaseMaxLegs">מקס&#8217; התכווצויות ברצף שלם</label><div class="field-combo"><input type="text" inputmode="none" id="cleanbaseMaxLegs" value="5" min="2" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="adrMin" value="4" min="0" step="0.5" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move6Min" value="30" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move3Min" value="30" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
@@ -1366,7 +1368,7 @@ const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100,consolWeeks:2},
   vcp:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
-  cleanbase: {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
+  cleanbase: {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10,cleanbaseMaxLegs:5},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:4,move6Min:30,move3Min:30,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1,finvizFromHigh:25},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
@@ -2098,7 +2100,12 @@ function _cleanbaseExactFail(r, bars, opts={}){
   // all passed the existing gate and had real weakDownCandles — but none of
   // them look like a textbook base. cleanbase requires the WHOLE sequence to
   // tighten, and caps the leg count, on top of everything _vcpExactFail
-  // already checks.
+  // already checks. Measured live 2026-09-26 against a real universe: NO
+  // window shorter than "the whole sequence" excludes CBL without also
+  // excluding every other candidate that had real weakDownCandles that day —
+  // a strict-but-honest criterion can legitimately leave 0 results, same as
+  // Power Play's consolWeeks. maxLegs is a user-facing field (cleanbaseMaxLegs)
+  // rather than a hidden constant for exactly that reason.
   const maxLegs = opts.maxLegs ?? 5;
   if(!Array.isArray(v.depths) || v.depths.length > maxLegs) return true;
   if(v.depths.some((d,i)=>i>0 && d>=v.depths[i-1])) return true;
@@ -2111,7 +2118,8 @@ async function validateExact(list, scr, onProgress, signal){
   const move3Min=num('move3Min')||0, move6Min=num('move6Min')||0;
   const reqVcp=!!$('requireVCP')?.checked, reqRsLine=!!$('requireRSLine')?.checked;
   const vcpOpts={minC:num('vcpContractions')||3, maxDepth:num('vcpDepthMax')||12,
-                 maxBelow:num('pivotBelow')||10, reqDryUp:!!$('vcpDryUp')?.checked};
+                 maxBelow:num('pivotBelow')||10, reqDryUp:!!$('vcpDryUp')?.checked,
+                 maxLegs:num('cleanbaseMaxLegs')||5};
   const consolBars=(num('consolWeeks')||2)*5;
   // One benchmark fetch for the whole pass — the RS line is price/SPY.
   const spy=await _fetchBars1y('SPY', signal).catch(()=>null);
@@ -2752,6 +2760,7 @@ const FIELD_PRESETS = {
   epsFwdMin: [[0,'כבוי'],[10,'10%'],[15,'15%'],[25,'25% — מינרוויני'],[40,'40%'],[60,'60%']],
   consolWeeks:  [[0,'כבוי — כל ריצה'],[1,'שבוע'],[2,'2 שבועות — ברירת מחדל'],[3,'3 שבועות — מינרוויני'],[4,'4 שבועות'],[6,'6 שבועות']],
   vcpContractions: [[2,'2 — רופף, הרבה רעש'],[3,'3 — ברירת מחדל'],[4,'4 — מינרוויני קלאסי'],[5,'5']],
+  cleanbaseMaxLegs: [[3,'3 — הדוק מאוד, מעט תוצאות'],[4,'4'],[5,'5 — ברירת מחדל'],[7,'7'],[10,'10 — רופף, יותר תוצאות']],
   vcpDepthMax:  [[5,'5% — הדוק מאוד'],[8,'8% — הדוק'],[10,'10%'],[12,'12% — ברירת מחדל'],[15,'15%'],[20,'20% — רופף']],
   pivotBelow:   [[3,'3% — ממש על הפריצה'],[5,'5%'],[8,'8%'],[10,'10% — ברירת מחדל'],[15,'15%'],[25,'25% — כל הבסיס']],
   adrMin:       [[2,'2%'],[3,'3% — ברירת מחדל'],[3.5,'3.5%'],[4,'4% — קולאמאגי מקורי'],[5,'5%'],[6,'6%'],[8,'8%']],
@@ -2870,7 +2879,7 @@ function applyPreset(key, btn){
    currently shows, per screener, so switching back restores the whole setup. */
 const MY_PRESETS_KEY='sepa_my_presets_v1';
 const PRESET_FIELDS=['rsMin','fromHigh','fromLow','priceMin','mcMin','liqMin','earnDays','runMin','consolWeeks',
-  'vcpContractions','vcpDepthMax','pivotBelow',
+  'vcpContractions','vcpDepthMax','pivotBelow','cleanbaseMaxLegs',
   'epsMin','revMin','roeMin','epsQoqMin','revQoqMin','adrMin','move6Min','move3Min',
   'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin','smaTrend50','smaTrend200',
   'nmMin','revQoqSepaMin','epsQoqSepaMin','epsFwdMin'];
@@ -4603,6 +4612,7 @@ function saveFilterPrefs(){
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
       epsQoqMin:num('epsQoqMin'),revQoqMin:num('revQoqMin'),
       vcpContractions:num('vcpContractions'),vcpDepthMax:num('vcpDepthMax'),pivotBelow:num('pivotBelow'),
+      cleanbaseMaxLegs:num('cleanbaseMaxLegs'),
       vcpDryUp:$('vcpDryUp')?.checked,
       adrMin:num('adrMin'),move6Min:num('move6Min'),move3Min:num('move3Min'),
       emaDistMax:num('emaDistMax'),weekRangeMax:num('weekRangeMax'),volSharesMin:num('volSharesMin'),
@@ -4646,6 +4656,7 @@ function loadFilterPrefs(){
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     set('epsQoqMin',p.epsQoqMin); set('revQoqMin',p.revQoqMin);
     set('vcpContractions',p.vcpContractions); set('vcpDepthMax',p.vcpDepthMax); set('pivotBelow',p.pivotBelow);
+    set('cleanbaseMaxLegs',p.cleanbaseMaxLegs);
     set('adrMin',p.adrMin); set('move6Min',p.move6Min); set('move3Min',p.move3Min);
     set('emaDistMax',p.emaDistMax); set('weekRangeMax',p.weekRangeMax); set('volSharesMin',p.volSharesMin);
     set('perfYMin',p.perfYMin); set('finvizVolMin',p.finvizVolMin);
