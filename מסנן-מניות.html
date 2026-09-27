@@ -2102,32 +2102,46 @@ function _vcpExactFail(r, bars, opts={}){
   if(v.distToPivot < -(opts.maxBelow ?? 10)) return true;
   return false;
 }
-// The last sessions vs. the stock's own norms. candleSize: last 3 ranges over
-// the 20 before the last 5. volSlope: per-day trend of the last 5 volumes, in
-// units of 50-day volume. lastMove: the last close-to-close move in ADRs.
-// spanRatio: last 10 sessions' high-low span over the 50 before them.
-// newHigh: % the last 15 sessions' high clears the 45 before it (a breakout).
+// Base shape vs. the stock's own norms. spanRatio: last 10 sessions'
+// high-low span over the 50 before them. newHigh: % the last 15 sessions' high
+// clears the 45 before it (a breakout, not a base). adr: 20-day ADR %.
 function _weakPullback(bars){
   if(!bars || bars.length<60) return null;
-  const n=bars.length, avg=a=>a.reduce((s,x)=>s+x,0)/a.length, rng=b=>(b.h/b.l-1)*100;
-  const adr=avg(bars.slice(-20).map(rng)), adrPrior=avg(bars.slice(-25,-5).map(rng));
-  const vol50=avg(bars.slice(-50).map(b=>b.v));
-  if(!(adrPrior>0) || !(vol50>0)) return null;
-  const v5=bars.slice(-5).map(b=>b.v/vol50), vm=avg(v5);
+  const avg=a=>a.reduce((s,x)=>s+x,0)/a.length, rng=b=>(b.h/b.l-1)*100;
   const hi=w=>Math.max(...w.map(b=>b.h)), span=w=>hi(w)/Math.min(...w.map(b=>b.l))-1;
-  return {adr,
-          candleSize: avg(bars.slice(-3).map(rng))/adrPrior,
-          volSlope: v5.reduce((s,y,i)=>s+(i-2)*(y-vm),0)/10,
-          recentVol: vm,
-          lastMove: (bars[n-1].c/bars[n-2].c-1)*100/adrPrior,
+  return {adr: avg(bars.slice(-20).map(rng)),
           spanRatio: span(bars.slice(-10))/span(bars.slice(-60,-10)),
           newHigh: (hi(bars.slice(-15))/hi(bars.slice(-60,-15))-1)*100};
 }
-// "בסיס נקי", as the user defined it (2026-09-27): the CURRENT pullback is
-// shallower than the recent ones and near the pivot, the range has contracted,
-// and the last sessions are small candles on volume falling day after day
-// with no strong up day at the end. Only the newest legs are judged — the
-// 90-day fractal scan also yields old, unrelated swings.
+// The user's pattern (2026-09-27, DIOD/SIMO): a strong up day on high volume,
+// then 2-5 quiet days. The thrust is the most recent up day of >=0.8 ADR on
+// >=1.1x 50-day volume — measured gaps between the user's good examples
+// (>=0.87 ADR, >=1.2x) and bad ones (NESR 0.77 ADR; MUFG/SMFG/ROST <=0.99x).
+// Moves and ranges are in ADRs of the 20 sessions before the last 5.
+function _thrustPullback(bars){
+  if(!bars || bars.length<60) return null;
+  const n=bars.length, avg=a=>a.reduce((s,x)=>s+x,0)/a.length, rng=b=>(b.h/b.l-1)*100;
+  const vol50=avg(bars.slice(-50).map(b=>b.v)), adr=avg(bars.slice(-25,-5).map(rng));
+  if(!(adr>0) || !(vol50>0)) return null;
+  const mv=(b,prev)=>(b.c/prev.c-1)*100/adr;
+  for(let i=n-3;i>=n-6;i--){
+    const t=bars[i];
+    if(mv(t,bars[i-1])<0.8 || t.v/vol50<1.1) continue;
+    const pb=bars.slice(i+1);
+    return {move:mv(t,bars[i-1]), vol:t.v/vol50, days:pb.length,
+            pbRangeMax: Math.max(...pb.map(b=>rng(b)/adr)),
+            pbVolAvg: avg(pb.map(b=>b.v))/vol50,
+            pbVolUnderThrust: pb.every(b=>b.v<t.v),
+            pbUpMax: Math.max(...pb.map((b,j)=>mv(b, j?pb[j-1]:t))),
+            net: mv(bars[n-1], t)};
+  }
+  return null;
+}
+// "בסיס נקי": passes another screener (see _cleanbaseUniverse), the CURRENT
+// pullback is shallower than the recent ones and near the pivot, the range
+// has contracted — and the last sessions are a thrust then a quiet pause.
+// Only the newest legs are judged; the 90-day fractal scan also yields old,
+// unrelated swings.
 function _cleanbaseExactFail(r, bars, opts={}){
   if(!bars || _ma200Rising(bars)===false) return true;
   const v=r.vcp;
@@ -2136,15 +2150,16 @@ function _cleanbaseExactFail(r, bars, opts={}){
   if(!(last < Math.max(...d.slice(-3,-1)))) return true;
   if(last > (opts.maxDepth ?? 12)) return true;
   if(v.distToPivot==null || v.distToPivot > 2 || v.distToPivot < -(opts.maxBelow ?? 10)) return true;
-  const p=r.pullback=_weakPullback(_completedBars(bars));
-  // Every cutoff sits in a measured gap between the user's labelled good
-  // setups (DIOD, SIMO, MTRN pre-breakout) and bad ones (KNSA, AMTB, NESR,
-  // MUFG, FTNT, SMFG, ITGR, RDVT): volSlope good <=-0.14 / bad >=-0.07;
-  // candleSize good <=0.82 / bad >=1.06; lastMove good <=0.27 / bad >=3.2;
-  // spanRatio good <=0.35 / bad >=0.6; ADR ITGR 0.2 / next 1.1; newHigh 2 is
-  // the same "more than 2% past the pivot is chasing" line above.
+  const done=_completedBars(bars);
+  const p=r.pullback=_weakPullback(done);
+  // spanRatio good <=0.35 / flagged FTNT,SMFG >=0.6; ADR ITGR 0.2 / next 1.1;
+  // newHigh 2 = the same "more than 2% past the pivot is chasing" line above.
   if(!p || p.adr < 0.5 || p.newHigh > 2 || p.spanRatio >= 0.5) return true;
-  return !(p.candleSize < 0.9 && p.volSlope <= -0.1 && p.lastMove <= 1 && p.recentVol < 1);
+  const t=r.thrust=_thrustPullback(done);
+  // A pause, not a continuation or distribution: every pullback candle no
+  // wider than usual and lighter than the thrust, no fresh up-thrust, and no
+  // close back above the thrust day.
+  return !(t && t.pbRangeMax<=1 && t.pbVolUnderThrust && t.pbVolAvg<1 && t.pbUpMax<=0.5 && t.net<=0.25);
 }
 // cleanbase's candidates: every stock that fully passes at least one other
 // screener on that screener's own default criteria (coarse + exact), tagged
@@ -2606,11 +2621,11 @@ function _calcScoreRaw(r, scr='sepa'){
     const revS  = Math.min(clamp(r.rev??0,0,200)/200,1)*5;
     return Math.round(clamp(moveS+adrS+emaS+tightS+epsS+perfYS+rsS+revS,0,100));
   }
-  if(scr==='cleanbase' && r.pullback){
-    const p=r.pullback, v=r.vcp;
+  if(scr==='cleanbase' && r.pullback && r.thrust){
+    const p=r.pullback, t=r.thrust, v=r.vcp;
     const tightS = clamp(1-p.spanRatio/0.5,0,1)*25;
-    const dryS   = clamp(-p.volSlope/0.3,0,1)*20;
-    const quietS = clamp((1-p.candleSize)/0.5,0,1)*10;
+    const dryS   = clamp((1-t.pbVolAvg)/0.5,0,1)*20;
+    const quietS = clamp((1-t.pbRangeMax)/0.5,0,1)*10;
     const pivotS = v?.distToPivot==null?0:clamp(1-Math.abs(v.distToPivot)/10,0,1)*20;
     const rsS    = clamp(r.rs,0,99)/99*15;
     return Math.round(clamp(tightS+dryS+quietS+pivotS+rsS+epsScore(r.eps,10),0,100));

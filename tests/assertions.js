@@ -187,50 +187,57 @@
       straight && straight.contractions === 0, 'got ' + JSON.stringify(straight));
   }
 
-  // ── cleanbase: a contracting base whose last sessions are small candles on
-  // volume falling day after day, with no strong up day at the end — the
-  // user's own definition (2026-09-27). Labels they gave: DIOD, SIMO and MTRN
-  // (the day before its breakout) are the setup; KNSA, AMTB, NESR, MUFG,
-  // FTNT, SMFG are not.
+  // ── cleanbase: a contracting base, then a strong up day on high volume
+  // followed by a quiet pullback — the one pattern the user picked
+  // (2026-09-27, DIOD/SIMO), over a steady quiet decline (TX), fully dried-up
+  // volume (IESC) and a quiet drift up (ROST).
   {
     // An advance, then a base whose swings shrink under its own high.
     const base = Array.from({ length: 250 }, (_, i) => {
       const j = i - 200, c = i < 200 ? 100 + i * 0.4 : 179.6 * (1 - 0.08 * (1 - j / 50) * (1 + Math.sin(j / 2)) / 2);
       return { t: i * 86400, o: c, h: c * 1.01, l: c * 0.99, c, v: 1000 };
     });
-    const withTail = ({ range = 0.004, vols = [950, 800, 650, 500, 350], moves = [-0.003, -0.003, -0.003, 0.003, 0.003] } = {}) => {
+    // tail: [move, range, volume] per session
+    const withTail = days => {
       let c = base[base.length - 1].c;
-      return base.concat(moves.map((m, i) => {
-        c = c * (1 + m);
-        return { t: (250 + i) * 86400, o: c, h: c * (1 + range), l: c * (1 - range), c, v: vols[i] };
-      }));
+      return base.concat(days.map(([m, r, v], i) => { c = c * (1 + m); return { t: (250 + i) * 86400, o: c, h: c * (1 + r), l: c * (1 - r), c, v }; }));
     };
-    const quiet = withTail();
-    const loud = withTail({ range: 0.03, vols: [1500, 1700, 1900, 2200, 2500] });
-    const flatVol = withTail({ vols: [700, 700, 700, 700, 700] });
-    const lastUp = withTail({ moves: [-0.003, -0.003, -0.003, 0.003, 0.025] });
+    const quiet = withTail([[0, 0.004, 900], [0.02, 0.008, 1800], [-0.003, 0.004, 700], [-0.003, 0.004, 600], [-0.003, 0.004, 500]]);
+    const steady = withTail([[-0.003, 0.004, 950], [-0.003, 0.004, 800], [-0.003, 0.004, 650], [-0.003, 0.004, 500], [-0.003, 0.004, 350]]);
+    const lightThrust = withTail([[0, 0.004, 900], [0.02, 0.008, 900], [-0.003, 0.004, 700], [-0.003, 0.004, 600], [-0.003, 0.004, 500]]);
+    const noPause = withTail([[0, 0.004, 900], [0.017, 0.008, 1800], [-0.003, 0.004, 700], [0.011, 0.004, 600], [-0.003, 0.004, 500]]);
+    const drift = withTail([[0, 0.004, 900], [0.017, 0.008, 1800], [0.002, 0.004, 700], [0.002, 0.004, 600], [0.002, 0.004, 500]]);
+    const heavyPb = withTail([[0, 0.004, 900], [0.02, 0.008, 1800], [-0.003, 0.004, 2000], [-0.003, 0.004, 600], [-0.003, 0.004, 500]]);
+    const widePb = withTail([[0, 0.004, 900], [0.02, 0.008, 1800], [-0.003, 0.03, 700], [-0.003, 0.004, 600], [-0.003, 0.004, 500]]);
+    const lastDay = withTail([[0, 0.004, 900], [-0.003, 0.004, 800], [-0.003, 0.004, 700], [-0.003, 0.004, 600], [0.02, 0.008, 1800]]);
 
-    const wp = _weakPullback(quiet);
-    check('_weakPullback: small candles, falling volume, no big last move',
-      wp && wp.candleSize < 0.9 && wp.volSlope <= -0.1 && wp.lastMove <= 1 && wp.recentVol < 1, 'got ' + JSON.stringify(wp));
-    const lp = _weakPullback(loud);
-    check('_weakPullback: wide candles on rising volume read that way',
-      lp && lp.candleSize > 1 && lp.volSlope > 0, 'got ' + JSON.stringify(lp));
+    const tp = _thrustPullback(quiet);
+    check('_thrustPullback: finds the up day and measures the quiet days after it',
+      tp && tp.days === 3 && tp.move >= 0.8 && tp.vol >= 1.1 && tp.pbRangeMax <= 1 && tp.pbVolAvg < 1, 'got ' + JSON.stringify(tp));
+    check('_thrustPullback: no qualifying up day → null', _thrustPullback(steady) === null);
     check('_weakPullback: too little history → null', _weakPullback(base.slice(0, 30)) === null);
-    check('_weakPullback: a tight last 10 sessions reads as a small spanRatio',
-      wp && wp.spanRatio < 0.5, 'got ' + JSON.stringify(wp));
+    const wp = _weakPullback(quiet);
+    check('_weakPullback: a tight last 10 sessions reads as a small spanRatio', wp && wp.spanRatio < 0.5, 'got ' + JSON.stringify(wp));
 
     const row = (depths, dist = -3) => ({ vcp: { contractions: depths.length, depths, lastDepth: depths[depths.length - 1], distToPivot: dist } });
     const knsa = [11.05, 5.23, 13.9, 4.82, 5.63, 4.81, 5.21, 8.52, 6.64]; // real depths, old noisy legs
     const g = { minC: 3, maxDepth: 12, maxBelow: 10 };
-    check('cleanbase: a base judged on its CURRENT contraction passes despite old noisy legs',
-      _cleanbaseExactFail(row(knsa), quiet, g) === false);
-    check('cleanbase: wide candles on rising volume are rejected',
-      _cleanbaseExactFail(row(knsa), loud, g) === true);
-    check('cleanbase: volume that is low but not falling day after day is rejected (NESR/MUFG/KNSA)',
-      _cleanbaseExactFail(row(knsa), flatVol, g) === true, 'got ' + JSON.stringify(_weakPullback(flatVol)));
-    check('cleanbase: a strong up day at the end is rejected (MUFG/SMFG)',
-      _cleanbaseExactFail(row(knsa), lastUp, g) === true, 'got ' + JSON.stringify(_weakPullback(lastUp)));
+    check('cleanbase: up day on volume, then a quiet pullback, on a contracting base passes',
+      _cleanbaseExactFail(row(knsa), quiet, g) === false, 'got ' + JSON.stringify(_thrustPullback(quiet)));
+    check('cleanbase: a steady quiet decline with no up day is not the pattern (TX)',
+      _cleanbaseExactFail(row(knsa), steady, g) === true);
+    check('cleanbase: an up day on ordinary volume is not a thrust (MUFG/SMFG)',
+      _cleanbaseExactFail(row(knsa), lightThrust, g) === true);
+    check('cleanbase: another strong up day in the pullback is not a pause',
+      _cleanbaseExactFail(row(knsa), noPause, g) === true);
+    check('cleanbase: drifting back above the up-day close is a continuation, not a pullback',
+      _cleanbaseExactFail(row(knsa), drift, g) === true, 'got ' + JSON.stringify(_thrustPullback(drift)));
+    check('cleanbase: a pullback day heavier than the thrust is selling, not a pause',
+      _cleanbaseExactFail(row(knsa), heavyPb, g) === true);
+    check('cleanbase: a wide candle in the pullback is not quiet',
+      _cleanbaseExactFail(row(knsa), widePb, g) === true);
+    check('cleanbase: an up day on the very last session has no pullback yet',
+      _cleanbaseExactFail(row(knsa), lastDay, g) === true);
     check('cleanbase: the newest pullback being the deepest of the last three is not a contraction',
       _cleanbaseExactFail(row([5, 6, 9]), quiet, g) === true);
     check('cleanbase: too deep a current pullback is rejected',
@@ -251,9 +258,9 @@
     const brk = quiet.map((b, i, a) => i >= a.length - 15 && i < a.length - 10 ? { ...b, h: 179.6 * 1.05 } : b);
     check('cleanbase: a new high >2% above the base in the last 15 sessions is a breakout, not a base',
       _cleanbaseExactFail(row(knsa), brk, g) === true, 'got ' + JSON.stringify(_weakPullback(brk)));
-    const scored = pb => calcScore({ rs: 90, eps: 20, vcp: row(knsa).vcp, pullback: pb }, 'cleanbase');
-    check('cleanbase: tighter, quieter setups rank above looser ones',
-      scored({ spanRatio: 0.2, volSlope: -0.25, candleSize: 0.5 }) > scored({ spanRatio: 0.45, volSlope: -0.1, candleSize: 0.85 }));
+    const scored = t => calcScore({ rs: 90, eps: 20, vcp: row(knsa).vcp, pullback: { spanRatio: 0.3 }, thrust: t }, 'cleanbase');
+    check('cleanbase: quieter pullbacks rank above noisier ones',
+      scored({ pbVolAvg: 0.5, pbRangeMax: 0.5 }) > scored({ pbVolAvg: 0.95, pbRangeMax: 0.95 }));
   }
 
   // ── cleanbase draws its candidates from every other screener, each judged
