@@ -1049,7 +1049,7 @@ tbody tr:last-child td { border-bottom: none; }
                 <label class="toggle"><input type="checkbox" id="vcpDryUp" checked> נפח מתייבש בהתכווצות האחרונה</label>
               </div>
             </div>
-            <div class="field f-cleanbase"><label for="cleanbaseTolerance">סובלנות לרצף שלא מתהדק (%)</label><div class="field-combo"><input type="text" inputmode="none" id="cleanbaseTolerance" value="20" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-cleanbase"><label for="cleanbaseMinDown">ימי ירידה חלשים (מתוך 5 האחרונים)</label><div class="field-combo"><input type="text" inputmode="none" id="cleanbaseMinDown" value="3" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="adrMin" value="4" min="0" step="0.5" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move6Min" value="30" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move3Min" value="30" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
@@ -1368,7 +1368,7 @@ const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100,consolWeeks:2},
   vcp:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
-  cleanbase: {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10,cleanbaseTolerance:20},
+  cleanbase: {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10,cleanbaseMinDown:3},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:4,move6Min:30,move3Min:30,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1,finvizFromHigh:25},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
@@ -1880,7 +1880,7 @@ function _vcp(bars, lookback=90){
   }
   const last=w[n-1].c;
   if(!highs.length) return {contractions:0, lastDepth:null, tighteningOK:false,
-                            volDryUp:null, pivot:null, distToPivot:null, weakDownCandles:null};
+                            volDryUp:null, pivot:null, distToPivot:null};
   // Depth of each pullback: swing high → lowest low before the next swing high.
   // The final leg runs to the last bar, so an in-progress pullback still counts.
   const legs=[];
@@ -1894,7 +1894,7 @@ function _vcp(bars, lookback=90){
   const pivot=w[highs[highs.length-1]].h;           // the level a breakout clears
   const distToPivot=(last/pivot-1)*100;
   if(real.length<2) return {contractions:real.length, lastDepth:real.length?real[real.length-1].depth:null,
-                            tighteningOK:false, volDryUp:null, pivot, distToPivot, weakDownCandles:null};
+                            tighteningOK:false, volDryUp:null, pivot, distToPivot};
   const tighteningOK=real[real.length-1].depth<real[real.length-2].depth;
   // Volume across the newest contraction vs the rest of the base — Minervini
   // wants it drying up as the pattern tightens.
@@ -1902,41 +1902,13 @@ function _vcp(bars, lookback=90){
   const at=real[real.length-1].at;
   const recentVol=volOf(at,n-1), baseVol=volOf(0,at);
   const volDryUp=(recentVol==null||baseVol==null||baseVol===0)?null:recentVol<baseVol;
-  // Minervini also reads supply drying up in the SHAPE of the individual down
-  // candles inside the newest contraction, not just their average volume
-  // (which volDryUp above already covers against the whole base): a real
-  // pullback trades a narrow range on light volume and closes off its low,
-  // while distribution sells off hard on a wide range and closes near it.
-  // Judged only against days that actually closed down within this leg, and
-  // only when there are at least two of them — one down day is too little to
-  // call either way. Up-day volume is measured across the WHOLE window, not
-  // just this leg: a clean final contraction can be (and often is) a smooth,
-  // near-monotonic slide with no up days of its own to compare against, so
-  // the baseline has to come from the base's normal up-day volume instead.
-  const downDays=[], upVols=[];
-  for(let i=1;i<n;i++){
-    if(w[i].v==null) continue;
-    if(i>at && w[i].c<w[i-1].c) downDays.push(w[i]);
-    else if(w[i].c>w[i-1].c) upVols.push(w[i].v);
-  }
-  const avg=arr=>arr.reduce((a,b)=>a+b,0)/arr.length;
-  // 0.4, not 0.5 — measured live 2026-09-27 across a real 37-candidate VCP
-  // scan: a down day closing above the exact midpoint of its own daily range
-  // is rare regardless of stock quality (only 4 of 37 ever cross 0.5 at all).
-  // Real, otherwise-clean pullbacks (TXN: light volume, ratio 0.68) sat at
-  // 0.44-0.46 and were being rejected by a bar almost nothing clears — 0.5
-  // was picked by intuition, not measurement, and it starved this screener to
-  // 0 real matches on an ordinary day.
-  const weakDownCandles = (downDays.length<2 || !upVols.length) ? null :
-    (avg(downDays.map(b=>b.v)) < avg(upVols)) &&
-    (avg(downDays.map(b=>b.h>b.l ? (b.c-b.l)/(b.h-b.l) : 0.5)) >= 0.4);
   // depths is what lets a caller judge the WHOLE sequence. tighteningOK only
   // compares the last two legs, which is enough as one narrowing gate stacked
   // on the Trend Template but far too loose as a screener's primary test — a
   // noisy mega-cap drift produces 8-10 legs and passes on whichever two happen
   // to shrink at the end (measured live: GOOG, XOM, WELL all did).
   return {contractions:real.length, lastDepth:real[real.length-1].depth, tighteningOK, volDryUp, pivot, distToPivot,
-          weakDownCandles, depths:real.map(l=>+l.depth.toFixed(2))};
+          depths:real.map(l=>+l.depth.toFixed(2))};
 }
 // Relative-strength line = price / benchmark. Minervini and IBD both read the
 // RS line making a new high *before* price clears its own pivot as the strongest
@@ -2088,49 +2060,35 @@ function _vcpExactFail(r, bars, opts={}){
   if(v.distToPivot < -(opts.maxBelow ?? 10)) return true;
   return false;
 }
-// "בסיס נקי" — the same VCP gate above, plus the newest contraction's down
-// days must read as weak (r.vcp.weakDownCandles, computed in _vcp) rather
-// than just tightening on average. A separate screener rather than a checkbox
-// on VCP itself, per the user's own choice — it belongs beside the other
-// seven, not folded into one of them.
+// Last `days` sessions vs. the stock's own norms: how many closed down, and
+// how heavy (vs. 50-day volume) and wide (vs. 20-day ADR) those down days were.
+function _weakPullback(bars, days=5){
+  if(!bars || bars.length<51) return null;
+  const n=bars.length, avg=a=>a.reduce((s,x)=>s+x,0)/a.length, rng=b=>(b.h/b.l-1)*100;
+  const adr=avg(bars.slice(-20).map(rng)), vol50=avg(bars.slice(-50).map(b=>b.v));
+  if(!(adr>0) || !(vol50>0)) return null;
+  const tail=bars.slice(-days), down=tail.filter((b,i)=>b.c<bars[n-days+i-1].c);
+  return {down:down.length,
+          downVol: down.length ? avg(down.map(b=>b.v))/vol50 : null,
+          downRange: down.length ? avg(down.map(rng))/adr : null,
+          recentVol: avg(tail.map(b=>b.v))/vol50};
+}
+// "בסיס נקי": the CURRENT pullback is shallower than the recent ones, near the
+// pivot, and the last sessions are mostly down days on light volume and narrow
+// ranges. Only the newest legs are judged — the 90-day fractal scan also yields
+// old, unrelated swings, and judging the whole sequence rejected every one of
+// the user's own watchlist setups (measured live 2026-09-27).
 function _cleanbaseExactFail(r, bars, opts={}){
-  if(_vcpExactFail(r, bars, opts)) return true;
+  if(!bars || _ma200Rising(bars)===false) return true;
   const v=r.vcp;
-  if(v?.weakDownCandles !== true) return true;
-  // _vcpExactFail's own structural check only requires the LAST minC legs
-  // (default 3) to shrink, so a noisy name with many legs passes on whichever
-  // few happen to tighten at the end — its own comment names GOOG/XOM/WELL as
-  // real examples. That is loose enough for a general VCP scan, but it is not
-  // the handful-of-clean-legs base the screenshots this screener was built
-  // from actually showed. Verified live 2026-09-26: IESC (10 legs, depths
-  // swinging 8%→28%→8%→25%…→9%), DIOD and CBL (6-7 legs, similarly chaotic)
-  // all passed the existing gate and had real weakDownCandles.
-  //
-  // A first attempt (2026-09-26) required the WHOLE sequence to be STRICTLY
-  // decreasing and capped the leg count at 5. That correctly rejected
-  // CBL/DIOD/IESC, but also rejected 2026-09-27's real universe entirely: TXN
-  // (7 legs, otherwise excellent — light down-day volume, closes near the
-  // middle of its range) failed purely because two of its seven depths were
-  // 17.38% then 17.44% — a 0.35% noise wobble, not real re-expansion — and
-  // requiring EVERY leg strictly smaller than the last turns out to reject
-  // almost any real multi-leg base, since some tiny wobble is normal. The leg
-  // count cap added nothing once this is fixed properly: on that same 37-name
-  // scan, every genuinely chaotic base (CBL/DIOD/IESC) already had a
-  // wobble far past any reasonable tolerance, so a tolerance check alone
-  // separates them from TXN without a separate, arbitrary leg-count limit.
-  //
-  // cleanbaseTolerance (%, default 20) is how far the next leg may exceed the
-  // previous one and still count as "still tightening" — measured against the
-  // same real universe: CBL's smallest violation was +36%, DIOD's +29%,
-  // IESC's +45% (all three still rejected at 20% tolerance), while TXN's
-  // 0.35% wobble passes clean. User-facing field, not a hidden constant, for
-  // the same reason Power Play's consolWeeks is — a strict-but-honest
-  // criterion can legitimately leave 0 results some days, and the user
-  // decides whether to loosen it rather than me picking blind.
-  const tolerance = (opts.tolerance ?? 20) / 100;
-  if(!Array.isArray(v.depths) || v.depths.length < 2) return true;
-  if(v.depths.some((d,i)=>i>0 && d > v.depths[i-1]*(1+tolerance))) return true;
-  return false;
+  if(!v || !Array.isArray(v.depths) || v.depths.length<2 || v.contractions < (opts.minC ?? 3)) return true;
+  const d=v.depths, last=d[d.length-1];
+  if(!(last < Math.max(...d.slice(-3,-1)))) return true;
+  if(last > (opts.maxDepth ?? 12)) return true;
+  if(v.distToPivot==null || v.distToPivot > 2 || v.distToPivot < -(opts.maxBelow ?? 10)) return true;
+  const p=_weakPullback(bars);
+  if(!p || p.down < (opts.minDown ?? 3)) return true;
+  return !(p.downVol<1 && p.downRange<1 && p.recentVol<1);
 }
 async function validateExact(list, scr, onProgress, signal){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp'&&scr!=='cleanbase')||!HAS_SUPABASE||!list.length) return list;
@@ -2140,7 +2098,7 @@ async function validateExact(list, scr, onProgress, signal){
   const reqVcp=!!$('requireVCP')?.checked, reqRsLine=!!$('requireRSLine')?.checked;
   const vcpOpts={minC:num('vcpContractions')||3, maxDepth:num('vcpDepthMax')||12,
                  maxBelow:num('pivotBelow')||10, reqDryUp:!!$('vcpDryUp')?.checked,
-                 tolerance:num('cleanbaseTolerance')??20};
+                 minDown:num('cleanbaseMinDown')??3};
   const consolBars=(num('consolWeeks')||2)*5;
   // One benchmark fetch for the whole pass — the RS line is price/SPY.
   const spy=await _fetchBars1y('SPY', signal).catch(()=>null);
@@ -2781,7 +2739,7 @@ const FIELD_PRESETS = {
   epsFwdMin: [[0,'כבוי'],[10,'10%'],[15,'15%'],[25,'25% — מינרוויני'],[40,'40%'],[60,'60%']],
   consolWeeks:  [[0,'כבוי — כל ריצה'],[1,'שבוע'],[2,'2 שבועות — ברירת מחדל'],[3,'3 שבועות — מינרוויני'],[4,'4 שבועות'],[6,'6 שבועות']],
   vcpContractions: [[2,'2 — רופף, הרבה רעש'],[3,'3 — ברירת מחדל'],[4,'4 — מינרוויני קלאסי'],[5,'5']],
-  cleanbaseTolerance: [[0,'0% — ללא סובלנות, כמעט תמיד 0 תוצאות'],[10,'10% — הדוק'],[20,'20% — ברירת מחדל'],[35,'35%'],[50,'50% — רופף, יותר תוצאות']],
+  cleanbaseMinDown: [[2,'2 — יותר תוצאות'],[3,'3 — ברירת מחדל'],[4,'4 — הדוק'],[5,'5 — כל 5 הימים']],
   vcpDepthMax:  [[5,'5% — הדוק מאוד'],[8,'8% — הדוק'],[10,'10%'],[12,'12% — ברירת מחדל'],[15,'15%'],[20,'20% — רופף']],
   pivotBelow:   [[3,'3% — ממש על הפריצה'],[5,'5%'],[8,'8%'],[10,'10% — ברירת מחדל'],[15,'15%'],[25,'25% — כל הבסיס']],
   adrMin:       [[2,'2%'],[3,'3% — ברירת מחדל'],[3.5,'3.5%'],[4,'4% — קולאמאגי מקורי'],[5,'5%'],[6,'6%'],[8,'8%']],
@@ -2900,7 +2858,7 @@ function applyPreset(key, btn){
    currently shows, per screener, so switching back restores the whole setup. */
 const MY_PRESETS_KEY='sepa_my_presets_v1';
 const PRESET_FIELDS=['rsMin','fromHigh','fromLow','priceMin','mcMin','liqMin','earnDays','runMin','consolWeeks',
-  'vcpContractions','vcpDepthMax','pivotBelow','cleanbaseTolerance',
+  'vcpContractions','vcpDepthMax','pivotBelow','cleanbaseMinDown',
   'epsMin','revMin','roeMin','epsQoqMin','revQoqMin','adrMin','move6Min','move3Min',
   'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin','smaTrend50','smaTrend200',
   'nmMin','revQoqSepaMin','epsQoqSepaMin','epsFwdMin'];
@@ -3220,8 +3178,7 @@ async function scan(force=false){
       _wlDataGen++;
       saveUniverseCache();
       // The coarse pass above never fetches real OHLC, so ttUniverse rows have
-      // no .vcp yet — cleanbase's own gate (weakDownCandles, the tightening
-      // sequence) needs it. ttUniverse is NOT watchlist-only — forceTickers
+      // no .vcp yet — cleanbase's own gate needs real bars. ttUniverse is NOT watchlist-only — forceTickers
       // only means "keep these even if they'd otherwise be dropped", so it
       // still holds every OTHER row that passes the coarse gate too (measured
       // live: 463 rows for 10 starred tickers). Validating only the actual
@@ -3266,7 +3223,12 @@ async function scan(force=false){
     };
 
     saveResultsCache();
-    finalize(needsExact);   // render candidates instantly; exact validation refines in the background
+    // cleanbase's coarse list is ~10x its real result, so painting it first
+    // reads as "the filter shows everything" — hold the skeleton instead.
+    if(needsExact && activeScreener==='cleanbase' && mode!=='watch'){
+      showSkeleton(); $('galleryView').style.display='none'; $('tableView').style.display='block';
+      $('statBar').innerHTML='<span class="spinner"></span> מאמת מדויק מול OHLC… <b>0</b>/'+allResults.length;
+    } else finalize(needsExact);   // render candidates instantly; exact validation refines in the background
     saveFilterPrefs();
     const rb=$('scanBtn'); if(rb) rb.style.display='';
 
@@ -4677,7 +4639,7 @@ function saveFilterPrefs(){
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
       epsQoqMin:num('epsQoqMin'),revQoqMin:num('revQoqMin'),
       vcpContractions:num('vcpContractions'),vcpDepthMax:num('vcpDepthMax'),pivotBelow:num('pivotBelow'),
-      cleanbaseTolerance:num('cleanbaseTolerance'),
+      cleanbaseMinDown:num('cleanbaseMinDown'),
       vcpDryUp:$('vcpDryUp')?.checked,
       adrMin:num('adrMin'),move6Min:num('move6Min'),move3Min:num('move3Min'),
       emaDistMax:num('emaDistMax'),weekRangeMax:num('weekRangeMax'),volSharesMin:num('volSharesMin'),
@@ -4721,7 +4683,7 @@ function loadFilterPrefs(){
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     set('epsQoqMin',p.epsQoqMin); set('revQoqMin',p.revQoqMin);
     set('vcpContractions',p.vcpContractions); set('vcpDepthMax',p.vcpDepthMax); set('pivotBelow',p.pivotBelow);
-    set('cleanbaseTolerance',p.cleanbaseTolerance);
+    set('cleanbaseMinDown',p.cleanbaseMinDown);
     set('adrMin',p.adrMin); set('move6Min',p.move6Min); set('move3Min',p.move3Min);
     set('emaDistMax',p.emaDistMax); set('weekRangeMax',p.weekRangeMax); set('volSharesMin',p.volSharesMin);
     set('perfYMin',p.perfYMin); set('finvizVolMin',p.finvizVolMin);

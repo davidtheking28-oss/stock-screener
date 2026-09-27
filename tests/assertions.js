@@ -185,89 +185,50 @@
     const straight = _vcp(mkv(leg(100, 180, 80)));
     check('_vcp: uninterrupted advance → no real contractions',
       straight && straight.contractions === 0, 'got ' + JSON.stringify(straight));
-    check('_vcp: no real contraction → weakDownCandles null (nothing to judge)',
-      straight.weakDownCandles === null, 'got ' + JSON.stringify(straight));
-
-    // "Weak" down days: light volume, closing in the upper half of their own
-    // range — supply drying up in the candle shape itself, not just in the
-    // leg's average volume (which volDryUp already covers). "Strong" down
-    // days: heavy volume, closing near the low — real selling pressure.
-    // Down-day h/l offsets are deliberately tiny (~0.2% total range) so they
-    // cannot alter the swing-high/depth measurement that _vcpExactFail's OWN
-    // gate reads from the same bars — only closePos and volume differ,
-    // exactly the two things weakDownCandles is defined on. Same closes
-    // (same depths/contractions) either way.
-    const buildDown = (closes, weak) => {
-      let prev = closes[0];
-      return closes.map((c, i) => {
-        const isDown = i > 0 && c < prev;
-        const bar = isDown && weak
-          ? { t: i * 86400, o: prev, h: c * 1.0006, l: c * 0.9985, c, v: 400 }
-          : isDown
-          ? { t: i * 86400, o: prev, h: c * 1.0015, l: c * 0.9994, c, v: 6000 }
-          : { t: i * 86400, o: prev, h: c * 1.01, l: c * 0.99, c, v: 3000 };
-        prev = c;
-        return bar;
-      });
-    };
-    const weakV = _vcp(buildDown(vcpCloses, true));
-    const strongV = _vcp(buildDown(vcpCloses, false));
-    check('_vcp: light-volume down days closing high in range → weakDownCandles true',
-      weakV && weakV.weakDownCandles === true, 'got ' + JSON.stringify(weakV));
-    check('_vcp: heavy-volume down days closing low in range → weakDownCandles false',
-      strongV && strongV.weakDownCandles === false, 'got ' + JSON.stringify(strongV));
-
-    // Pins the 0.4 threshold itself (not just "clearly above" vs "clearly
-    // below") — real TXN closed its down days at ~0.45 on 2026-09-27, an
-    // otherwise-clean, light-volume pullback that a >0.5 bar rejected. A down
-    // day closing above the exact midpoint of its own range is rare on real
-    // data regardless of quality (measured: only 4 of 37 real candidates ever
-    // crossed 0.5 that day), so 0.4 is the measured, not guessed, line.
-    const buildMidClose = (closes) => {
-      let prev = closes[0];
-      return closes.map((c, i) => {
-        const isDown = i > 0 && c < prev;
-        const bar = isDown
-          ? { t: i * 86400, o: prev, h: c * 1.002444, l: c * 0.998, c, v: 400 } // closePos ≈ 0.45
-          : { t: i * 86400, o: prev, h: c * 1.01, l: c * 0.99, c, v: 3000 };
-        prev = c;
-        return bar;
-      });
-    };
-    const midV = _vcp(buildMidClose(vcpCloses));
-    check('_vcp: down days closing at ~0.45 of their range (below the old 0.5 bar) → weakDownCandles true',
-      midV && midV.weakDownCandles === true, 'got ' + JSON.stringify(midV));
   }
 
-  // ── _cleanbaseExactFail: _vcpExactFail's gate, plus weak down-candles ──
+  // ── cleanbase: a tightening base whose LAST few sessions are weak down days
+  // on light volume. Thresholds measured live 2026-09-27 against 462 real
+  // coarse candidates plus the user's own watchlist, which they confirmed
+  // is the kind of setup this screener must find.
   {
-    const leg = (from, to, len) => Array.from({ length: len }, (_, i) => from + (to - from) * (i / (len - 1)));
-    const vcpCloses = [].concat(
-      leg(100, 140, 30), leg(140, 112, 12), leg(112, 138, 12),
-      leg(138, 121, 10), leg(121, 139, 10), leg(139, 131, 8)
-    );
-    const buildDown = (closes, weak) => {
-      let prev = closes[0];
-      return closes.map((c, i) => {
-        const isDown = i > 0 && c < prev;
-        const bar = isDown && weak
-          ? { t: i * 86400, o: prev, h: c * 1.0006, l: c * 0.9985, c, v: 400 }
-          : isDown
-          ? { t: i * 86400, o: prev, h: c * 1.0015, l: c * 0.9994, c, v: 6000 }
-          : { t: i * 86400, o: prev, h: c * 1.01, l: c * 0.99, c, v: 3000 };
-        prev = c;
-        return bar;
-      });
+    const base = Array.from({ length: 250 }, (_, i) => { const c = 100 + i * 0.4; return { t: i * 86400, o: c, h: c * 1.01, l: c * 0.99, c, v: 1000 }; });
+    const withTail = (downDays, weak) => {
+      let c = base[base.length - 1].c;
+      return base.concat(Array.from({ length: 5 }, (_, i) => {
+        const dn = i < downDays; c = dn ? c * 0.997 : c * 1.003;
+        const r = weak ? 0.004 : 0.03;
+        return { t: (250 + i) * 86400, o: c, h: c * (1 + r), l: c * (1 - r), c, v: dn ? (weak ? 600 : 2500) : 800 };
+      }));
     };
-    const weakBars = buildDown(vcpCloses, true), strongBars = buildDown(vcpCloses, false);
-    const rWeak = { perf6: 30, vcp: _vcp(weakBars) }, rStrong = { perf6: 30, vcp: _vcp(strongBars) };
-    check('_cleanbaseExactFail: passes the VCP gate AND has weak down-candles → false (accepted)',
-      _cleanbaseExactFail(rWeak, weakBars) === false, 'got ' + JSON.stringify(rWeak.vcp));
-    check('_cleanbaseExactFail: passes the VCP gate but down-candles are strong → true (rejected)',
-      _cleanbaseExactFail(rStrong, strongBars) === true, 'got ' + JSON.stringify(rStrong.vcp));
-    const tooFewBars = leg(100, 110, 20).map((c, i) => ({ t: i * 86400, o: c, h: c * 1.005, l: c * 0.995, c, v: 1000 }));
-    check('_cleanbaseExactFail: fails the underlying VCP gate too → true regardless of candles',
-      _cleanbaseExactFail({ perf6: 30, vcp: _vcp(tooFewBars) }, tooFewBars) === true);
+    const weak3 = withTail(3, true), strong3 = withTail(3, false), weak2 = withTail(2, true);
+
+    const wp = _weakPullback(weak3);
+    check('_weakPullback: counts the down days in the last 5 sessions', wp && wp.down === 3, 'got ' + JSON.stringify(wp));
+    check('_weakPullback: light, narrow down days read below 1x their averages',
+      wp && wp.downVol < 1 && wp.downRange < 1 && wp.recentVol < 1, 'got ' + JSON.stringify(wp));
+    const sp = _weakPullback(strong3);
+    check('_weakPullback: heavy, wide down days read above 1x their averages',
+      sp && sp.downVol > 1 && sp.downRange > 1, 'got ' + JSON.stringify(sp));
+    check('_weakPullback: too little history → null', _weakPullback(base.slice(0, 30)) === null);
+
+    const row = (depths, dist = -3) => ({ vcp: { contractions: depths.length, depths, lastDepth: depths[depths.length - 1], distToPivot: dist } });
+    const knsa = [11.05, 5.23, 13.9, 4.82, 5.63, 4.81, 5.21, 8.52, 6.64]; // real, user's watchlist
+    const g = { minC: 3, maxDepth: 12, maxBelow: 10 };
+    check('cleanbase: a real watchlist base with old noisy legs still passes on its CURRENT contraction (KNSA)',
+      _cleanbaseExactFail(row(knsa), weak3, g) === false);
+    check('cleanbase: heavy, wide down days are rejected even on a clean base',
+      _cleanbaseExactFail(row(knsa), strong3, g) === true);
+    check('cleanbase: the newest pullback being the deepest of the last three is not a contraction',
+      _cleanbaseExactFail(row([5, 6, 9]), weak3, g) === true);
+    check('cleanbase: too deep a current pullback is rejected',
+      _cleanbaseExactFail(row([20, 15, 13]), weak3, g) === true);
+    check('cleanbase: already broken out past the pivot is rejected',
+      _cleanbaseExactFail(row(knsa, 3), weak3, g) === true);
+    check('cleanbase: only 2 down days fails the default of 3, passes when the field allows 2',
+      _cleanbaseExactFail(row(knsa), weak2, g) === true
+      && _cleanbaseExactFail(row(knsa), weak2, { ...g, minDown: 2 }) === false);
+    check('cleanbase: no bars drops the row', _cleanbaseExactFail(row(knsa), null, g) === true);
   }
 
   // ── cleanbase is registered like every other screener ──
@@ -278,16 +239,11 @@
     setScreener('cleanbase', true);
     check('setScreener(cleanbase) switches panel class', document.getElementById('filterPanel').classList.contains('panel-cleanbase'));
     check('cleanbase shares the VCP fields (vcpContractions visible)', num('vcpContractions') === (SCREENER_DEFAULTS.cleanbase.vcpContractions ?? 3));
-    // The full-sequence-tightening tolerance is a user-facing field, not a
-    // hidden constant — same pattern as vcpContractions/vcpDepthMax/pivotBelow
-    // and Power Play's consolWeeks: a strict literal criterion can legitimately
-    // leave 0 results on a given day, and the user decides whether to loosen
-    // it rather than me picking a threshold for them (2026-09-26/27).
-    check('cleanbase has its own tolerance field, defaulting to 20%', num('cleanbaseTolerance') === 20,
-      'got ' + num('cleanbaseTolerance'));
-    check("cleanbaseTolerance is hidden on VCP's own panel", (() => {
+    check('cleanbase has its own down-days field, defaulting to 3', num('cleanbaseMinDown') === 3,
+      'got ' + num('cleanbaseMinDown'));
+    check("cleanbaseMinDown is hidden on VCP's own panel", (() => {
       setScreener('vcp', true);
-      const hidden = getComputedStyle($('cleanbaseTolerance').closest('.field')).display === 'none';
+      const hidden = getComputedStyle($('cleanbaseMinDown').closest('.field')).display === 'none';
       setScreener('cleanbase', true);
       return hidden;
     })());
@@ -636,31 +592,6 @@
       && _vcpExactFail(withDepths([4, 12, 9, 6]), rising, { ...g, minC: 4 }) === true);
     check('vcp: a flat (non-shrinking) leg is not a contraction',
       _vcpExactFail(withDepths([10, 6, 6]), rising, { ...g, minC: 3 }) === true);
-    // cleanbase layers one more requirement on top of _vcpExactFail's own
-    // last-minC check: the WHOLE sequence has to keep tightening, within a
-    // tolerance — not stay perfectly monotonic (2026-09-26's first attempt
-    // required that, and it rejected TXN, a real, otherwise-clean base,
-    // purely because two of its seven real depths were 17.38% then 17.44%, a
-    // 0.35% noise wobble). Real depths sequences below, measured live
-    // 2026-09-27 against the actual universe.
-    const cleanRow = (ds, weak) => ({ perf6: 30, vcp: { ...withDepths(ds).vcp, weakDownCandles: weak } });
-    const txnDepths  = [17.38, 17.44, 11.45, 11.04, 11.89, 7.23, 6.05]; // real TXN, tiny wobble only
-    const cblDepths  = [4.84, 8.8, 7.84, 10.68, 9.69, 6.73, 6.68];       // real CBL, +82% then +36%
-    const iescDepths = [8.72, 12.67, 15.23, 27.81, 28.16, 8.19, 24.77, 14.09, 11.29, 9.38]; // real IESC
-    check('cleanbase: a clean 3-leg tightening base with weak down-candles passes',
-      _cleanbaseExactFail(cleanRow([12, 8, 4], true), rising, { ...g, minC: 3 }) === false);
-    check('cleanbase: the same clean base WITHOUT weak down-candles still fails',
-      _cleanbaseExactFail(cleanRow([12, 8, 4], false), rising, { ...g, minC: 3 }) === true);
-    check('cleanbase: a tiny (<1%) noise wobble within an otherwise-tightening real sequence still passes (TXN)',
-      _cleanbaseExactFail(cleanRow(txnDepths, true), rising, { ...g, minC: 3 }) === false,
-      'got depths ' + JSON.stringify(txnDepths));
-    check('cleanbase: real re-expansion well past tolerance is dropped, even with weak down-candles (CBL)',
-      _cleanbaseExactFail(cleanRow(cblDepths, true), rising, { ...g, minC: 3 }) === true);
-    check('cleanbase: chaotic real depths across many legs are dropped (IESC)',
-      _cleanbaseExactFail(cleanRow(iescDepths, true), rising, { ...g, minC: 3 }) === true);
-    check('cleanbase: tolerance is a configurable field, not a constant',
-      _cleanbaseExactFail(cleanRow(cblDepths, true), rising, { ...g, minC: 3, tolerance: 100 }) === false,
-      'a 100% tolerance should let even CBL through');
     // Rows restored from an older results cache predate the depths array.
     check('vcp: falls back to tighteningOK when depths are absent',
       _vcpExactFail({ perf6: 30, vcp: { contractions: 3, lastDepth: 4, tighteningOK: true, volDryUp: true, pivot: 100, distToPivot: -2 } }, rising, { ...g, minC: 3 }) === false
