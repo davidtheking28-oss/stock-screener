@@ -316,6 +316,7 @@ body {
    written the other way round — negated — so the VCP fields hide everywhere
    except their own panel without touching seven existing selectors. */
 #filterPanel:not(.panel-vcp):not(.panel-cleanbase) .f-vcp { display: none; }
+#filterPanel.panel-cleanbase .f-vcponly { display: none; }
 #filterPanel.panel-vcp .f-sepa, #filterPanel.panel-vcp .f-power, #filterPanel.panel-vcp .f-growth, #filterPanel.panel-vcp .f-commodities, #filterPanel.panel-vcp .f-qulla, #filterPanel.panel-vcp .f-finviz, #filterPanel.panel-cleanbase .f-sepa, #filterPanel.panel-cleanbase .f-power, #filterPanel.panel-cleanbase .f-growth, #filterPanel.panel-cleanbase .f-commodities, #filterPanel.panel-cleanbase .f-qulla, #filterPanel.panel-cleanbase .f-finviz { display: none; }
 .filter-sections.single { grid-template-columns: 1fr; }
 .preset-btn {
@@ -1043,7 +1044,7 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field f-vcp"><label for="vcpContractions">התכווצויות מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="vcpContractions" value="3" min="1" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-vcp"><label for="vcpDepthMax">עומק ההתכווצות האחרונה מקס&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="vcpDepthMax" value="12" min="1" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-vcp"><label for="pivotBelow">מרחק מתחת ל-Pivot מקס&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="pivotBelow" value="10" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
-            <div class="field f-vcp" style="grid-column:1 / -1">
+            <div class="field f-vcp f-vcponly" style="grid-column:1 / -1">
               <div class="filter-toggles">
                 <label class="toggle"><input type="checkbox" id="vcpDryUp" checked> נפח מתייבש בהתכווצות האחרונה</label>
               </div>
@@ -1356,7 +1357,7 @@ const SCREENERS = {
   sepa:     {name:'Minervini SEPA',      sub:'Trend Template + SEPA',  fund:true,  presets:true},
   power:    {name:'Power Play',           sub:'ריצה נפיצה + דשדוש הדוק', fund:false, presets:false},
   vcp:      {name:'VCP / פריצה',        sub:'בסיס VCP מתהדק + מחיר צמוד לנקודת הפריצה', fund:false, presets:false},
-  cleanbase: {name:'בסיס נקי',           sub:'VCP + נרות ירידה חלשים בהתכווצות האחרונה', fund:false, presets:false},
+  cleanbase: {name:'בסיס נקי',           sub:'עוברת מסנן קיים + התכווצות, נרות קטנים וווליום יורד', fund:false, presets:false},
   qulla:    {name:'Qullamaggie',          sub:'Breakout — מהלך גדול + דשדוש צמוד ל-EMA', fund:false, presets:false},
   finviz:   {name:'מומנטום שנתי',         sub:'שנה +30% · מעל SMA50/200 · קרוב לשיא', fund:false, presets:false},
   growth:   {name:'מסנן פונדמנטלי',      sub:'סקטורים נבחרים + צמיחה רבעונית', fund:false, presets:false},
@@ -2109,6 +2110,10 @@ function _cleanbaseExactFail(r, bars, opts={}){
 const CLEANBASE_SOURCES=['sepa','power','vcp','qulla','finviz','growth'];
 const CLEANBASE_VIA={sepa:'SEPA',power:'Power',vcp:'VCP',qulla:'Qulla',finviz:'מומנטום',growth:'פונדמנטלי'};
 async function _cleanbaseUniverse(universe, rsMap, signal){
+  // cleanbase's own panel still narrows the pool (e.g. no entry right before a
+  // report), read now, before any source screener's defaults are swapped in.
+  const rsMin=num('rsMin'), fh=num('fromHigh'), priceMin=num('priceMin'), mcMin=num('mcMin')*1e9,
+        liqMin=num('liqMin')*1e6, earnGap=num('earnDays');
   const byT=new Map();
   for(const s of CLEANBASE_SOURCES){
     let pending;
@@ -2120,7 +2125,8 @@ async function _cleanbaseUniverse(universe, rsMap, signal){
       if(seen) seen.via.push(s); else { r.via=[s]; byT.set(r.ticker, r); }
     }
   }
-  return [...byT.values()];
+  return [...byT.values()].filter(r=>r.rs>=rsMin && r.fromHighPct>=-fh && r.close>=priceMin && (r.mc??0)>=mcMin
+    && (!liqMin || (r.dollarVol??0)>=liqMin) && !(earnGap>0 && r.earnIn!=null && r.earnIn>=0 && r.earnIn<=earnGap));
 }
 async function validateExact(list, scr, onProgress, signal){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp'&&scr!=='cleanbase')||!HAS_SUPABASE||!list.length) return list;

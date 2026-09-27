@@ -276,13 +276,16 @@
     const uni = [
       mkStock('U:GROWA', { ...base, name: 'GROWA', sector: 'Technology Services' }),
       mkStock('U:NOPE', { ...base, name: 'NOPE', sector: 'Utilities' }),
+      mkStock('U:EARN', { ...base, name: 'EARN', sector: 'Technology Services', earnings_release_next_date: Date.now() / 1000 + 2 * 86400 }),
     ];
-    const pool = await _cleanbaseUniverse(uni, {});
+    const pool = await _cleanbaseUniverse(uni, { 'U:GROWA': 85, 'U:NOPE': 85, 'U:EARN': 85 });
     const growa = pool.find(r => r.ticker === 'GROWA');
     check('cleanbase pool: a stock passing another screener on its own criteria is a candidate, tagged with it',
       growa && growa.via.includes('growth'), 'got ' + JSON.stringify(pool.map(r => [r.ticker, r.via])));
     check('cleanbase pool: a stock passing no screener is not a candidate',
       !pool.some(r => r.ticker === 'NOPE'));
+    check("cleanbase pool: cleanbase's own panel (earnings in 2 days vs a 5-day block) still filters the pool",
+      !pool.some(r => r.ticker === 'EARN'), 'got ' + JSON.stringify(pool.map(r => r.ticker)));
     check('cleanbase pool: running every screener leaves the live panel untouched',
       activeScreener === 'cleanbase' && num('rsMin') === panelRs && _asScreener === null);
     setScreener('sepa', true);
