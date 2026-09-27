@@ -1891,6 +1891,39 @@ async function _fetchBars1y(sym, signal){
     return bars;
   }catch(e){ return null; }
 }
+// Warms _valBars/_barsStore for a whole chunk in one HTTP request instead of
+// one per symbol — the dominant cost of a cold cleanbase scan (~500 symbols
+// at 20-concurrent single-symbol fetches). Failures are per-symbol, so a
+// timed-out or errored chunk just leaves those symbols uncached; validateExact's
+// existing worker loop then falls back to _fetchBars1y's normal single-symbol
+// path for anything not already warm, so a batch failure degrades to the old
+// behavior rather than dropping the symbols outright.
+async function _fetchBars1yBatch(symbols, signal){
+  if(!HAS_SUPABASE || !symbols.length) return;
+  try{
+    const sig = signal ? AbortSignal.any([AbortSignal.timeout(SCAN_TIMEOUT), signal]) : AbortSignal.timeout(SCAN_TIMEOUT);
+    const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc',{method:'POST',
+      headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON,'Content-Type':'application/json'},
+      body:JSON.stringify({symbols,range:'1y'}), signal:sig});
+    if(!r.ok) return;
+    const j=await r.json(); const results=Array.isArray(j.results)?j.results:[];
+    const now=Date.now();
+    for(const res of results){
+      const bars=Array.isArray(res.bars)?res.bars:[];
+      if(!bars.length) continue;
+      const entry={bars,t:now,key:_closedSessionKey(now)};
+      _valBars.set(res.symbol,entry);
+      _barsStore.put(res.symbol,entry);
+    }
+  }catch(e){}
+}
+const BATCH_CHUNK=60, BATCH_CONCURRENCY=4;
+async function _fetchBars1yWarm(tickers, signal){
+  const chunks=[]; for(let i=0;i<tickers.length;i+=BATCH_CHUNK) chunks.push(tickers.slice(i,i+BATCH_CHUNK));
+  let idx=0;
+  async function worker(){ while(idx<chunks.length) await _fetchBars1yBatch(chunks[idx++], signal); }
+  await Promise.all(Array.from({length:Math.min(BATCH_CONCURRENCY,chunks.length)}, worker));
+}
 function _sma(c, end, period){ if(end-period+1<0) return null; let s=0; for(let i=end-period+1;i<=end;i++) s+=c[i]; return s/period; }
 function _ma200Rising(bars){
   if(!bars || bars.length<222) return null;   // unknown → keep
@@ -2245,6 +2278,11 @@ async function validateExact(list, scr, onProgress, signal){
   const consolBars=(num('consolWeeks')||2)*5;
   // One benchmark fetch for the whole pass — the RS line is price/SPY.
   const spy=await _fetchBars1y('SPY', signal).catch(()=>null);
+  // Warm the cache in a handful of batched requests before the per-ticker
+  // pool below — each worker's _fetchBars1y then resolves from cache instead
+  // of one more network round trip; anything a batch missed (error, or a
+  // symbol added after the batch ran) still falls back to fetching itself.
+  await _fetchBars1yWarm(list.map(r=>r.ticker), signal).catch(()=>{});
   async function worker(){
     while(idx<list.length){
       const r=list[idx++];

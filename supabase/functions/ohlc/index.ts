@@ -119,6 +119,59 @@ function ok(sym: string, bars: unknown, src: string) {
   });
 }
 
+// Shared by the single-symbol GET path and the batch POST path below, so both
+// go through the exact same in-instance + persistent caching and freshness
+// policy — a batch call and a concurrent single-symbol call warm each other's
+// cache for free.
+async function getBarsFor(sym: string, range: string): Promise<{ bars: unknown; src: string }> {
+  const ckey = range === '1y' ? '1y:' + sym : sym;
+  const policy = oneYearBarsPolicy(Date.now());
+  const m = mem.get(ckey);
+  if (m && Date.now() - m.time < MEM_TTL && m.time >= policy.lastClose) return { bars: m.bars, src: 'MEM' };
+  const { data: bars, src } = await serveCached(
+    'ohlc:' + ckey,
+    range === '1y' ? policy.ttl : DB_TTL,
+    range === '1y' ? policy.maxStale : MAX_STALE,
+    () => fetchYahoo(sym, range),
+  );
+  mem.set(ckey, { bars, time: Date.now() });
+  return { bars, src };
+}
+
+// A cold cleanbase scan validates ~500 symbols one HTTP request at a time —
+// this lets the client send a chunk (e.g. 50-100) in one call instead, cutting
+// the ~500 function-invocation overheads down to a handful. Symbols are
+// resolved with bounded internal concurrency so one big chunk can't fan out
+// into an unbounded burst of Yahoo requests; a per-symbol failure is reported
+// inline rather than failing the whole chunk.
+const BATCH_CONCURRENCY = 12;
+const BATCH_MAX = 150;
+async function handleBatch(req: Request): Promise<Response> {
+  let body: { symbols?: unknown; range?: unknown };
+  try { body = await req.json(); } catch { return new Response(JSON.stringify({ error: 'invalid JSON' }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } }); }
+  const symbols = Array.isArray(body.symbols) ? body.symbols.filter((s) => typeof s === 'string') : [];
+  if (!symbols.length) return new Response(JSON.stringify({ error: 'missing symbols' }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } });
+  if (symbols.length > BATCH_MAX) return new Response(JSON.stringify({ error: `at most ${BATCH_MAX} symbols per batch` }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } });
+  const range = body.range === '1y' ? '1y' : '3mo';
+  const results: { symbol: string; bars?: unknown; error?: string }[] = new Array(symbols.length);
+  let idx = 0;
+  async function worker() {
+    while (idx < symbols.length) {
+      const i = idx++;
+      const sym = mapSymbol(symbols[i]);
+      try {
+        const { bars, src } = await getBarsFor(sym, range);
+        results[i] = { symbol: sym, bars };
+        void src;
+      } catch (e) {
+        results[i] = { symbol: sym, error: (e as Error).message };
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(BATCH_CONCURRENCY, symbols.length) }, worker));
+  return new Response(JSON.stringify({ results }), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
@@ -126,6 +179,24 @@ Deno.serve(async (req: Request) => {
   const now = Date.now();
   const rl = _rate.get(ip) || { count: 0, resetAt: now + 60_000 };
   if (rl.resetAt < now) { rl.count = 0; rl.resetAt = now + 60_000; }
+
+  if (req.method === 'POST') {
+    // A batch counts as more than one request against the same per-IP budget
+    // (one "unit" per 10 symbols) — the budget was sized for ~150 single-symbol
+    // calls, and a 60-symbol batch does the same upstream work as 60 of those.
+    let bodyForCount: { symbols?: unknown };
+    try { bodyForCount = await req.clone().json(); } catch { bodyForCount = {}; }
+    const n = Array.isArray(bodyForCount.symbols) ? bodyForCount.symbols.length : 1;
+    rl.count += Math.max(1, Math.ceil(n / 10));
+    _rate.set(ip, rl);
+    if (rl.count > RATE_LIMIT) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
+        status: 429, headers: { ...CORS, 'Content-Type': 'application/json', 'Retry-After': '60' },
+      });
+    }
+    return handleBatch(req);
+  }
+
   rl.count++;
   _rate.set(ip, rl);
   if (rl.count > RATE_LIMIT) {
@@ -139,24 +210,9 @@ Deno.serve(async (req: Request) => {
   if (!raw) return new Response(JSON.stringify({ error: 'missing symbol' }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } });
   const sym = mapSymbol(raw);
   const range = url.searchParams.get('range') === '1y' ? '1y' : '3mo';
-  const ckey = range === '1y' ? '1y:' + sym : sym;
 
-  // 1. warm in-instance cache — never a copy taken before the last close (its
-  // last candle is a half-finished session; see oneYearBarsPolicy)
-  const policy = oneYearBarsPolicy(Date.now());
-  const m = mem.get(ckey);
-  if (m && Date.now() - m.time < MEM_TTL && m.time >= policy.lastClose) return ok(sym, m.bars, 'MEM');
-
-  // 2. persistent DB cache — fresh, stale-but-usable (background refresh), or
-  // a blocking live fetch past MAX_STALE
   try {
-    const { data: bars, src } = await serveCached(
-      'ohlc:' + ckey,
-      range === '1y' ? policy.ttl : DB_TTL,
-      range === '1y' ? policy.maxStale : MAX_STALE,
-      () => fetchYahoo(sym, range),
-    );
-    mem.set(ckey, { bars, time: Date.now() });
+    const { bars, src } = await getBarsFor(sym, range);
     return ok(sym, bars, src);
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), { status: 502, headers: { ...CORS, 'Content-Type': 'application/json' } });
