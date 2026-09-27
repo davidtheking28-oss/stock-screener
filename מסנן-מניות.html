@@ -3786,6 +3786,9 @@ function _restoreSortForMode(){
 function _wlCleanbaseVisible(r){
   return !(activeScreener==='cleanbase' && r._exactFail===true);
 }
+function _wlCleanbaseHidden(){
+  return [...watchlist].filter(t=>ttUniverse[t] && !_wlCleanbaseVisible(ttUniverse[t])).length;
+}
 function visibleRows(){
   const base = mode==='watch'
     ? sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean).filter(_wlCleanbaseVisible))
@@ -3807,7 +3810,8 @@ function render(){
   // meant the מעקב count changed the instant you clicked it (16 -> 0 before the
   // first scan), which reads as the list having just been emptied.
   $('resCount').textContent='('+results.length+')';
-  const wc=$('wlCount'); if(wc) wc.textContent='('+watchlist.size+')';
+  const wc=$('wlCount'), hid=_wlCleanbaseHidden();
+  if(wc) wc.textContent='('+(hid ? (watchlist.size-hid)+'/'+watchlist.size : watchlist.size)+')';
   if(mode==='watch') layout==='gallery' ? renderWatchlistGallery() : renderWatchlist();
   else               layout==='gallery' ? renderGallery()          : renderTable();
   _renderWlMissing();
@@ -3907,7 +3911,9 @@ function syncStatBar(){
     // the moment anything was typed in the search box.
     const rows=visibleRows();
     const tt=rows.filter(r=>r.ttPass!==false).length;
-    sb.innerHTML='<b>'+rows.length+'</b> במעקב \xb7 <b>'+tt+'</b> עוברות את ה-Trend Template';
+    const hid=_wlCleanbaseHidden();
+    sb.innerHTML='<b>'+rows.length+'</b> במעקב \xb7 <b>'+tt+'</b> עוברות את ה-Trend Template'
+      +(hid ? ' \xb7 <b>'+hid+'</b> מוסתרות — לא עוברות כרגע בסיס נקי' : '');
   } else {
     // Assigning even when empty: entering the watchlist before any scan left
     // the watchlist summary stuck in the topbar after switching back, because

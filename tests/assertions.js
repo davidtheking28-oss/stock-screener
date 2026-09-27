@@ -337,6 +337,25 @@
     check('cleanbase active: a row that explicitly passed stays visible', _wlCleanbaseVisible(explicitPass) === true);
     setScreener('vcp', true);
     check('vcp active: a "failed" row is still shown — the hide rule is cleanbase-only', _wlCleanbaseVisible(failed) === true);
+    // User (2026-09-27): "the watchlist says 10 but shows 2" — the tab count and
+    // summary must say how many are hidden, not just the list size.
+    const savedWl = new Set(watchlist), savedTT = ttUniverse, savedMode = mode;
+    try {
+      watchlist.clear(); ['AAA', 'BBB', 'CCC'].forEach(t => watchlist.add(t));
+      ttUniverse = { AAA: { ticker: 'AAA', _exactFail: false }, BBB: { ticker: 'BBB', _exactFail: true }, CCC: { ticker: 'CCC', _exactFail: true } };
+      setScreener('cleanbase', true);
+      check('cleanbase: watchlist hidden count', _wlCleanbaseHidden() === 2, 'got ' + _wlCleanbaseHidden());
+      render();
+      check('cleanbase: the watchlist tab count shows shown/total', $('wlCount').textContent === '(1/3)', 'got ' + $('wlCount').textContent);
+      mode = 'watch'; syncStatBar();
+      check('cleanbase: the watchlist summary says how many are hidden and why',
+        /2<\/b> מוסתרות/.test($('statBar').innerHTML), 'got ' + $('statBar').innerHTML);
+      mode = savedMode;
+      setScreener('vcp', true); render();
+      check('other screeners: the tab count stays the plain list size', $('wlCount').textContent === '(3)', 'got ' + $('wlCount').textContent);
+    } finally {
+      mode = savedMode; watchlist.clear(); savedWl.forEach(t => watchlist.add(t)); ttUniverse = savedTT;
+    }
     setScreener('sepa', true);
   }
 
