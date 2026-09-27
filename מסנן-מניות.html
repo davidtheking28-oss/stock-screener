@@ -2254,13 +2254,21 @@ async function _cleanbaseUniverse(universe, rsMap, signal){
   // would drop anyway never cost an OHLC download (~18% fewer, measured).
   const keep=r=>r.rs>=rsMin && r.fromHighPct>=-fh && r.close>=priceMin && (r.mc??0)>=mcMin
     && (!liqMin || (r.dollarVol??0)>=liqMin) && !(earnGap>0 && r.earnIn!=null && r.earnIn>=0 && r.earnIn<=earnGap);
-  const byT=new Map();
+  // Each source screener is independent, so start all six before awaiting any
+  // of them — validateExact reads its options synchronously before its first
+  // await, so _asScreener is safe to set/unset in a tight loop here as long as
+  // each call is made (not just awaited) before the next one's assignment.
+  // Promise.all preserves CLEANBASE_SOURCES order regardless of completion
+  // order, so `via` tagging stays deterministic.
+  const pendings=[];
   for(const s of CLEANBASE_SOURCES){
-    let pending;
     _asScreener=s;
-    try{ pending=validateExact(applyFilters(universe, rsMap).filter(keep), s, null, signal); }
+    try{ pendings.push(validateExact(applyFilters(universe, rsMap).filter(keep), s, null, signal).then(rows=>({s,rows}))); }
     finally{ _asScreener=null; }
-    for(const r of await pending){
+  }
+  const byT=new Map();
+  for(const {s,rows} of await Promise.all(pendings)){
+    for(const r of rows){
       const seen=byT.get(r.ticker);
       if(seen) seen.via.push(s); else { r.via=[s]; byT.set(r.ticker, r); }
     }
