@@ -229,6 +229,13 @@
       _cleanbaseExactFail(row(knsa), weak2, g) === true
       && _cleanbaseExactFail(row(knsa), weak2, { ...g, minDown: 2 }) === false);
     check('cleanbase: no bars drops the row', _cleanbaseExactFail(row(knsa), null, g) === true);
+    // FTNT/SMFG (user-flagged 2026-09-27): weak last days, but the last 10
+    // sessions' range was ~0.6x the prior base's — no real contraction.
+    const wide = weak3.map((b, i, a) => i >= a.length - 10 && i < a.length - 5 ? { ...b, h: b.c * 1.15, l: b.c * 0.85 } : b);
+    check('_weakPullback: a tight last 10 sessions reads as a small spanRatio',
+      wp && wp.spanRatio < 0.5, 'got ' + JSON.stringify(wp));
+    check('cleanbase: last 10 sessions as wide as the prior base is not a contraction',
+      _cleanbaseExactFail(row(knsa), wide, g) === true, 'got ' + JSON.stringify(_weakPullback(wide)));
   }
 
   // ── cleanbase is registered like every other screener ──

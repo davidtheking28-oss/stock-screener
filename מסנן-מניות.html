@@ -2062,16 +2062,19 @@ function _vcpExactFail(r, bars, opts={}){
 }
 // Last `days` sessions vs. the stock's own norms: how many closed down, and
 // how heavy (vs. 50-day volume) and wide (vs. 20-day ADR) those down days were.
+// spanRatio: last 10 sessions' high-low span over the 50 before them.
 function _weakPullback(bars, days=5){
-  if(!bars || bars.length<51) return null;
+  if(!bars || bars.length<60) return null;
   const n=bars.length, avg=a=>a.reduce((s,x)=>s+x,0)/a.length, rng=b=>(b.h/b.l-1)*100;
   const adr=avg(bars.slice(-20).map(rng)), vol50=avg(bars.slice(-50).map(b=>b.v));
   if(!(adr>0) || !(vol50>0)) return null;
   const tail=bars.slice(-days), down=tail.filter((b,i)=>b.c<bars[n-days+i-1].c);
+  const span=w=>Math.max(...w.map(b=>b.h))/Math.min(...w.map(b=>b.l))-1;
   return {down:down.length,
           downVol: down.length ? avg(down.map(b=>b.v))/vol50 : null,
           downRange: down.length ? avg(down.map(rng))/adr : null,
-          recentVol: avg(tail.map(b=>b.v))/vol50};
+          recentVol: avg(tail.map(b=>b.v))/vol50,
+          spanRatio: span(bars.slice(-10))/span(bars.slice(-60,-10))};
 }
 // "בסיס נקי": the CURRENT pullback is shallower than the recent ones, near the
 // pivot, and the last sessions are mostly down days on light volume and narrow
@@ -2088,7 +2091,9 @@ function _cleanbaseExactFail(r, bars, opts={}){
   if(v.distToPivot==null || v.distToPivot > 2 || v.distToPivot < -(opts.maxBelow ?? 10)) return true;
   const p=_weakPullback(bars);
   if(!p || p.down < (opts.minDown ?? 3)) return true;
-  return !(p.downVol<1 && p.downRange<1 && p.recentVol<1);
+  // 0.5: measured gap on 2026-09-27's 44 results — the user's own setups sat
+  // at 0.19-0.35, the flagged FTNT/SMFG at 0.60-0.63, nothing between 0.44-0.58.
+  return !(p.downVol<1 && p.downRange<1 && p.recentVol<1 && p.spanRatio<0.5);
 }
 async function validateExact(list, scr, onProgress, signal){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp'&&scr!=='cleanbase')||!HAS_SUPABASE||!list.length) return list;
