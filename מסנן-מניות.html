@@ -1822,16 +1822,25 @@ function _ohlcNext(){
 /* ── exact OHLC validation (1y bars) ── */
 // Daily bars only change while the US market is open, so a fetch made after a
 // close stays good until the next session opens; intraday ones expire in 30m.
-// Returns the ET date of the latest close, or null during market hours
-// (holidays just cost one extra fetch).
+// Returns the ET date of the latest close, or null during market hours —
+// 9:30 to 16:15 ET, the extra 15 min letting the feed finalize the day's bar
+// (same window as the ohlc function's market_hours.ts; holidays just cost one
+// extra fetch).
 const _etFmt = new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',year:'numeric',month:'2-digit',day:'2-digit',hour:'numeric',minute:'numeric',hour12:false});
 function _closedSessionKey(ms){
   const et=m=>Object.fromEntries(_etFmt.formatToParts(new Date(m)).map(x=>[x.type,x.value]));
   const weekend=p=>p.weekday==='Sat'||p.weekday==='Sun';
   let p=et(ms); const min=(+p.hour%24)*60 + +p.minute;
-  if(!weekend(p) && min>=570 && min<960) return null;
+  if(!weekend(p) && min>=570 && min<975) return null;
   if(weekend(p) || min<570){ do{ ms-=86400000; p=et(ms); } while(weekend(p)); }
   return p.year+'-'+p.month+'-'+p.day;
+}
+const _etDay = new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York'});
+// During the session the newest daily bar is half a day, so its volume and
+// range always look "quiet". Candle/volume judgements use completed days only.
+function _completedBars(bars, now=Date.now()){
+  if(!bars?.length || _closedSessionKey(now)!==null) return bars;
+  return _etDay.format(new Date(bars[bars.length-1].t*1000))===_etDay.format(new Date(now)) ? bars.slice(0,-1) : bars;
 }
 const BARS_TTL=30*60*1000;
 function _barsFresh(c, now=Date.now()){
@@ -2127,7 +2136,7 @@ function _cleanbaseExactFail(r, bars, opts={}){
   if(!(last < Math.max(...d.slice(-3,-1)))) return true;
   if(last > (opts.maxDepth ?? 12)) return true;
   if(v.distToPivot==null || v.distToPivot > 2 || v.distToPivot < -(opts.maxBelow ?? 10)) return true;
-  const p=r.pullback=_weakPullback(bars);
+  const p=r.pullback=_weakPullback(_completedBars(bars));
   // Every cutoff sits in a measured gap between the user's labelled good
   // setups (DIOD, SIMO, MTRN pre-breakout) and bad ones (KNSA, AMTB, NESR,
   // MUFG, FTNT, SMFG, ITGR, RDVT): volSlope good <=-0.14 / bad >=-0.07;

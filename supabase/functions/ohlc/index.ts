@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { serveCached } from "../_shared/market_cache.ts";
+import { oneYearBarsPolicy } from "../_shared/market_hours.ts";
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -9,12 +10,10 @@ const CORS = {
 const mem = new Map<string, { bars: unknown; time: number }>();
 const MEM_TTL = 15 * 60 * 1000;      // 15min in-instance
 const DB_TTL = 45 * 60 * 1000;       // 45min persistent freshness (3mo bars)
-const DB_TTL_1Y = 6 * 60 * 60 * 1000; // 6h persistent freshness (1y bars — daily, finalize once/day)
 // Past the TTL but under this bound, serve the last bars immediately and
 // refresh behind the response instead of blocking the caller on Yahoo — see
 // _shared/market_cache.ts.
 const MAX_STALE = 3 * 60 * 60 * 1000;      // 3h (3mo bars)
-const MAX_STALE_1Y = 24 * 60 * 60 * 1000;  // 24h (1y bars)
 
 const _rate = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 400;   // one screener scan validates ~150 survivors from a single IP
@@ -142,17 +141,19 @@ Deno.serve(async (req: Request) => {
   const range = url.searchParams.get('range') === '1y' ? '1y' : '3mo';
   const ckey = range === '1y' ? '1y:' + sym : sym;
 
-  // 1. warm in-instance cache
+  // 1. warm in-instance cache — never a copy taken before the last close (its
+  // last candle is a half-finished session; see oneYearBarsPolicy)
+  const policy = oneYearBarsPolicy(Date.now());
   const m = mem.get(ckey);
-  if (m && Date.now() - m.time < MEM_TTL) return ok(sym, m.bars, 'MEM');
+  if (m && Date.now() - m.time < MEM_TTL && m.time >= policy.lastClose) return ok(sym, m.bars, 'MEM');
 
   // 2. persistent DB cache — fresh, stale-but-usable (background refresh), or
   // a blocking live fetch past MAX_STALE
   try {
     const { data: bars, src } = await serveCached(
       'ohlc:' + ckey,
-      range === '1y' ? DB_TTL_1Y : DB_TTL,
-      range === '1y' ? MAX_STALE_1Y : MAX_STALE,
+      range === '1y' ? policy.ttl : DB_TTL,
+      range === '1y' ? policy.maxStale : MAX_STALE,
       () => fetchYahoo(sym, range),
     );
     mem.set(ckey, { bars, time: Date.now() });

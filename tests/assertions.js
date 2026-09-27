@@ -307,6 +307,18 @@
     const intraday = { t: utc('2026-09-22T14:00:00'), key: null };
     check('_barsFresh: intraday fetches still expire after 30 minutes',
       _barsFresh(intraday, utc('2026-09-22T14:10:00')) === true && _barsFresh(intraday, utc('2026-09-22T15:00:00')) === false);
+    // During the session today's bar is half a day: its volume always reads as
+    // "falling" and its range as "small", so cleanbase judges completed days only.
+    const day = s => ({ t: utc(s) / 1000, o: 1, h: 1, l: 1, c: 1, v: 1 });
+    const tueBars = [day('2026-09-21T13:30:00'), day('2026-09-22T13:30:00')];
+    check('_completedBars: during the session, today\'s partial bar is dropped',
+      _completedBars(tueBars, utc('2026-09-22T15:00:00')).length === 1);
+    check('_completedBars: after the close, today\'s bar is complete and kept',
+      _completedBars(tueBars, utc('2026-09-22T21:00:00')).length === 2);
+    check('_completedBars: a feed that has no bar for today yet is left alone',
+      _completedBars(tueBars.slice(0, 1), utc('2026-09-22T15:00:00')).length === 1);
+    check('_closedSessionKey: the 15-minute finalization buffer after the bell counts as open',
+      _closedSessionKey(utc('2026-09-22T20:10:00')) === null);
     await _barsStore.put('ZZTEST', { bars: [{ t: 1, c: 1 }], t: Date.now(), key: 'k' });
     const back = await _barsStore.get('ZZTEST');
     check('_barsStore: bars survive a round trip through IndexedDB', back && back.bars[0].c === 1, 'got ' + JSON.stringify(back));
