@@ -2137,9 +2137,24 @@ function _thrustPullback(bars){
   }
   return null;
 }
+// The other pattern, from the user's logged missed entries (2026-09-27): no
+// thrust at all, just quiet sideways sessions right under the pivot. Same ADR
+// window as _thrustPullback; net is the last 5 sessions' change in ADRs.
+function _quietPause(bars){
+  if(!bars || bars.length<60) return null;
+  const n=bars.length, avg=a=>a.reduce((s,x)=>s+x,0)/a.length, rng=b=>(b.h/b.l-1)*100;
+  const vol50=avg(bars.slice(-50).map(b=>b.v)), adr=avg(bars.slice(-25,-5).map(rng));
+  if(!(adr>0) || !(vol50>0)) return null;
+  const last3=bars.slice(-3), mv=i=>(bars[i].c/bars[i-1].c-1)*100/adr;
+  return {moveMax: Math.max(...[n-3,n-2,n-1].map(i=>Math.abs(mv(i)))),
+          net: (bars[n-1].c/bars[n-6].c-1)*100/adr,
+          rangeMax: Math.max(...last3.map(b=>rng(b)/adr)),
+          volAvg: avg(last3.map(b=>b.v))/vol50};
+}
 // "בסיס נקי": passes another screener (see _cleanbaseUniverse), the CURRENT
 // pullback is shallower than the recent ones and near the pivot, the range
-// has contracted — and the last sessions are a thrust then a quiet pause.
+// has contracted — and the last sessions are either a thrust then a quiet
+// pause, or quiet and sideways right under the pivot.
 // Only the newest legs are judged; the 90-day fractal scan also yields old,
 // unrelated swings.
 function _cleanbaseExactFail(r, bars, opts={}){
@@ -2163,7 +2178,16 @@ function _cleanbaseExactFail(r, bars, opts={}){
   // MDB/GFF/PWR (real thrust+pullback setups the tighter cutoffs excluded —
   // one pullback day at 1.06-1.19x, PWR recovering to 0.57 net) against
   // IRDM/TXN/VSAT/ROG/MSGE/AMBQ/SNDK (1.28-1.50x range, still excluded).
-  return !(t && t.pbRangeMax<=1.2 && t.pbVolUnderThrust && t.pbVolAvg<1 && t.pbUpMax<=0.5 && t.net<=0.6);
+  const thrustOK = t && t.pbRangeMax<=1.2 && t.pbVolUnderThrust && t.pbVolAvg<1 && t.pbUpMax<=0.5 && t.net<=0.6;
+  // Replayed on the user's 33 logged missed entries (day before entry): 15 of
+  // the 18 whose base passed fit this, vs 1 of the 7 rejected (AMTB) — TX/KNSA
+  // fall (net <=-0.9), ROST rises (+1.8), MUFG has a 3.2-ADR day, IESC/NESR sit
+  // 4.5-5% under the pivot while the missed ones were within 4%.
+  const q=_quietPause(done);
+  const quietOK = q && v.distToPivot >= -4 && q.moveMax <= 1 && q.net >= -0.5 && q.net <= 1.3;
+  r.pause = thrustOK ? {kind:'thrust', volAvg:t.pbVolAvg, rangeMax:t.pbRangeMax}
+          : quietOK ? {kind:'quiet', volAvg:q.volAvg, rangeMax:q.rangeMax} : null;
+  return !r.pause;
 }
 // cleanbase's candidates: every stock that fully passes at least one other
 // screener on that screener's own default criteria (coarse + exact), tagged
@@ -2625,11 +2649,11 @@ function _calcScoreRaw(r, scr='sepa'){
     const revS  = Math.min(clamp(r.rev??0,0,200)/200,1)*5;
     return Math.round(clamp(moveS+adrS+emaS+tightS+epsS+perfYS+rsS+revS,0,100));
   }
-  if(scr==='cleanbase' && r.pullback && r.thrust){
-    const p=r.pullback, t=r.thrust, v=r.vcp;
+  if(scr==='cleanbase' && r.pullback && r.pause){
+    const p=r.pullback, t=r.pause, v=r.vcp;
     const tightS = clamp(1-p.spanRatio/0.5,0,1)*25;
-    const dryS   = clamp((1-t.pbVolAvg)/0.5,0,1)*20;
-    const quietS = clamp((1-t.pbRangeMax)/0.5,0,1)*10;
+    const dryS   = clamp((1-t.volAvg)/0.5,0,1)*20;
+    const quietS = clamp((1-t.rangeMax)/0.5,0,1)*10;
     const pivotS = v?.distToPivot==null?0:clamp(1-Math.abs(v.distToPivot)/10,0,1)*20;
     const rsS    = clamp(r.rs,0,99)/99*15;
     return Math.round(clamp(tightS+dryS+quietS+pivotS+rsS+epsScore(r.eps,10),0,100));

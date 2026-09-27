@@ -206,14 +206,19 @@
     const steady = withTail([[-0.003, 0.004, 950], [-0.003, 0.004, 800], [-0.003, 0.004, 650], [-0.003, 0.004, 500], [-0.003, 0.004, 350]]);
     const lightThrust = withTail([[0, 0.004, 900], [0.02, 0.008, 900], [-0.003, 0.004, 700], [-0.003, 0.004, 600], [-0.003, 0.004, 500]]);
     const noPause = withTail([[0, 0.004, 900], [0.017, 0.008, 1800], [-0.003, 0.004, 700], [0.011, 0.004, 600], [-0.003, 0.004, 500]]);
-    const drift = withTail([[0, 0.004, 900], [0.017, 0.008, 1800], [0.0045, 0.004, 700], [0.0045, 0.004, 600], [0.0045, 0.004, 500]]);
+    // Fixtures that end above the base would trip newHigh first; starting them
+    // after a 3% drop keeps each one failing on its own rule only.
+    const low = days => withTail([[-0.03, 0.004, 800], ...days]);
+    const drift = low([[0, 0.004, 900], [0.017, 0.008, 1800], [0.0045, 0.004, 700], [0.0045, 0.004, 600], [0.0045, 0.004, 500]]);
+    const rise = low([[0.006, 0.004, 700], [0.006, 0.004, 700], [0.006, 0.004, 700], [0.006, 0.004, 700], [0.006, 0.004, 700]]);
     // MDB/GFF/PWR (2026-09-27): real thrust+pullback setups the original
     // 1.0/0.25 cutoffs excluded — one pullback day a bit wider than usual,
     // and price recovering partway (not all the way) back toward the thrust
     // close. User confirmed these should pass; loosened to 1.2/0.6.
     const looserPause = withTail([[0, 0.004, 900], [0.017, 0.008, 1800], [-0.007, 0.0116, 700], [0.007, 0.004, 600], [0.007, 0.004, 500]]);
-    const heavyPb = withTail([[0, 0.004, 900], [0.02, 0.008, 1800], [-0.003, 0.004, 2000], [-0.003, 0.004, 600], [-0.003, 0.004, 500]]);
-    const widePb = withTail([[0, 0.004, 900], [0.02, 0.008, 1800], [-0.003, 0.03, 700], [-0.003, 0.004, 600], [-0.003, 0.004, 500]]);
+    const heavyPb = withTail([[0, 0.004, 900], [0.02, 0.008, 1800], [-0.003, 0.004, 2000], [-0.003, 0.004, 300], [-0.003, 0.004, 300]]);
+    const busyPb = low([[0, 0.004, 900], [0.02, 0.008, 1800], [-0.003, 0.004, 1300], [-0.003, 0.004, 1300], [-0.003, 0.004, 1300]]);
+    const widePb = low([[0, 0.004, 900], [0.02, 0.008, 1800], [-0.003, 0.0145, 700], [-0.003, 0.004, 600], [-0.003, 0.004, 500]]);
     const lastDay = withTail([[0, 0.004, 900], [-0.003, 0.004, 800], [-0.003, 0.004, 700], [-0.003, 0.004, 600], [0.02, 0.008, 1800]]);
 
     const tp = _thrustPullback(quiet);
@@ -227,24 +232,29 @@
     const row = (depths, dist = -3) => ({ vcp: { contractions: depths.length, depths, lastDepth: depths[depths.length - 1], distToPivot: dist } });
     const knsa = [11.05, 5.23, 13.9, 4.82, 5.63, 4.81, 5.21, 8.52, 6.64]; // real depths, old noisy legs
     const g = { minC: 3, maxDepth: 12, maxBelow: 10 };
+    // The thrust pattern is judged 6% under the pivot, outside the quiet
+    // pattern's 4% window, so each thrust fixture tests the thrust rules alone.
+    const far = row(knsa, -6);
     check('cleanbase: up day on volume, then a quiet pullback, on a contracting base passes',
-      _cleanbaseExactFail(row(knsa), quiet, g) === false, 'got ' + JSON.stringify(_thrustPullback(quiet)));
+      _cleanbaseExactFail(far, quiet, g) === false, 'got ' + JSON.stringify(_thrustPullback(quiet)));
     check('cleanbase: a steady quiet decline with no up day is not the pattern (TX)',
-      _cleanbaseExactFail(row(knsa), steady, g) === true);
+      _cleanbaseExactFail(far, steady, g) === true);
     check('cleanbase: an up day on ordinary volume is not a thrust (MUFG/SMFG)',
-      _cleanbaseExactFail(row(knsa), lightThrust, g) === true);
+      _cleanbaseExactFail(far, lightThrust, g) === true);
     check('cleanbase: another strong up day in the pullback is not a pause',
-      _cleanbaseExactFail(row(knsa), noPause, g) === true);
+      _cleanbaseExactFail(far, noPause, g) === true);
     check('cleanbase: drifting back above the up-day close is a continuation, not a pullback',
-      _cleanbaseExactFail(row(knsa), drift, g) === true, 'got ' + JSON.stringify(_thrustPullback(drift)));
+      _cleanbaseExactFail(far, drift, g) === true, 'got ' + JSON.stringify(_thrustPullback(drift)));
     check('cleanbase: a pullback with one somewhat-wide day and partial recovery still passes (MDB/GFF/PWR)',
-      _cleanbaseExactFail(row(knsa), looserPause, g) === false, 'got ' + JSON.stringify(_thrustPullback(looserPause)));
+      _cleanbaseExactFail(far, looserPause, g) === false, 'got ' + JSON.stringify(_thrustPullback(looserPause)));
     check('cleanbase: a pullback day heavier than the thrust is selling, not a pause',
-      _cleanbaseExactFail(row(knsa), heavyPb, g) === true);
+      _cleanbaseExactFail(far, heavyPb, g) === true);
+    check('cleanbase: a pullback busier than usual on average is not a pause',
+      _cleanbaseExactFail(far, busyPb, g) === true, 'got ' + JSON.stringify(_thrustPullback(busyPb)));
     check('cleanbase: a wide candle in the pullback is not quiet',
-      _cleanbaseExactFail(row(knsa), widePb, g) === true);
+      _cleanbaseExactFail(far, widePb, g) === true, 'got ' + JSON.stringify(_thrustPullback(widePb)));
     check('cleanbase: an up day on the very last session has no pullback yet',
-      _cleanbaseExactFail(row(knsa), lastDay, g) === true);
+      _cleanbaseExactFail(far, lastDay, g) === true);
     check('cleanbase: the newest pullback being the deepest of the last three is not a contraction',
       _cleanbaseExactFail(row([5, 6, 9]), quiet, g) === true);
     check('cleanbase: too deep a current pullback is rejected',
@@ -265,9 +275,27 @@
     const brk = quiet.map((b, i, a) => i >= a.length - 15 && i < a.length - 10 ? { ...b, h: 179.6 * 1.05 } : b);
     check('cleanbase: a new high >2% above the base in the last 15 sessions is a breakout, not a base',
       _cleanbaseExactFail(row(knsa), brk, g) === true, 'got ' + JSON.stringify(_weakPullback(brk)));
-    const scored = t => calcScore({ rs: 90, eps: 20, vcp: row(knsa).vcp, pullback: { spanRatio: 0.3 }, thrust: t }, 'cleanbase');
+    // The other pattern (2026-09-27): 31 of the user's 33 logged missed entries
+    // had no thrust day — the day before entry was quiet, sideways and within
+    // ~4% of the pivot. Measured against the rejected TX (net -1.25 ADR),
+    // KNSA (-0.91), ROST (+1.83), MUFG (a 3.2-ADR day), IESC/NESR (-5%/-4.5%).
+    const sideways = withTail([[0.002, 0.004, 800], [-0.002, 0.004, 700], [0.002, 0.004, 900], [-0.002, 0.004, 700], [0.002, 0.004, 800]]);
+    const spike = withTail([[0.002, 0.004, 800], [-0.002, 0.004, 700], [-0.025, 0.004, 900], [0.03, 0.004, 700], [0.002, 0.004, 800]]);
+    const qp = _quietPause(sideways);
+    check('_quietPause: measures the last sessions in ADRs', qp && qp.moveMax < 0.5 && Math.abs(qp.net) < 0.5, 'got ' + JSON.stringify(qp));
+    check('cleanbase: quiet sideways candles near the pivot pass without a thrust (TWLO/UFCS/BOKF)',
+      _cleanbaseExactFail(row(knsa), sideways, g) === false, 'got ' + JSON.stringify(_quietPause(sideways)));
+    check('cleanbase: the same quiet candles more than 4% under the pivot are not ready yet (IESC/NESR)',
+      _cleanbaseExactFail(row(knsa, -5), sideways, g) === true);
+    check('cleanbase: a steady decline is not quiet sideways (TX/KNSA)',
+      _cleanbaseExactFail(row(knsa), steady, g) === true, 'got ' + JSON.stringify(_quietPause(steady)));
+    check('cleanbase: drifting up is not quiet sideways (ROST)',
+      _cleanbaseExactFail(row(knsa), rise, g) === true, 'got ' + JSON.stringify(_quietPause(rise)));
+    check('cleanbase: a big candle in the last three sessions is not quiet (MUFG)',
+      _cleanbaseExactFail(row(knsa), spike, g) === true, 'got ' + JSON.stringify(_quietPause(spike)));
+    const scored = t => calcScore({ rs: 90, eps: 20, vcp: row(knsa).vcp, pullback: { spanRatio: 0.3 }, pause: t }, 'cleanbase');
     check('cleanbase: quieter pullbacks rank above noisier ones',
-      scored({ pbVolAvg: 0.5, pbRangeMax: 0.5 }) > scored({ pbVolAvg: 0.95, pbRangeMax: 0.95 }));
+      scored({ volAvg: 0.5, rangeMax: 0.5 }) > scored({ volAvg: 0.95, rangeMax: 0.95 }));
   }
 
   // ── cleanbase draws its candidates from every other screener, each judged
