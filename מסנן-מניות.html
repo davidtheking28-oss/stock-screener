@@ -2194,7 +2194,12 @@ function _cleanbaseExactFail(r, bars, opts={}){
   // Live, that alone let in 47 names, 32 of them passing only the broad annual
   // momentum screen (KO, MRK, JNJ...). A quiet base has no thrust to vouch for
   // it, so it must also pass a base/trend screener (user's call, 2026-09-27).
-  const quietOK = q && r.via?.some(s=>CLEANBASE_STRICT.includes(s))
+  // A thrust day itself proves real participation; a quiet base has no such
+  // proof, so a thinly-traded name can look "quiet" purely from a lack of
+  // buyers. Measured live 2026-09-27: PLPC's $vol20 ($28.5M) sits clear below
+  // every good quiet name (GSAT $47.6M, PK $51.5M, PEB $41.9M), while NTAP
+  // ($484.9M, kept) and the rest sit far above — real gap, quiet-only.
+  const quietOK = q && r.via?.some(s=>CLEANBASE_STRICT.includes(s)) && (r.dollarVol??0) >= 35e6
     && v.distToPivot >= -4 && q.moveMax <= 1 && q.net >= -0.5 && q.net <= 1.3;
   r.pause = thrustOK ? {kind:'thrust', volAvg:t.pbVolAvg, rangeMax:t.pbRangeMax}
           : quietOK ? {kind:'quiet', volAvg:q.volAvg, rangeMax:q.rangeMax} : null;

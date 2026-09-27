@@ -259,7 +259,7 @@
     const wp = _weakPullback(quiet);
     check('_weakPullback: a tight last 10 sessions reads as a small spanRatio', wp && wp.spanRatio < 0.5, 'got ' + JSON.stringify(wp));
 
-    const row = (depths, dist = -3, via = ['vcp']) => ({ via, vcp: { contractions: depths.length, depths, lastDepth: depths[depths.length - 1], distToPivot: dist } });
+    const row = (depths, dist = -3, via = ['vcp'], dollarVol = 100e6) => ({ via, dollarVol, vcp: { contractions: depths.length, depths, lastDepth: depths[depths.length - 1], distToPivot: dist } });
     const knsa = [11.05, 5.23, 13.9, 4.82, 5.63, 4.81, 5.21, 8.52, 6.64]; // real depths, old noisy legs
     const g = { minC: 3, maxDepth: 12, maxBelow: 10 };
     // The thrust pattern is judged 6% under the pivot, outside the quiet
@@ -317,6 +317,10 @@
       _cleanbaseExactFail(row(knsa), sideways, g) === false, 'got ' + JSON.stringify(_quietPause(sideways)));
     check('cleanbase: quiet candles via the momentum/fundamental screens alone are not enough (KO/MRK/JNJ)',
       _cleanbaseExactFail(row(knsa, -3, ['finviz', 'growth']), sideways, g) === true);
+    check('cleanbase: quiet candles on a thinly-traded name are not proof of real participation (PLPC)',
+      _cleanbaseExactFail(row(knsa, -3, ['vcp'], 28.5e6), sideways, g) === true);
+    check('cleanbase: the same quiet candles pass once volume clears the floor (NTAP)',
+      _cleanbaseExactFail(row(knsa, -3, ['vcp'], 484.9e6), sideways, g) === false);
     check('cleanbase: a thrust still counts via the momentum screen alone (PWR/MDB/RGLD)',
       _cleanbaseExactFail(row(knsa, -6, ['finviz']), quiet, g) === false);
     check('cleanbase: the same quiet candles more than 4% under the pivot are not ready yet (IESC/NESR)',
