@@ -3198,6 +3198,21 @@ async function scan(force=false){
       applyFilters(universe, rsMap, {skipFund:true, forceTickers:watchlist}).forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
       _wlDataGen++;
       saveUniverseCache();
+      // The coarse pass above never fetches real OHLC, so ttUniverse rows have
+      // no .vcp yet — cleanbase's own gate (weakDownCandles, the tightening
+      // sequence) needs it. The watchlist is small, so re-running the same
+      // exact-validation pass used for the main scan against just these rows
+      // is cheap. Runs in the background: the watchlist paints immediately
+      // with everything visible, then _wlCleanbaseVisible hides the ones that
+      // fail once this resolves (per the user's explicit choice — hide, not
+      // just badge — 2026-09-27).
+      if(activeScreener==='cleanbase'){
+        validateExact(Object.values(ttUniverse), 'cleanbase', null, myAbort.signal).then(()=>{
+          if(myToken!==_scanToken) return;
+          _wlDataGen++;
+          if(mode==='watch') applyView();
+        }).catch(()=>{});
+      }
     }
     if(!wasResultsVisible) $('filterPanel')?.classList.remove('open');
     $('resultsPanel').style.display='block'; _syncWlTopbarBtn();
@@ -3694,9 +3709,19 @@ function _restoreSortForMode(){
 // tab the header counted the screener output above the watchlist, and CSV
 // exported the screener list; with a search active every one of them ignored
 // the filter.
+// Only meaningful on the מעקב tab while "בסיס נקי" is the active screener —
+// every other screener leaves the watchlist showing every starred ticker,
+// same as before (that IS the point of a watchlist). _exactFail is set by
+// validateExact, which scan() now also runs against the watchlist's own rows
+// when cleanbase is active (see scan()'s ttUniverse block) — a row with no
+// _exactFail yet (validation still in flight, or never run because the
+// active screener isn't cleanbase) is left visible rather than hidden.
+function _wlCleanbaseVisible(r){
+  return !(activeScreener==='cleanbase' && r._exactFail===true);
+}
 function visibleRows(){
   const base = mode==='watch'
-    ? sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean))
+    ? sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean).filter(_wlCleanbaseVisible))
     : results;
   if(!searchQuery) return base;
   return base.filter(r=>(r.ticker||'').includes(searchQuery)||(r.name||'').toUpperCase().includes(searchQuery));
@@ -4185,12 +4210,20 @@ function renderWatchlist(){
   }
   // Sorted, so clicking a column header actually reorders the watchlist — it
   // used to render in the Set's insertion order while the header arrow flipped.
-  const wlRows=sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean));
-  if(!wlRows.length){
+  const rawRows=[...watchlist].map(t=>ttUniverse[t]).filter(Boolean);
+  if(!rawRows.length){
     // Since the decouple a failing name is KEPT (tagged ttPass:false), so this
     // branch can only mean "no data for any of them" — not "they all failed".
     // The old text sent the user to the technical filters, which cannot help.
     $('tableView').innerHTML=emptyHtml('אין נתונים למניות שברשימת המעקב','סרוק את השוק כדי למשוך נתונים עדכניים','<button class="btn-scan" style="margin-top:14px" onclick="scan()">סרוק את השוק</button>');
+    return;
+  }
+  const wlRows=sortRows(rawRows.filter(_wlCleanbaseVisible));
+  if(!wlRows.length){
+    // Distinct from the branch above: there IS OHLC data for these tickers,
+    // none of them just currently pass cleanbase's own gate (weak down-candles
+    // + a fully tightening base) — an honest "not today", not a data problem.
+    $('tableView').innerHTML=emptyHtml('אף מניה במעקב לא בבסיס נקי כרגע','נסה שוב אחרי שהמניות יתקדמו, או עבור למסנן אחר לראות את כל המעקב');
     return;
   }
   renderTable(wlRows);
@@ -4214,7 +4247,14 @@ function renderWatchlistGallery(){
     _ohlcDisposeAll(); $('galleryView').innerHTML=emptyHtml('נתונים טרם נטענו','סרוק את השוק כדי לראות נתוני מעקב','<button class="btn-scan" style="margin-top:14px" onclick="scan()">סרוק את השוק</button>'); _galleryKey='';
     return;
   }
-  const wlRows=sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean));
+  const rawRows=[...watchlist].map(t=>ttUniverse[t]).filter(Boolean);
+  const wlRows=sortRows(rawRows.filter(_wlCleanbaseVisible));
+  if(rawRows.length && !wlRows.length){
+    // Same distinction as renderWatchlist: real data exists, none of it
+    // currently passes cleanbase's own gate.
+    _ohlcDisposeAll(); $('galleryView').innerHTML=emptyHtml('אף מניה במעקב לא בבסיס נקי כרגע','נסה שוב אחרי שהמניות יתקדמו, או עבור למסנן אחר לראות את כל המעקב'); _galleryKey='';
+    return;
+  }
   renderGallery(wlRows);
 }
 

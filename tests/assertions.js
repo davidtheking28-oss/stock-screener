@@ -273,6 +273,23 @@
     setScreener('sepa', true);
   }
 
+  // ── _wlCleanbaseVisible: the watchlist hides non-passing rows, but ONLY
+  // while cleanbase is the active screener, and ONLY once a row has actually
+  // been judged (unvalidated rows stay visible rather than flashing empty
+  // while the background OHLC fetch is still in flight) ──
+  {
+    const passed = { ticker: 'AAA' }; // no _exactFail at all — not yet validated
+    const failed = { ticker: 'BBB', _exactFail: true };
+    const explicitPass = { ticker: 'CCC', _exactFail: false };
+    setScreener('cleanbase', true);
+    check('cleanbase active: an unvalidated row stays visible', _wlCleanbaseVisible(passed) === true);
+    check('cleanbase active: a row that failed validation is hidden', _wlCleanbaseVisible(failed) === false);
+    check('cleanbase active: a row that explicitly passed stays visible', _wlCleanbaseVisible(explicitPass) === true);
+    setScreener('vcp', true);
+    check('vcp active: a "failed" row is still shown — the hide rule is cleanbase-only', _wlCleanbaseVisible(failed) === true);
+    setScreener('sepa', true);
+  }
+
   // ── _rsLine ──
   {
     const bar = (t, c) => ({ t, o: c, h: c, l: c, c, v: 1000 });
