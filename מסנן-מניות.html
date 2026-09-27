@@ -1904,9 +1904,9 @@ function _ma200Rising(bars){
 // `lookback` bars, cuts the base at each swing high, and measures the drawdown
 // that follows it. Returns null when there isn't enough history to judge.
 // {contractions, lastDepth, tighteningOK, volDryUp, pivot, distToPivot, depths}
-function _vcp(bars, lookback=90){
+function _vcp(bars, lookback=90, now=Date.now()){
   if(!bars || bars.length<60) return null;
-  const w=bars.slice(-lookback), n=w.length, k=3;
+  const w=_completedBars(bars, now).slice(-lookback), n=w.length, k=3;
   // Swing highs as fractals — a bar whose high tops the k bars on either side.
   // A running-high scan would miss the pattern entirely: in a real VCP the
   // rallies tighten *under* the prior high rather than exceeding it, so only
@@ -1920,7 +1920,10 @@ function _vcp(bars, lookback=90){
       if(w[i].h>w[highs[highs.length-1]].h) highs[highs.length-1]=i;
     } else highs.push(i);
   }
-  const last=w[n-1].c;
+  // The live price, not the last completed close — distToPivot is "where is
+  // it trading right now", which during the session is real information, not
+  // an artifact of a half-finished candle the way volume/range legs are above.
+  const last=bars[bars.length-1].c;
   if(!highs.length) return {contractions:0, lastDepth:null, tighteningOK:false,
                             volDryUp:null, pivot:null, distToPivot:null};
   // Depth of each pullback: swing high → lowest low before the next swing high.
@@ -1968,9 +1971,9 @@ function _rsLine(bars, benchBars, lookback=60){
   if(!(max>0)) return null;
   return {atHigh: cur>=max*0.999, pctFromHigh:(cur/max-1)*100};
 }
-function _powerPlayOK(bars, runPct, minConsolBars=10){
+function _powerPlayOK(bars, runPct, minConsolBars=10, now=Date.now()){
   if(!bars || bars.length<45) return null;
-  const w=bars.slice(-55), need=1+runPct/100;
+  const w=_completedBars(bars, now).slice(-55), need=1+runPct/100;
   let best=null;   // strongest ≤40-bar (≈8wk) 100%+ run culminating at bar j
   for(let j=0;j<w.length;j++){
     let minL=Infinity; for(let i=Math.max(0,j-40);i<j;i++){ if(w[i].l<minL) minL=w[i].l; }
@@ -2024,10 +2027,14 @@ function _barsSane(bars){
   }
   return true;
 }
-function _qullaExactOK(bars, adrMin, emaDistMax, weekMax, move3Min, move6Min){
+function _qullaExactOK(bars, adrMin, emaDistMax, weekMax, move3Min, move6Min, now=Date.now()){
   if(!bars || bars.length<25) return null;
   const n=bars.length, c=bars.map(b=>b.c);
-  let adr=0; for(let i=n-20;i<n;i++){ if(!bars[i].l) return null; adr+=(bars[i].h/bars[i].l-1)*100; }
+  // ADR is a range measure, and a half-finished today candle understates its
+  // own range — the close/EMA/week checks below stay on the raw series since
+  // "where is it trading right now" is real information, not that artifact.
+  const db=_completedBars(bars, now);
+  let adr=0; for(let i=db.length-20;i<db.length;i++){ if(!db[i].l) return null; adr+=(db[i].h/db[i].l-1)*100; }
   adr/=20;
   if(adr<adrMin) return false;
   const ema=p=>{ const k=2/(p+1); let e=c[0]; for(let i=1;i<n;i++) e=c[i]*k+e*(1-k); return e; };

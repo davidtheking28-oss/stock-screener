@@ -53,6 +53,20 @@
     _powerPlayOK(mkVol(good, 1000, 5000, 35), 100) === false);
   check('_powerPlayOK: consolidation volume genuinely lighter than the run → still true',
     _powerPlayOK(mkVol(good, 1000, 300, 35), 100) === true);
+  // Same fix as the VCP dry-up check above: a today bar still mid-session
+  // carries a volume spike that would flip the consolidation-volume check, but
+  // only once the session actually closes.
+  {
+    const utcPP = s => Date.parse(s + 'Z');
+    const ppBase = mkVol(good, 1000, 300, 35);
+    const ppLastClose = ppBase[ppBase.length - 1].c;
+    const ppSpike = { t: Math.floor(utcPP('2026-09-22T13:30:00') / 1000), o: ppLastClose, h: ppLastClose * 1.01, l: ppLastClose * 0.99, c: ppLastClose, v: 100000 };
+    const ppWithToday = ppBase.concat([ppSpike]);
+    check('_powerPlayOK: a partial today volume spike during market hours does not spoil the consolidation',
+      _powerPlayOK(ppWithToday, 100, 10, utcPP('2026-09-22T15:00:00')) === true);
+    check('_powerPlayOK: after the close, the same spike counts and breaks the pause',
+      _powerPlayOK(ppWithToday, 100, 10, utcPP('2026-09-22T21:00:00')) === false);
+  }
   {
     setScreener('power', true);
     check('Power Play default consolidation is 2 weeks', num('consolWeeks') === 2, 'got ' + num('consolWeeks'));
@@ -185,6 +199,22 @@
     const straight = _vcp(mkv(leg(100, 180, 80)));
     check('_vcp: uninterrupted advance → no real contractions',
       straight && straight.contractions === 0, 'got ' + JSON.stringify(straight));
+
+    // A mid-session spike in volume on today's still-open bar must not read as
+    // the dry-up breaking — the coarse checks already fixed this for cleanbase
+    // via _completedBars, but the VCP screener's own dry-up gate reads _vcp
+    // directly and never got the same fix.
+    const utcVcp = s => Date.parse(s + 'Z');
+    const vcpBars = mkv(vcpCloses, vcpVols);
+    const lastVcpClose = vcpBars[vcpBars.length - 1].c;
+    const vcpSpike = { t: Math.floor(utcVcp('2026-09-22T13:30:00') / 1000), o: lastVcpClose, h: lastVcpClose * 1.02, l: lastVcpClose * 0.98, c: lastVcpClose, v: 50000 };
+    const vcpWithToday = vcpBars.concat([vcpSpike]);
+    check('_vcp: a partial today volume spike during market hours is ignored by the dry-up check',
+      _vcp(vcpWithToday, 90, utcVcp('2026-09-22T15:00:00'))?.volDryUp === true,
+      'got ' + JSON.stringify(_vcp(vcpWithToday, 90, utcVcp('2026-09-22T15:00:00'))));
+    check('_vcp: after the close, the same spike counts and breaks the dry-up',
+      _vcp(vcpWithToday, 90, utcVcp('2026-09-22T21:00:00'))?.volDryUp === false,
+      'got ' + JSON.stringify(_vcp(vcpWithToday, 90, utcVcp('2026-09-22T21:00:00'))));
   }
 
   // ── cleanbase: a contracting base, then a strong up day on high volume
@@ -864,6 +894,19 @@
       'was passing identically to a name above its ema before the directional fix');
     check('qulla: a name trading above its ema still passes the surf gate',
       _qullaExactOK(flatThenClose(2), 0, 3, 100, 0, 0) === true);
+
+    // ADR is a range measure, so a today bar still mid-session (near-zero
+    // range so far) drags the 20-day average down — the coarse pass already
+    // guards against this via TradingView's own lag, but the exact ADR gate
+    // read the raw bars directly and had no such guard.
+    const utcQ = s => Date.parse(s + 'Z');
+    const qFlatBars = Array.from({ length: 29 }, (_, i) => ({ t: i * 86400, o: 100, h: 105, l: 95, c: 100, v: 1000 }));
+    const qSpike = { t: Math.floor(utcQ('2026-09-22T13:30:00') / 1000), o: 100, h: 100.001, l: 99.999, c: 100, v: 1000 };
+    const qWithToday = qFlatBars.concat([qSpike]);
+    check('qulla: a near-zero-range today bar during market hours does not drag the ADR gate down',
+      _qullaExactOK(qWithToday, 10.05, 100, 100, 0, 0, utcQ('2026-09-22T15:00:00')) === true);
+    check('qulla: after the close, the same near-zero range counts and fails the ADR gate',
+      _qullaExactOK(qWithToday, 10.05, 100, 100, 0, 0, utcQ('2026-09-22T21:00:00')) === false);
 
     // The coarse ADR slack. TradingView's column runs as low as 0.751x the
     // true 20-bar ADR, so a 0.9 gate rejects names that do qualify.
