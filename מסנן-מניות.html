@@ -2184,7 +2184,11 @@ function _cleanbaseExactFail(r, bars, opts={}){
   // fall (net <=-0.9), ROST rises (+1.8), MUFG has a 3.2-ADR day, IESC/NESR sit
   // 4.5-5% under the pivot while the missed ones were within 4%.
   const q=_quietPause(done);
-  const quietOK = q && v.distToPivot >= -4 && q.moveMax <= 1 && q.net >= -0.5 && q.net <= 1.3;
+  // Live, that alone let in 47 names, 32 of them passing only the broad annual
+  // momentum screen (KO, MRK, JNJ...). A quiet base has no thrust to vouch for
+  // it, so it must also pass a base/trend screener (user's call, 2026-09-27).
+  const quietOK = q && r.via?.some(s=>CLEANBASE_STRICT.includes(s))
+    && v.distToPivot >= -4 && q.moveMax <= 1 && q.net >= -0.5 && q.net <= 1.3;
   r.pause = thrustOK ? {kind:'thrust', volAvg:t.pbVolAvg, rangeMax:t.pbRangeMax}
           : quietOK ? {kind:'quiet', volAvg:q.volAvg, rangeMax:q.rangeMax} : null;
   return !r.pause;
@@ -2194,6 +2198,7 @@ function _cleanbaseExactFail(r, bars, opts={}){
 // with which ones. Each validateExact reads its options synchronously before
 // its first await, so _asScreener only has to be set around the call itself.
 const CLEANBASE_SOURCES=['sepa','power','vcp','qulla','finviz','growth'];
+const CLEANBASE_STRICT=['sepa','power','vcp','qulla'];
 const CLEANBASE_VIA={sepa:'SEPA',power:'Power',vcp:'VCP',qulla:'Qulla',finviz:'מומנטום',growth:'פונדמנטלי'};
 async function _cleanbaseUniverse(universe, rsMap, signal){
   // cleanbase's own panel still narrows the pool (e.g. no entry right before a
