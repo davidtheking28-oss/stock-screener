@@ -1,7 +1,7 @@
 /* Regression assertions for the screener's pure logic.
    Runs inside the loaded app page (via tests/run-tests.py) against the REAL
    in-page functions — no copies. Returns [{name, pass, detail}]. */
-(() => {
+(async () => {
   const R = [];
   const check = (name, cond, detail) => R.push({ name, pass: !!cond, detail: cond ? '' : (detail || '') });
 
@@ -254,6 +254,38 @@
     const scored = pb => calcScore({ rs: 90, eps: 20, vcp: row(knsa).vcp, pullback: pb }, 'cleanbase');
     check('cleanbase: tighter, quieter setups rank above looser ones',
       scored({ spanRatio: 0.2, volSlope: -0.25, candleSize: 0.5 }) > scored({ spanRatio: 0.45, volSlope: -0.1, candleSize: 0.85 }));
+  }
+
+  // ── cleanbase draws its candidates from every other screener, each judged
+  // on its OWN default criteria (user, 2026-09-27: "they must meet their own
+  // screener's criteria, not just weak falling candles").
+  {
+    setScreener('cleanbase', true);
+    const panelRs = num('rsMin');
+    _asScreener = 'power';
+    const powerRs = num('rsMin'), fundDefault = chk('useFund');
+    _asScreener = null;
+    check('_asScreener: num() reads the named screener defaults, not the live panel',
+      powerRs === SCREENER_DEFAULTS.power.rsMin && num('rsMin') === panelRs, 'got ' + powerRs + ' / ' + num('rsMin'));
+    check('_asScreener: chk() reads a checkbox default, not its live state',
+      fundDefault === $('useFund').defaultChecked);
+
+    const base = { close: 50, SMA50: 40, SMA150: 40, SMA200: 40, price_52_week_high: 60, price_52_week_low: 30,
+      market_cap_basic: 5e9, average_volume_10d_calc: 1e6, volume: 1e6, description: 'x', exchange: 'NASDAQ',
+      earnings_per_share_diluted_qoq_growth_fq: 20, total_revenue_qoq_growth_fq: 30 };
+    const uni = [
+      mkStock('U:GROWA', { ...base, name: 'GROWA', sector: 'Technology Services' }),
+      mkStock('U:NOPE', { ...base, name: 'NOPE', sector: 'Utilities' }),
+    ];
+    const pool = await _cleanbaseUniverse(uni, {});
+    const growa = pool.find(r => r.ticker === 'GROWA');
+    check('cleanbase pool: a stock passing another screener on its own criteria is a candidate, tagged with it',
+      growa && growa.via.includes('growth'), 'got ' + JSON.stringify(pool.map(r => [r.ticker, r.via])));
+    check('cleanbase pool: a stock passing no screener is not a candidate',
+      !pool.some(r => r.ticker === 'NOPE'));
+    check('cleanbase pool: running every screener leaves the live panel untouched',
+      activeScreener === 'cleanbase' && num('rsMin') === panelRs && _asScreener === null);
+    setScreener('sepa', true);
   }
 
   // ── cleanbase is registered like every other screener ──

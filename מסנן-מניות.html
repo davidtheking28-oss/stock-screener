@@ -2102,14 +2102,34 @@ function _cleanbaseExactFail(r, bars, opts={}){
   if(!p || p.adr < 0.5 || p.newHigh > 2 || p.spanRatio >= 0.5) return true;
   return !(p.candleSize < 0.9 && p.volSlope <= -0.1 && p.lastMove <= 1 && p.recentVol < 1);
 }
+// cleanbase's candidates: every stock that fully passes at least one other
+// screener on that screener's own default criteria (coarse + exact), tagged
+// with which ones. Each validateExact reads its options synchronously before
+// its first await, so _asScreener only has to be set around the call itself.
+const CLEANBASE_SOURCES=['sepa','power','vcp','qulla','finviz','growth'];
+const CLEANBASE_VIA={sepa:'SEPA',power:'Power',vcp:'VCP',qulla:'Qulla',finviz:'מומנטום',growth:'פונדמנטלי'};
+async function _cleanbaseUniverse(universe, rsMap, signal){
+  const byT=new Map();
+  for(const s of CLEANBASE_SOURCES){
+    let pending;
+    _asScreener=s;
+    try{ pending=validateExact(applyFilters(universe, rsMap), s, null, signal); }
+    finally{ _asScreener=null; }
+    for(const r of await pending){
+      const seen=byT.get(r.ticker);
+      if(seen) seen.via.push(s); else { r.via=[s]; byT.set(r.ticker, r); }
+    }
+  }
+  return [...byT.values()];
+}
 async function validateExact(list, scr, onProgress, signal){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp'&&scr!=='cleanbase')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   const adrMin=num('adrMin')||4, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
   const move3Min=num('move3Min')||0, move6Min=num('move6Min')||0;
-  const reqVcp=!!$('requireVCP')?.checked, reqRsLine=!!$('requireRSLine')?.checked;
+  const reqVcp=chk('requireVCP'), reqRsLine=chk('requireRSLine');
   const vcpOpts={minC:num('vcpContractions')||3, maxDepth:num('vcpDepthMax')||12,
-                 maxBelow:num('pivotBelow')||10, reqDryUp:!!$('vcpDryUp')?.checked};
+                 maxBelow:num('pivotBelow')||10, reqDryUp:chk('vcpDryUp')};
   const consolBars=(num('consolWeeks')||2)*5;
   // One benchmark fetch for the whole pass — the RS line is price/SPY.
   const spy=await _fetchBars1y('SPY', signal).catch(()=>null);
@@ -2203,7 +2223,15 @@ const $   = id => document.getElementById(id);
 // validateInputs (which only tests < and >) reported everything fine.
 // field-combo boxes show a formatted label ("+$300M"), not the raw threshold —
 // the real number lives in data-raw and is what every filter comparison reads.
-const num = id => { const el=$(id); const raw = el?.dataset.raw ?? el?.value; const v = parseFloat(raw); return Number.isFinite(v) ? v : 0; };
+// Set while cleanbase runs another screener's own criteria: fields read that
+// screener's defaults (or the input's HTML default) instead of the live panel.
+let _asScreener = null;
+const num = id => {
+  const el=$(id), d=_asScreener && SCREENER_DEFAULTS[_asScreener];
+  const raw = d ? (id in d ? d[id] : el?.defaultValue) : (el?.dataset.raw ?? el?.value);
+  const v = parseFloat(raw); return Number.isFinite(v) ? v : 0;
+};
+const chk = id => { const el=$(id); return !!(_asScreener ? el?.defaultChecked : el?.checked); };
 const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
 const pct = v => v==null ? '—' : v.toFixed(1)+'%';
 const fmtB = v => {
@@ -3184,7 +3212,10 @@ async function scan(force=false){
       $('breadthChip').classList.add('show');
     }
 
-    allResults = applyFilters(universe, rsMap); _dataGen++;
+    if(activeScreener==='cleanbase') $('statBar').innerHTML='<span class="spinner"></span> מריץ את כל המסננים…';
+    allResults = activeScreener==='cleanbase' ? await _cleanbaseUniverse(universe, rsMap, myAbort.signal) : applyFilters(universe, rsMap);
+    _dataGen++;
+    if(myToken!==_scanToken) return;
     allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
     const needsExact = activeScreener==='sepa' || activeScreener==='power' || activeScreener==='qulla' || activeScreener==='vcp' || activeScreener==='cleanbase';
     if(myToken!==_scanToken) return;
@@ -3196,24 +3227,6 @@ async function scan(force=false){
       applyFilters(universe, rsMap, {skipFund:true, forceTickers:watchlist}).forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
       _wlDataGen++;
       saveUniverseCache();
-      // The coarse pass above never fetches real OHLC, so ttUniverse rows have
-      // no .vcp yet — cleanbase's own gate needs real bars. ttUniverse is NOT watchlist-only — forceTickers
-      // only means "keep these even if they'd otherwise be dropped", so it
-      // still holds every OTHER row that passes the coarse gate too (measured
-      // live: 463 rows for 10 starred tickers). Validating only the actual
-      // starred subset keeps this to the handful of real OHLC fetches the
-      // watchlist tab actually needs, not hundreds. Runs in the background:
-      // the watchlist paints immediately with everything visible, then
-      // _wlCleanbaseVisible hides the ones that fail once this resolves (per
-      // the user's explicit choice — hide, not just badge — 2026-09-27).
-      if(activeScreener==='cleanbase'){
-        const wlOnly=[...watchlist].map(t=>ttUniverse[t]).filter(Boolean);
-        validateExact(wlOnly, 'cleanbase', null, myAbort.signal).then(()=>{
-          if(myToken!==_scanToken) return;
-          _wlDataGen++;
-          if(mode==='watch') applyView();
-        }).catch(()=>{});
-      }
     }
     if(!wasResultsVisible) $('filterPanel')?.classList.remove('open');
     $('resultsPanel').style.display='block'; _syncWlTopbarBtn();
@@ -3272,6 +3285,13 @@ async function scan(force=false){
         // pass above annotated the row — scoring before it leaves the whole
         // screener ranked on RS and EPS alone.
         if(activeScreener==='vcp'||activeScreener==='cleanbase') allResults.forEach(x=>{ x.score=calcScore(x,activeScreener); });
+        // The watchlist under cleanbase shows exactly what the scan found —
+        // hide, not badge, per the user (2026-09-27).
+        if(activeScreener==='cleanbase'){
+          const ok=new Set(v.map(x=>x.ticker));
+          for(const t of watchlist){ const w=ttUniverse[t]; if(w) w._exactFail=!ok.has(t); }
+          _wlDataGen++;
+        }
         saveResultsCache(); finalize(false);
         checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken){ saveResultsCache(); render(); } });
         toast('נמצאו '+results.length+' מניות');
@@ -3405,7 +3425,7 @@ function computeRS(universe){
    FILTER
 ════════════════════════════════════ */
 function applyFilters(universe, rsMap, opts={}){
-  const scr = opts.skipFund ? 'sepa' : activeScreener;
+  const scr = opts.skipFund ? 'sepa' : (_asScreener ?? activeScreener);
   // skipFund builds the Trend Template reference set for the מעקב tab. It zeroed
   // the fundamentals but left rsMin/fromHigh/fromLow reading whatever the current
   // screener had in the inputs (Power leaves rsMin at 90), so watchlist names that
@@ -3423,10 +3443,10 @@ function applyFilters(universe, rsMap, opts={}){
   const mcMin=opts.skipFund?0:num('mcMin')*1e9, priceMin=opts.skipFund?0:num('priceMin');
   const liqMin=opts.skipFund?0:num('liqMin')*1e6, earnGap=opts.skipFund?0:num('earnDays');
   const runMin=num('runMin');
-  const useFund=opts.skipFund?false:$('useFund').checked, reqProfit=opts.skipFund?false:$('requireProfit').checked;
-  const reqEpsAccel=opts.skipFund?false:!!$('requireEpsAccel')?.checked;
-  const reqRevAccel=opts.skipFund?false:!!$('requireRevAccel')?.checked;
-  const reqMarginTrend=opts.skipFund?false:!!$('requireMarginTrend')?.checked;
+  const useFund=opts.skipFund?false:chk('useFund'), reqProfit=opts.skipFund?false:chk('requireProfit');
+  const reqEpsAccel=opts.skipFund?false:chk('requireEpsAccel');
+  const reqRevAccel=opts.skipFund?false:chk('requireRevAccel');
+  const reqMarginTrend=opts.skipFund?false:chk('requireMarginTrend');
   const epsMin=num('epsMin'), revMin=num('revMin'), roeMin=num('roeMin');
   const nmMin=opts.skipFund?0:num('nmMin'), revQoqSepaMin=opts.skipFund?0:num('revQoqSepaMin'),
         epsQoqSepaMin=opts.skipFund?0:num('epsQoqSepaMin'), epsFwdMin=opts.skipFund?0:num('epsFwdMin');
@@ -3497,15 +3517,13 @@ function applyFilters(universe, rsMap, opts={}){
       const strong=rs>=rsMin;
       checks={run,near,up,strong};
       pass=run&&near&&up&&strong;
-    } else if(scr==='vcp'||scr==='cleanbase'){
+    } else if(scr==='vcp'){
       // A VCP only forms inside a stage-2 uptrend, so the coarse pass is the
       // Trend Template's alignment — the base itself is measured from OHLC bars
-      // in _vcpExactFail/_cleanbaseExactFail. close>s50 is deliberately NOT
-      // required: the last contraction of a real VCP routinely undercuts the
-      // 50-day for a few days right before the pivot, which is the tightest
-      // and most actionable point in the pattern. cleanbase shares this exact
-      // coarse gate — only the fine gate (validateExact) differs, requiring
-      // weak down-candles on top.
+      // in _vcpExactFail. close>s50 is deliberately NOT required: the last
+      // contraction of a real VCP routinely undercuts the 50-day for a few days
+      // right before the pivot, which is the tightest and most actionable point
+      // in the pattern.
       const trend=close>s150 && close>s200 && s150>s200 && s50>s200;
       const near=fromHighPct>=-num('fromHigh');
       const above=close>=lo*(1+flPct);
@@ -4146,6 +4164,8 @@ function renderGallery(srcRows){
     // The same badge renderTable draws. Without it a watchlist name that fails
     // the Trend Template looked identical to one that passes, as soon as you
     // switched the watchlist to גרפים.
+    const viaB = (!fromWatchlist && r.via?.length)
+      ? '<span class="earn-badge" title="עוברת את הקריטריונים של: '+r.via.map(k=>SCREENERS[k].name).join(', ')+'">'+r.via.map(k=>CLEANBASE_VIA[k]).join(' · ')+'</span>' : '';
     const ttB = (fromWatchlist && r.ttPass===false)
       ? '<span class="tt-badge" title="במעקב, אך אינה עוברת כרגע את ה-Trend Template">מחוץ למגמה</span>' : '';
     const priceStr = r.close>=100 ? Math.round(r.close).toLocaleString('en-US') : r.close.toFixed(2);
@@ -4161,7 +4181,7 @@ function renderGallery(srcRows){
     return '<div class="gcard" role="button" tabindex="0" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&event.target===this){event.preventDefault();openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')}">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
-      +((earnB||ttB)?'<div class="gcard-tags">'+earnB+ttB+'</div>':'')+'</div></div>'
+      +((earnB||ttB||viaB)?'<div class="gcard-tags">'+viaB+earnB+ttB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span>'+sectorBadgeHtml(r.sector,true)+'</div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
