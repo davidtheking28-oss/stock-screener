@@ -316,7 +316,6 @@ body {
    written the other way round — negated — so the VCP fields hide everywhere
    except their own panel without touching seven existing selectors. */
 #filterPanel:not(.panel-vcp):not(.panel-cleanbase) .f-vcp { display: none; }
-#filterPanel:not(.panel-cleanbase) .f-cleanbase { display: none; }
 #filterPanel.panel-vcp .f-sepa, #filterPanel.panel-vcp .f-power, #filterPanel.panel-vcp .f-growth, #filterPanel.panel-vcp .f-commodities, #filterPanel.panel-vcp .f-qulla, #filterPanel.panel-vcp .f-finviz, #filterPanel.panel-cleanbase .f-sepa, #filterPanel.panel-cleanbase .f-power, #filterPanel.panel-cleanbase .f-growth, #filterPanel.panel-cleanbase .f-commodities, #filterPanel.panel-cleanbase .f-qulla, #filterPanel.panel-cleanbase .f-finviz { display: none; }
 .filter-sections.single { grid-template-columns: 1fr; }
 .preset-btn {
@@ -1049,7 +1048,6 @@ tbody tr:last-child td { border-bottom: none; }
                 <label class="toggle"><input type="checkbox" id="vcpDryUp" checked> נפח מתייבש בהתכווצות האחרונה</label>
               </div>
             </div>
-            <div class="field f-cleanbase"><label for="cleanbaseMinDown">ימי ירידה חלשים (מתוך 5 האחרונים)</label><div class="field-combo"><input type="text" inputmode="none" id="cleanbaseMinDown" value="3" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="adrMin">ADR%20 מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="adrMin" value="4" min="0" step="0.5" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="move6Min">מהלך 6ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move6Min" value="30" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-qulla"><label for="move3Min">מהלך 3ח&#8217; מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="move3Min" value="30" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
@@ -1368,7 +1366,7 @@ const SCREENER_DEFAULTS = {
   sepa:     {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:2,  liqMin:20,earnDays:5},
   power:    {rsMin:90,fromHigh:25,fromLow:0, priceMin:10,mcMin:0.3,liqMin:10,earnDays:0,runMin:100,consolWeeks:2},
   vcp:      {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
-  cleanbase: {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10,cleanbaseMinDown:3},
+  cleanbase: {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:4,move6Min:30,move3Min:30,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1,finvizFromHigh:25},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
@@ -2060,29 +2058,32 @@ function _vcpExactFail(r, bars, opts={}){
   if(v.distToPivot < -(opts.maxBelow ?? 10)) return true;
   return false;
 }
-// Last `days` sessions vs. the stock's own norms: how many closed down, and
-// how heavy (vs. 50-day volume) and wide (vs. 20-day ADR) those down days were.
+// The last sessions vs. the stock's own norms. candleSize: last 3 ranges over
+// the 20 before the last 5. volSlope: per-day trend of the last 5 volumes, in
+// units of 50-day volume. lastMove: the last close-to-close move in ADRs.
 // spanRatio: last 10 sessions' high-low span over the 50 before them.
 // newHigh: % the last 15 sessions' high clears the 45 before it (a breakout).
-function _weakPullback(bars, days=5){
+function _weakPullback(bars){
   if(!bars || bars.length<60) return null;
   const n=bars.length, avg=a=>a.reduce((s,x)=>s+x,0)/a.length, rng=b=>(b.h/b.l-1)*100;
-  const adr=avg(bars.slice(-20).map(rng)), vol50=avg(bars.slice(-50).map(b=>b.v));
-  if(!(adr>0) || !(vol50>0)) return null;
-  const tail=bars.slice(-days), down=tail.filter((b,i)=>b.c<bars[n-days+i-1].c);
+  const adr=avg(bars.slice(-20).map(rng)), adrPrior=avg(bars.slice(-25,-5).map(rng));
+  const vol50=avg(bars.slice(-50).map(b=>b.v));
+  if(!(adrPrior>0) || !(vol50>0)) return null;
+  const v5=bars.slice(-5).map(b=>b.v/vol50), vm=avg(v5);
   const hi=w=>Math.max(...w.map(b=>b.h)), span=w=>hi(w)/Math.min(...w.map(b=>b.l))-1;
-  return {down:down.length,
-          downVol: down.length ? avg(down.map(b=>b.v))/vol50 : null,
-          downRange: down.length ? avg(down.map(rng))/adr : null,
-          recentVol: avg(tail.map(b=>b.v))/vol50,
+  return {adr,
+          candleSize: avg(bars.slice(-3).map(rng))/adrPrior,
+          volSlope: v5.reduce((s,y,i)=>s+(i-2)*(y-vm),0)/10,
+          recentVol: vm,
+          lastMove: (bars[n-1].c/bars[n-2].c-1)*100/adrPrior,
           spanRatio: span(bars.slice(-10))/span(bars.slice(-60,-10)),
-          adr, newHigh: (hi(bars.slice(-15))/hi(bars.slice(-60,-15))-1)*100};
+          newHigh: (hi(bars.slice(-15))/hi(bars.slice(-60,-15))-1)*100};
 }
-// "בסיס נקי": the CURRENT pullback is shallower than the recent ones, near the
-// pivot, and the last sessions are mostly down days on light volume and narrow
-// ranges. Only the newest legs are judged — the 90-day fractal scan also yields
-// old, unrelated swings, and judging the whole sequence rejected every one of
-// the user's own watchlist setups (measured live 2026-09-27).
+// "בסיס נקי", as the user defined it (2026-09-27): the CURRENT pullback is
+// shallower than the recent ones and near the pivot, the range has contracted,
+// and the last sessions are small candles on volume falling day after day
+// with no strong up day at the end. Only the newest legs are judged — the
+// 90-day fractal scan also yields old, unrelated swings.
 function _cleanbaseExactFail(r, bars, opts={}){
   if(!bars || _ma200Rising(bars)===false) return true;
   const v=r.vcp;
@@ -2092,13 +2093,14 @@ function _cleanbaseExactFail(r, bars, opts={}){
   if(last > (opts.maxDepth ?? 12)) return true;
   if(v.distToPivot==null || v.distToPivot > 2 || v.distToPivot < -(opts.maxBelow ?? 10)) return true;
   const p=r.pullback=_weakPullback(bars);
-  if(!p || p.down < (opts.minDown ?? 3)) return true;
-  // ADR 0.5: ITGR (merger-pinned) sat at 0.2, the next-quietest result at 1.1.
-  // newHigh 2: the same "more than 2% past the pivot is chasing" line above.
-  if(p.adr < 0.5 || p.newHigh > 2) return true;
-  // 0.5: measured gap on 2026-09-27's 44 results — the user's own setups sat
-  // at 0.19-0.35, the flagged FTNT/SMFG at 0.60-0.63, nothing between 0.44-0.58.
-  return !(p.downVol<1 && p.downRange<1 && p.recentVol<1 && p.spanRatio<0.5);
+  // Every cutoff sits in a measured gap between the user's labelled good
+  // setups (DIOD, SIMO, MTRN pre-breakout) and bad ones (KNSA, AMTB, NESR,
+  // MUFG, FTNT, SMFG, ITGR, RDVT): volSlope good <=-0.14 / bad >=-0.07;
+  // candleSize good <=0.82 / bad >=1.06; lastMove good <=0.27 / bad >=3.2;
+  // spanRatio good <=0.35 / bad >=0.6; ADR ITGR 0.2 / next 1.1; newHigh 2 is
+  // the same "more than 2% past the pivot is chasing" line above.
+  if(!p || p.adr < 0.5 || p.newHigh > 2 || p.spanRatio >= 0.5) return true;
+  return !(p.candleSize < 0.9 && p.volSlope <= -0.1 && p.lastMove <= 1 && p.recentVol < 1);
 }
 async function validateExact(list, scr, onProgress, signal){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp'&&scr!=='cleanbase')||!HAS_SUPABASE||!list.length) return list;
@@ -2107,8 +2109,7 @@ async function validateExact(list, scr, onProgress, signal){
   const move3Min=num('move3Min')||0, move6Min=num('move6Min')||0;
   const reqVcp=!!$('requireVCP')?.checked, reqRsLine=!!$('requireRSLine')?.checked;
   const vcpOpts={minC:num('vcpContractions')||3, maxDepth:num('vcpDepthMax')||12,
-                 maxBelow:num('pivotBelow')||10, reqDryUp:!!$('vcpDryUp')?.checked,
-                 minDown:num('cleanbaseMinDown')??3};
+                 maxBelow:num('pivotBelow')||10, reqDryUp:!!$('vcpDryUp')?.checked};
   const consolBars=(num('consolWeeks')||2)*5;
   // One benchmark fetch for the whole pass — the RS line is price/SPY.
   const spy=await _fetchBars1y('SPY', signal).catch(()=>null);
@@ -2528,8 +2529,8 @@ function _calcScoreRaw(r, scr='sepa'){
   if(scr==='cleanbase' && r.pullback){
     const p=r.pullback, v=r.vcp;
     const tightS = clamp(1-p.spanRatio/0.5,0,1)*25;
-    const dryS   = clamp((1-p.downVol)/0.5,0,1)*20;
-    const quietS = clamp((1-p.downRange)/0.5,0,1)*10;
+    const dryS   = clamp(-p.volSlope/0.3,0,1)*20;
+    const quietS = clamp((1-p.candleSize)/0.5,0,1)*10;
     const pivotS = v?.distToPivot==null?0:clamp(1-Math.abs(v.distToPivot)/10,0,1)*20;
     const rsS    = clamp(r.rs,0,99)/99*15;
     return Math.round(clamp(tightS+dryS+quietS+pivotS+rsS+epsScore(r.eps,10),0,100));
@@ -2758,7 +2759,6 @@ const FIELD_PRESETS = {
   epsFwdMin: [[0,'כבוי'],[10,'10%'],[15,'15%'],[25,'25% — מינרוויני'],[40,'40%'],[60,'60%']],
   consolWeeks:  [[0,'כבוי — כל ריצה'],[1,'שבוע'],[2,'2 שבועות — ברירת מחדל'],[3,'3 שבועות — מינרוויני'],[4,'4 שבועות'],[6,'6 שבועות']],
   vcpContractions: [[2,'2 — רופף, הרבה רעש'],[3,'3 — ברירת מחדל'],[4,'4 — מינרוויני קלאסי'],[5,'5']],
-  cleanbaseMinDown: [[2,'2 — יותר תוצאות'],[3,'3 — ברירת מחדל'],[4,'4 — הדוק'],[5,'5 — כל 5 הימים']],
   vcpDepthMax:  [[5,'5% — הדוק מאוד'],[8,'8% — הדוק'],[10,'10%'],[12,'12% — ברירת מחדל'],[15,'15%'],[20,'20% — רופף']],
   pivotBelow:   [[3,'3% — ממש על הפריצה'],[5,'5%'],[8,'8%'],[10,'10% — ברירת מחדל'],[15,'15%'],[25,'25% — כל הבסיס']],
   adrMin:       [[2,'2%'],[3,'3% — ברירת מחדל'],[3.5,'3.5%'],[4,'4% — קולאמאגי מקורי'],[5,'5%'],[6,'6%'],[8,'8%']],
@@ -2877,7 +2877,7 @@ function applyPreset(key, btn){
    currently shows, per screener, so switching back restores the whole setup. */
 const MY_PRESETS_KEY='sepa_my_presets_v1';
 const PRESET_FIELDS=['rsMin','fromHigh','fromLow','priceMin','mcMin','liqMin','earnDays','runMin','consolWeeks',
-  'vcpContractions','vcpDepthMax','pivotBelow','cleanbaseMinDown',
+  'vcpContractions','vcpDepthMax','pivotBelow',
   'epsMin','revMin','roeMin','epsQoqMin','revQoqMin','adrMin','move6Min','move3Min',
   'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin','smaTrend50','smaTrend200',
   'nmMin','revQoqSepaMin','epsQoqSepaMin','epsFwdMin'];
@@ -4658,7 +4658,6 @@ function saveFilterPrefs(){
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
       epsQoqMin:num('epsQoqMin'),revQoqMin:num('revQoqMin'),
       vcpContractions:num('vcpContractions'),vcpDepthMax:num('vcpDepthMax'),pivotBelow:num('pivotBelow'),
-      cleanbaseMinDown:num('cleanbaseMinDown'),
       vcpDryUp:$('vcpDryUp')?.checked,
       adrMin:num('adrMin'),move6Min:num('move6Min'),move3Min:num('move3Min'),
       emaDistMax:num('emaDistMax'),weekRangeMax:num('weekRangeMax'),volSharesMin:num('volSharesMin'),
@@ -4702,7 +4701,6 @@ function loadFilterPrefs(){
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
     set('epsQoqMin',p.epsQoqMin); set('revQoqMin',p.revQoqMin);
     set('vcpContractions',p.vcpContractions); set('vcpDepthMax',p.vcpDepthMax); set('pivotBelow',p.pivotBelow);
-    set('cleanbaseMinDown',p.cleanbaseMinDown);
     set('adrMin',p.adrMin); set('move6Min',p.move6Min); set('move3Min',p.move3Min);
     set('emaDistMax',p.emaDistMax); set('weekRangeMax',p.weekRangeMax); set('volSharesMin',p.volSharesMin);
     set('perfYMin',p.perfYMin); set('finvizVolMin',p.finvizVolMin);

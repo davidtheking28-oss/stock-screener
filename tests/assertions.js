@@ -187,76 +187,73 @@
       straight && straight.contractions === 0, 'got ' + JSON.stringify(straight));
   }
 
-  // ── cleanbase: a tightening base whose LAST few sessions are weak down days
-  // on light volume. Thresholds measured live 2026-09-27 against 462 real
-  // coarse candidates plus the user's own watchlist, which they confirmed
-  // is the kind of setup this screener must find.
+  // ── cleanbase: a contracting base whose last sessions are small candles on
+  // volume falling day after day, with no strong up day at the end — the
+  // user's own definition (2026-09-27). Labels they gave: DIOD, SIMO and MTRN
+  // (the day before its breakout) are the setup; KNSA, AMTB, NESR, MUFG,
+  // FTNT, SMFG are not.
   {
     // An advance, then a base whose swings shrink under its own high.
     const base = Array.from({ length: 250 }, (_, i) => {
       const j = i - 200, c = i < 200 ? 100 + i * 0.4 : 179.6 * (1 - 0.08 * (1 - j / 50) * (1 + Math.sin(j / 2)) / 2);
       return { t: i * 86400, o: c, h: c * 1.01, l: c * 0.99, c, v: 1000 };
     });
-    const withTail = (downDays, weak) => {
+    const withTail = ({ range = 0.004, vols = [950, 800, 650, 500, 350], moves = [-0.003, -0.003, -0.003, 0.003, 0.003] } = {}) => {
       let c = base[base.length - 1].c;
-      return base.concat(Array.from({ length: 5 }, (_, i) => {
-        const dn = i < downDays; c = dn ? c * 0.997 : c * 1.003;
-        const r = weak ? 0.004 : 0.03;
-        return { t: (250 + i) * 86400, o: c, h: c * (1 + r), l: c * (1 - r), c, v: dn ? (weak ? 600 : 2500) : 800 };
+      return base.concat(moves.map((m, i) => {
+        c = c * (1 + m);
+        return { t: (250 + i) * 86400, o: c, h: c * (1 + range), l: c * (1 - range), c, v: vols[i] };
       }));
     };
-    const weak3 = withTail(3, true), strong3 = withTail(3, false), weak2 = withTail(2, true);
+    const quiet = withTail();
+    const loud = withTail({ range: 0.03, vols: [1500, 1700, 1900, 2200, 2500] });
+    const flatVol = withTail({ vols: [700, 700, 700, 700, 700] });
+    const lastUp = withTail({ moves: [-0.003, -0.003, -0.003, 0.003, 0.025] });
 
-    const wp = _weakPullback(weak3);
-    check('_weakPullback: counts the down days in the last 5 sessions', wp && wp.down === 3, 'got ' + JSON.stringify(wp));
-    check('_weakPullback: light, narrow down days read below 1x their averages',
-      wp && wp.downVol < 1 && wp.downRange < 1 && wp.recentVol < 1, 'got ' + JSON.stringify(wp));
-    const sp = _weakPullback(strong3);
-    check('_weakPullback: heavy, wide down days read above 1x their averages',
-      sp && sp.downVol > 1 && sp.downRange > 1, 'got ' + JSON.stringify(sp));
+    const wp = _weakPullback(quiet);
+    check('_weakPullback: small candles, falling volume, no big last move',
+      wp && wp.candleSize < 0.9 && wp.volSlope <= -0.1 && wp.lastMove <= 1 && wp.recentVol < 1, 'got ' + JSON.stringify(wp));
+    const lp = _weakPullback(loud);
+    check('_weakPullback: wide candles on rising volume read that way',
+      lp && lp.candleSize > 1 && lp.volSlope > 0, 'got ' + JSON.stringify(lp));
     check('_weakPullback: too little history → null', _weakPullback(base.slice(0, 30)) === null);
-
-    const row = (depths, dist = -3) => ({ vcp: { contractions: depths.length, depths, lastDepth: depths[depths.length - 1], distToPivot: dist } });
-    const knsa = [11.05, 5.23, 13.9, 4.82, 5.63, 4.81, 5.21, 8.52, 6.64]; // real, user's watchlist
-    const g = { minC: 3, maxDepth: 12, maxBelow: 10 };
-    check('cleanbase: a real watchlist base with old noisy legs still passes on its CURRENT contraction (KNSA)',
-      _cleanbaseExactFail(row(knsa), weak3, g) === false);
-    check('cleanbase: heavy, wide down days are rejected even on a clean base',
-      _cleanbaseExactFail(row(knsa), strong3, g) === true);
-    check('cleanbase: the newest pullback being the deepest of the last three is not a contraction',
-      _cleanbaseExactFail(row([5, 6, 9]), weak3, g) === true);
-    check('cleanbase: too deep a current pullback is rejected',
-      _cleanbaseExactFail(row([20, 15, 13]), weak3, g) === true);
-    check('cleanbase: already broken out past the pivot is rejected',
-      _cleanbaseExactFail(row(knsa, 3), weak3, g) === true);
-    check('cleanbase: only 2 down days fails the default of 3, passes when the field allows 2',
-      _cleanbaseExactFail(row(knsa), weak2, g) === true
-      && _cleanbaseExactFail(row(knsa), weak2, { ...g, minDown: 2 }) === false);
-    check('cleanbase: no bars drops the row', _cleanbaseExactFail(row(knsa), null, g) === true);
-    // FTNT/SMFG (user-flagged 2026-09-27): weak last days, but the last 10
-    // sessions' range was ~0.6x the prior base's — no real contraction.
-    const wide = weak3.map((b, i, a) => i >= a.length - 10 && i < a.length - 5 ? { ...b, h: b.c * 1.15, l: b.c * 0.85 } : b);
     check('_weakPullback: a tight last 10 sessions reads as a small spanRatio',
       wp && wp.spanRatio < 0.5, 'got ' + JSON.stringify(wp));
+
+    const row = (depths, dist = -3) => ({ vcp: { contractions: depths.length, depths, lastDepth: depths[depths.length - 1], distToPivot: dist } });
+    const knsa = [11.05, 5.23, 13.9, 4.82, 5.63, 4.81, 5.21, 8.52, 6.64]; // real depths, old noisy legs
+    const g = { minC: 3, maxDepth: 12, maxBelow: 10 };
+    check('cleanbase: a base judged on its CURRENT contraction passes despite old noisy legs',
+      _cleanbaseExactFail(row(knsa), quiet, g) === false);
+    check('cleanbase: wide candles on rising volume are rejected',
+      _cleanbaseExactFail(row(knsa), loud, g) === true);
+    check('cleanbase: volume that is low but not falling day after day is rejected (NESR/MUFG/KNSA)',
+      _cleanbaseExactFail(row(knsa), flatVol, g) === true, 'got ' + JSON.stringify(_weakPullback(flatVol)));
+    check('cleanbase: a strong up day at the end is rejected (MUFG/SMFG)',
+      _cleanbaseExactFail(row(knsa), lastUp, g) === true, 'got ' + JSON.stringify(_weakPullback(lastUp)));
+    check('cleanbase: the newest pullback being the deepest of the last three is not a contraction',
+      _cleanbaseExactFail(row([5, 6, 9]), quiet, g) === true);
+    check('cleanbase: too deep a current pullback is rejected',
+      _cleanbaseExactFail(row([20, 15, 13]), quiet, g) === true);
+    check('cleanbase: already broken out past the pivot is rejected',
+      _cleanbaseExactFail(row(knsa, 3), quiet, g) === true);
+    check('cleanbase: no bars drops the row', _cleanbaseExactFail(row(knsa), null, g) === true);
+    // FTNT/SMFG: the last 10 sessions' range ~0.6x the prior base's.
+    const wide = quiet.map((b, i, a) => i >= a.length - 10 && i < a.length - 5 ? { ...b, h: b.c * 1.15, l: b.c * 0.85 } : b);
     check('cleanbase: last 10 sessions as wide as the prior base is not a contraction',
       _cleanbaseExactFail(row(knsa), wide, g) === true, 'got ' + JSON.stringify(_weakPullback(wide)));
-    // ITGR (2026-09-27): an acquired stock pinned to its deal price has
-    // "weak, quiet" candles only because it no longer moves at all.
-    const frozen = weak3.map((b, i, a) => {
-      if (i < a.length - 20) return b;
-      const r = (i >= a.length - 5 && b.c < a[i - 1].c) ? 0.0005 : 0.0015;
-      return { ...b, h: b.c * (1 + r), l: b.c * (1 - r) };
-    });
+    // ITGR: a merger-pinned stock is "quiet" only because it no longer moves.
+    const frozen = quiet.map((b, i, a) => i < a.length - 20 ? b : { ...b, h: b.c * 1.0015, l: b.c * 0.9985 });
     check('cleanbase: a stock that barely moves (merger-pinned) is rejected',
       _cleanbaseExactFail(row(knsa), frozen, g) === true, 'got ' + JSON.stringify(_weakPullback(frozen)));
-    // RDVT/FTNT (2026-09-27): a fresh new high days ago re-anchors the pivot,
-    // so the pullback from it looks like a base when it is really a breakout.
-    const brk = weak3.map((b, i, a) => i >= a.length - 15 && i < a.length - 10 ? { ...b, h: 179.6 * 1.05 } : b);
+    // RDVT/FTNT: a fresh new high re-anchors the pivot, so the dip from it
+    // looks like a base when it is really a breakout.
+    const brk = quiet.map((b, i, a) => i >= a.length - 15 && i < a.length - 10 ? { ...b, h: 179.6 * 1.05 } : b);
     check('cleanbase: a new high >2% above the base in the last 15 sessions is a breakout, not a base',
       _cleanbaseExactFail(row(knsa), brk, g) === true, 'got ' + JSON.stringify(_weakPullback(brk)));
     const scored = pb => calcScore({ rs: 90, eps: 20, vcp: row(knsa).vcp, pullback: pb }, 'cleanbase');
     check('cleanbase: tighter, quieter setups rank above looser ones',
-      scored({ spanRatio: 0.2, downVol: 0.6, downRange: 0.6 }) > scored({ spanRatio: 0.45, downVol: 0.95, downRange: 0.95 }));
+      scored({ spanRatio: 0.2, volSlope: -0.25, candleSize: 0.5 }) > scored({ spanRatio: 0.45, volSlope: -0.1, candleSize: 0.85 }));
   }
 
   // ── cleanbase is registered like every other screener ──
@@ -267,14 +264,6 @@
     setScreener('cleanbase', true);
     check('setScreener(cleanbase) switches panel class', document.getElementById('filterPanel').classList.contains('panel-cleanbase'));
     check('cleanbase shares the VCP fields (vcpContractions visible)', num('vcpContractions') === (SCREENER_DEFAULTS.cleanbase.vcpContractions ?? 3));
-    check('cleanbase has its own down-days field, defaulting to 3', num('cleanbaseMinDown') === 3,
-      'got ' + num('cleanbaseMinDown'));
-    check("cleanbaseMinDown is hidden on VCP's own panel", (() => {
-      setScreener('vcp', true);
-      const hidden = getComputedStyle($('cleanbaseMinDown').closest('.field')).display === 'none';
-      setScreener('cleanbase', true);
-      return hidden;
-    })());
     setScreener('sepa', true);
   }
 
