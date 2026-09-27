@@ -3200,14 +3200,18 @@ async function scan(force=false){
       saveUniverseCache();
       // The coarse pass above never fetches real OHLC, so ttUniverse rows have
       // no .vcp yet — cleanbase's own gate (weakDownCandles, the tightening
-      // sequence) needs it. The watchlist is small, so re-running the same
-      // exact-validation pass used for the main scan against just these rows
-      // is cheap. Runs in the background: the watchlist paints immediately
-      // with everything visible, then _wlCleanbaseVisible hides the ones that
-      // fail once this resolves (per the user's explicit choice — hide, not
-      // just badge — 2026-09-27).
+      // sequence) needs it. ttUniverse is NOT watchlist-only — forceTickers
+      // only means "keep these even if they'd otherwise be dropped", so it
+      // still holds every OTHER row that passes the coarse gate too (measured
+      // live: 463 rows for 10 starred tickers). Validating only the actual
+      // starred subset keeps this to the handful of real OHLC fetches the
+      // watchlist tab actually needs, not hundreds. Runs in the background:
+      // the watchlist paints immediately with everything visible, then
+      // _wlCleanbaseVisible hides the ones that fail once this resolves (per
+      // the user's explicit choice — hide, not just badge — 2026-09-27).
       if(activeScreener==='cleanbase'){
-        validateExact(Object.values(ttUniverse), 'cleanbase', null, myAbort.signal).then(()=>{
+        const wlOnly=[...watchlist].map(t=>ttUniverse[t]).filter(Boolean);
+        validateExact(wlOnly, 'cleanbase', null, myAbort.signal).then(()=>{
           if(myToken!==_scanToken) return;
           _wlDataGen++;
           if(mode==='watch') applyView();
