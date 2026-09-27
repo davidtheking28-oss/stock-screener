@@ -2063,18 +2063,20 @@ function _vcpExactFail(r, bars, opts={}){
 // Last `days` sessions vs. the stock's own norms: how many closed down, and
 // how heavy (vs. 50-day volume) and wide (vs. 20-day ADR) those down days were.
 // spanRatio: last 10 sessions' high-low span over the 50 before them.
+// newHigh: % the last 15 sessions' high clears the 45 before it (a breakout).
 function _weakPullback(bars, days=5){
   if(!bars || bars.length<60) return null;
   const n=bars.length, avg=a=>a.reduce((s,x)=>s+x,0)/a.length, rng=b=>(b.h/b.l-1)*100;
   const adr=avg(bars.slice(-20).map(rng)), vol50=avg(bars.slice(-50).map(b=>b.v));
   if(!(adr>0) || !(vol50>0)) return null;
   const tail=bars.slice(-days), down=tail.filter((b,i)=>b.c<bars[n-days+i-1].c);
-  const span=w=>Math.max(...w.map(b=>b.h))/Math.min(...w.map(b=>b.l))-1;
+  const hi=w=>Math.max(...w.map(b=>b.h)), span=w=>hi(w)/Math.min(...w.map(b=>b.l))-1;
   return {down:down.length,
           downVol: down.length ? avg(down.map(b=>b.v))/vol50 : null,
           downRange: down.length ? avg(down.map(rng))/adr : null,
           recentVol: avg(tail.map(b=>b.v))/vol50,
-          spanRatio: span(bars.slice(-10))/span(bars.slice(-60,-10))};
+          spanRatio: span(bars.slice(-10))/span(bars.slice(-60,-10)),
+          adr, newHigh: (hi(bars.slice(-15))/hi(bars.slice(-60,-15))-1)*100};
 }
 // "בסיס נקי": the CURRENT pullback is shallower than the recent ones, near the
 // pivot, and the last sessions are mostly down days on light volume and narrow
@@ -2089,8 +2091,11 @@ function _cleanbaseExactFail(r, bars, opts={}){
   if(!(last < Math.max(...d.slice(-3,-1)))) return true;
   if(last > (opts.maxDepth ?? 12)) return true;
   if(v.distToPivot==null || v.distToPivot > 2 || v.distToPivot < -(opts.maxBelow ?? 10)) return true;
-  const p=_weakPullback(bars);
+  const p=r.pullback=_weakPullback(bars);
   if(!p || p.down < (opts.minDown ?? 3)) return true;
+  // ADR 0.5: ITGR (merger-pinned) sat at 0.2, the next-quietest result at 1.1.
+  // newHigh 2: the same "more than 2% past the pivot is chasing" line above.
+  if(p.adr < 0.5 || p.newHigh > 2) return true;
   // 0.5: measured gap on 2026-09-27's 44 results — the user's own setups sat
   // at 0.19-0.35, the flagged FTNT/SMFG at 0.60-0.63, nothing between 0.44-0.58.
   return !(p.downVol<1 && p.downRange<1 && p.recentVol<1 && p.spanRatio<0.5);
@@ -2519,6 +2524,15 @@ function _calcScoreRaw(r, scr='sepa'){
     // ranked the same. 5%, carved out of moveS.
     const revS  = Math.min(clamp(r.rev??0,0,200)/200,1)*5;
     return Math.round(clamp(moveS+adrS+emaS+tightS+epsS+perfYS+rsS+revS,0,100));
+  }
+  if(scr==='cleanbase' && r.pullback){
+    const p=r.pullback, v=r.vcp;
+    const tightS = clamp(1-p.spanRatio/0.5,0,1)*25;
+    const dryS   = clamp((1-p.downVol)/0.5,0,1)*20;
+    const quietS = clamp((1-p.downRange)/0.5,0,1)*10;
+    const pivotS = v?.distToPivot==null?0:clamp(1-Math.abs(v.distToPivot)/10,0,1)*20;
+    const rsS    = clamp(r.rs,0,99)/99*15;
+    return Math.round(clamp(tightS+dryS+quietS+pivotS+rsS+epsScore(r.eps,10),0,100));
   }
   if(scr==='vcp'||scr==='cleanbase'){
     // Ranked on actionability, not on strength: every row here already passed

@@ -192,7 +192,11 @@
   // coarse candidates plus the user's own watchlist, which they confirmed
   // is the kind of setup this screener must find.
   {
-    const base = Array.from({ length: 250 }, (_, i) => { const c = 100 + i * 0.4; return { t: i * 86400, o: c, h: c * 1.01, l: c * 0.99, c, v: 1000 }; });
+    // An advance, then a base whose swings shrink under its own high.
+    const base = Array.from({ length: 250 }, (_, i) => {
+      const j = i - 200, c = i < 200 ? 100 + i * 0.4 : 179.6 * (1 - 0.08 * (1 - j / 50) * (1 + Math.sin(j / 2)) / 2);
+      return { t: i * 86400, o: c, h: c * 1.01, l: c * 0.99, c, v: 1000 };
+    });
     const withTail = (downDays, weak) => {
       let c = base[base.length - 1].c;
       return base.concat(Array.from({ length: 5 }, (_, i) => {
@@ -236,6 +240,23 @@
       wp && wp.spanRatio < 0.5, 'got ' + JSON.stringify(wp));
     check('cleanbase: last 10 sessions as wide as the prior base is not a contraction',
       _cleanbaseExactFail(row(knsa), wide, g) === true, 'got ' + JSON.stringify(_weakPullback(wide)));
+    // ITGR (2026-09-27): an acquired stock pinned to its deal price has
+    // "weak, quiet" candles only because it no longer moves at all.
+    const frozen = weak3.map((b, i, a) => {
+      if (i < a.length - 20) return b;
+      const r = (i >= a.length - 5 && b.c < a[i - 1].c) ? 0.0005 : 0.0015;
+      return { ...b, h: b.c * (1 + r), l: b.c * (1 - r) };
+    });
+    check('cleanbase: a stock that barely moves (merger-pinned) is rejected',
+      _cleanbaseExactFail(row(knsa), frozen, g) === true, 'got ' + JSON.stringify(_weakPullback(frozen)));
+    // RDVT/FTNT (2026-09-27): a fresh new high days ago re-anchors the pivot,
+    // so the pullback from it looks like a base when it is really a breakout.
+    const brk = weak3.map((b, i, a) => i >= a.length - 15 && i < a.length - 10 ? { ...b, h: 179.6 * 1.05 } : b);
+    check('cleanbase: a new high >2% above the base in the last 15 sessions is a breakout, not a base',
+      _cleanbaseExactFail(row(knsa), brk, g) === true, 'got ' + JSON.stringify(_weakPullback(brk)));
+    const scored = pb => calcScore({ rs: 90, eps: 20, vcp: row(knsa).vcp, pullback: pb }, 'cleanbase');
+    check('cleanbase: tighter, quieter setups rank above looser ones',
+      scored({ spanRatio: 0.2, downVol: 0.6, downRange: 0.6 }) > scored({ spanRatio: 0.45, downVol: 0.95, downRange: 0.95 }));
   }
 
   // ── cleanbase is registered like every other screener ──
