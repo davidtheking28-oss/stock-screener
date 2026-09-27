@@ -2156,10 +2156,14 @@ function _cleanbaseExactFail(r, bars, opts={}){
   // newHigh 2 = the same "more than 2% past the pivot is chasing" line above.
   if(!p || p.adr < 0.5 || p.newHigh > 2 || p.spanRatio >= 0.5) return true;
   const t=r.thrust=_thrustPullback(done);
-  // A pause, not a continuation or distribution: every pullback candle no
-  // wider than usual and lighter than the thrust, no fresh up-thrust, and no
-  // close back above the thrust day.
-  return !(t && t.pbRangeMax<=1 && t.pbVolUnderThrust && t.pbVolAvg<1 && t.pbUpMax<=0.5 && t.net<=0.25);
+  // A pause, not a continuation or distribution: every pullback candle not
+  // much wider than usual and lighter than the thrust, no fresh up-thrust,
+  // and no real recovery back above the thrust day.
+  // pbRangeMax 1.2 / net 0.6, not 1.0 / 0.25: confirmed live 2026-09-27 against
+  // MDB/GFF/PWR (real thrust+pullback setups the tighter cutoffs excluded —
+  // one pullback day at 1.06-1.19x, PWR recovering to 0.57 net) against
+  // IRDM/TXN/VSAT/ROG/MSGE/AMBQ/SNDK (1.28-1.50x range, still excluded).
+  return !(t && t.pbRangeMax<=1.2 && t.pbVolUnderThrust && t.pbVolAvg<1 && t.pbUpMax<=0.5 && t.net<=0.6);
 }
 // cleanbase's candidates: every stock that fully passes at least one other
 // screener on that screener's own default criteria (coarse + exact), tagged

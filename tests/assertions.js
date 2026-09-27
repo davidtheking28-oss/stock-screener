@@ -206,7 +206,12 @@
     const steady = withTail([[-0.003, 0.004, 950], [-0.003, 0.004, 800], [-0.003, 0.004, 650], [-0.003, 0.004, 500], [-0.003, 0.004, 350]]);
     const lightThrust = withTail([[0, 0.004, 900], [0.02, 0.008, 900], [-0.003, 0.004, 700], [-0.003, 0.004, 600], [-0.003, 0.004, 500]]);
     const noPause = withTail([[0, 0.004, 900], [0.017, 0.008, 1800], [-0.003, 0.004, 700], [0.011, 0.004, 600], [-0.003, 0.004, 500]]);
-    const drift = withTail([[0, 0.004, 900], [0.017, 0.008, 1800], [0.002, 0.004, 700], [0.002, 0.004, 600], [0.002, 0.004, 500]]);
+    const drift = withTail([[0, 0.004, 900], [0.017, 0.008, 1800], [0.0045, 0.004, 700], [0.0045, 0.004, 600], [0.0045, 0.004, 500]]);
+    // MDB/GFF/PWR (2026-09-27): real thrust+pullback setups the original
+    // 1.0/0.25 cutoffs excluded — one pullback day a bit wider than usual,
+    // and price recovering partway (not all the way) back toward the thrust
+    // close. User confirmed these should pass; loosened to 1.2/0.6.
+    const looserPause = withTail([[0, 0.004, 900], [0.017, 0.008, 1800], [-0.007, 0.0116, 700], [0.007, 0.004, 600], [0.007, 0.004, 500]]);
     const heavyPb = withTail([[0, 0.004, 900], [0.02, 0.008, 1800], [-0.003, 0.004, 2000], [-0.003, 0.004, 600], [-0.003, 0.004, 500]]);
     const widePb = withTail([[0, 0.004, 900], [0.02, 0.008, 1800], [-0.003, 0.03, 700], [-0.003, 0.004, 600], [-0.003, 0.004, 500]]);
     const lastDay = withTail([[0, 0.004, 900], [-0.003, 0.004, 800], [-0.003, 0.004, 700], [-0.003, 0.004, 600], [0.02, 0.008, 1800]]);
@@ -232,6 +237,8 @@
       _cleanbaseExactFail(row(knsa), noPause, g) === true);
     check('cleanbase: drifting back above the up-day close is a continuation, not a pullback',
       _cleanbaseExactFail(row(knsa), drift, g) === true, 'got ' + JSON.stringify(_thrustPullback(drift)));
+    check('cleanbase: a pullback with one somewhat-wide day and partial recovery still passes (MDB/GFF/PWR)',
+      _cleanbaseExactFail(row(knsa), looserPause, g) === false, 'got ' + JSON.stringify(_thrustPullback(looserPause)));
     check('cleanbase: a pullback day heavier than the thrust is selling, not a pause',
       _cleanbaseExactFail(row(knsa), heavyPb, g) === true);
     check('cleanbase: a wide candle in the pullback is not quiet',
