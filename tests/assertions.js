@@ -291,6 +291,27 @@
     setScreener('sepa', true);
   }
 
+  // ── 1y bar cache: kept until the next US session opens, not just 30 min —
+  // sessionStorage held only 186 of 516 symbols (quota), so every reload
+  // re-downloaded ~330 (measured 2026-09-27).
+  {
+    const utc = s => Date.parse(s + 'Z');
+    check('_closedSessionKey: Saturday belongs to Friday\'s close', _closedSessionKey(utc('2026-09-26T16:00:00')) === '2026-09-25');
+    check('_closedSessionKey: market hours have no closed-session key', _closedSessionKey(utc('2026-09-22T14:00:00')) === null);
+    check('_closedSessionKey: after the close it is that day', _closedSessionKey(utc('2026-09-22T21:00:00')) === '2026-09-22');
+    check('_closedSessionKey: pre-market it is the previous weekday', _closedSessionKey(utc('2026-09-22T12:00:00')) === '2026-09-21'
+      && _closedSessionKey(utc('2026-09-21T12:00:00')) === '2026-09-18', 'got ' + _closedSessionKey(utc('2026-09-21T12:00:00')));
+    const fri = { t: utc('2026-09-25T21:00:00'), key: _closedSessionKey(utc('2026-09-25T21:00:00')) };
+    check('_barsFresh: fetched after Friday\'s close is still fresh on Saturday', _barsFresh(fri, utc('2026-09-26T16:00:00')) === true);
+    check('_barsFresh: stale once Monday\'s session is open', _barsFresh(fri, utc('2026-09-28T14:00:00')) === false);
+    const intraday = { t: utc('2026-09-22T14:00:00'), key: null };
+    check('_barsFresh: intraday fetches still expire after 30 minutes',
+      _barsFresh(intraday, utc('2026-09-22T14:10:00')) === true && _barsFresh(intraday, utc('2026-09-22T15:00:00')) === false);
+    await _barsStore.put('ZZTEST', { bars: [{ t: 1, c: 1 }], t: Date.now(), key: 'k' });
+    const back = await _barsStore.get('ZZTEST');
+    check('_barsStore: bars survive a round trip through IndexedDB', back && back.bars[0].c === 1, 'got ' + JSON.stringify(back));
+  }
+
   // ── cleanbase is registered like every other screener ──
   {
     check('SCREENERS.cleanbase is registered', !!SCREENERS.cleanbase);

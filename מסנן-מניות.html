@@ -1820,13 +1820,47 @@ function _ohlcNext(){
 }
 
 /* ── exact OHLC validation (1y bars) ── */
+// Daily bars only change while the US market is open, so a fetch made after a
+// close stays good until the next session opens; intraday ones expire in 30m.
+// Returns the ET date of the latest close, or null during market hours
+// (holidays just cost one extra fetch).
+const _etFmt = new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',year:'numeric',month:'2-digit',day:'2-digit',hour:'numeric',minute:'numeric',hour12:false});
+function _closedSessionKey(ms){
+  const et=m=>Object.fromEntries(_etFmt.formatToParts(new Date(m)).map(x=>[x.type,x.value]));
+  const weekend=p=>p.weekday==='Sat'||p.weekday==='Sun';
+  let p=et(ms); const min=(+p.hour%24)*60 + +p.minute;
+  if(!weekend(p) && min>=570 && min<960) return null;
+  if(weekend(p) || min<570){ do{ ms-=86400000; p=et(ms); } while(weekend(p)); }
+  return p.year+'-'+p.month+'-'+p.day;
+}
+const BARS_TTL=30*60*1000;
+function _barsFresh(c, now=Date.now()){
+  return !!c && (now-c.t<BARS_TTL || (c.key!=null && c.key===_closedSessionKey(now)));
+}
+// IndexedDB, not sessionStorage: ~500 symbols of 1y bars is ~25MB, and
+// sessionStorage's quota kept only 186 of 516 (measured), so a reload
+// re-downloaded the rest. Every failure degrades to "not cached".
+const _barsStore = (()=>{
+  let dbp=null;
+  const db=()=>dbp ??= new Promise((res,rej)=>{
+    const q=indexedDB.open('screener-bars',1);
+    q.onupgradeneeded=()=>q.result.createObjectStore('bars1y');
+    q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error);
+  });
+  const tx=(mode,fn)=>db().then(d=>new Promise((res,rej)=>{
+    const r=fn(d.transaction('bars1y',mode).objectStore('bars1y'));
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+  }));
+  return {get:k=>tx('readonly',s=>s.get(k)).catch(()=>null),
+          put:(k,v)=>tx('readwrite',s=>s.put(v,k)).catch(()=>null)};
+})();
 const _valBars = new Map();
 async function _fetchBars1y(sym, signal){
   if(!HAS_SUPABASE) return null;
-  const TTL=30*60*1000;
   const c=_valBars.get(sym);
-  if(c && Date.now()-c.t<TTL) return c.bars;
-  try{ const sc=JSON.parse(sessionStorage.getItem('ohlc1y_v2_'+sym)); if(sc && sc.t && Date.now()-sc.t<TTL){ _valBars.set(sym,{bars:sc.bars,t:sc.t}); return sc.bars; } }catch(e){}
+  if(_barsFresh(c)) return c.bars;
+  const stored=await _barsStore.get(sym);
+  if(_barsFresh(stored)){ _valBars.set(sym,stored); return stored.bars; }
   try{
     // Combined with the caller's own abort signal (validateExact, wired to a
     // switch to a newer scan) when given — a plain timeout signal alone left
@@ -1837,13 +1871,13 @@ async function _fetchBars1y(sym, signal){
     if(!r.ok) return null;
     const j=await r.json(); const bars=Array.isArray(j.bars)?j.bars:[];
     // Only cache a real result. A 500/429 upstream still parses as JSON with no
-    // bars, and pinning that empty array for the full TTL (sessionStorage, so it
-    // survives reloads) left the symbol permanently unvalidated with blank
-    // VCP/RS-line columns for the rest of the session. Same guard the gallery
-    // OHLC path already uses.
+    // bars, and pinning that empty array would leave the symbol unvalidated
+    // with blank VCP/RS-line columns until the cache expired. Same guard the
+    // gallery OHLC path already uses.
     if(bars.length){
-      _valBars.set(sym,{bars,t:Date.now()});
-      try{ sessionStorage.setItem('ohlc1y_v2_'+sym, JSON.stringify({bars,t:Date.now()})); }catch(e){}
+      const now=Date.now(), entry={bars,t:now,key:_closedSessionKey(now)};
+      _valBars.set(sym,entry);
+      _barsStore.put(sym,entry);
     }
     return bars;
   }catch(e){ return null; }
@@ -2114,19 +2148,22 @@ async function _cleanbaseUniverse(universe, rsMap, signal){
   // report), read now, before any source screener's defaults are swapped in.
   const rsMin=num('rsMin'), fh=num('fromHigh'), priceMin=num('priceMin'), mcMin=num('mcMin')*1e9,
         liqMin=num('liqMin')*1e6, earnGap=num('earnDays');
+  // Applied before each source's exact pass, not after, so names this panel
+  // would drop anyway never cost an OHLC download (~18% fewer, measured).
+  const keep=r=>r.rs>=rsMin && r.fromHighPct>=-fh && r.close>=priceMin && (r.mc??0)>=mcMin
+    && (!liqMin || (r.dollarVol??0)>=liqMin) && !(earnGap>0 && r.earnIn!=null && r.earnIn>=0 && r.earnIn<=earnGap);
   const byT=new Map();
   for(const s of CLEANBASE_SOURCES){
     let pending;
     _asScreener=s;
-    try{ pending=validateExact(applyFilters(universe, rsMap), s, null, signal); }
+    try{ pending=validateExact(applyFilters(universe, rsMap).filter(keep), s, null, signal); }
     finally{ _asScreener=null; }
     for(const r of await pending){
       const seen=byT.get(r.ticker);
       if(seen) seen.via.push(s); else { r.via=[s]; byT.set(r.ticker, r); }
     }
   }
-  return [...byT.values()].filter(r=>r.rs>=rsMin && r.fromHighPct>=-fh && r.close>=priceMin && (r.mc??0)>=mcMin
-    && (!liqMin || (r.dollarVol??0)>=liqMin) && !(earnGap>0 && r.earnIn!=null && r.earnIn>=0 && r.earnIn<=earnGap));
+  return [...byT.values()];
 }
 async function validateExact(list, scr, onProgress, signal){
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp'&&scr!=='cleanbase')||!HAS_SUPABASE||!list.length) return list;
