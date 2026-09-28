@@ -2714,7 +2714,7 @@ function toggleFeatPanel(e){
     '<label class="col-picker-item"><input type="checkbox" '+(colVis[f.key]!==false?'checked':'')+' onchange="setFeature(\''+f.key+'\',this.checked)"> '+f.label+'</label>').join('');
   const rect=e.currentTarget.getBoundingClientRect();
   panel.style.top=(rect.bottom+6)+'px';
-  panel.style.left=rect.left+'px';
+  panel.style.left=Math.max(8, Math.min(rect.left, innerWidth-panel.offsetWidth-8, innerWidth-288))+'px';
   panel.classList.add('open');
   btn.setAttribute('aria-expanded','true');
 }
