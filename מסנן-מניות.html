@@ -1430,6 +1430,7 @@ const COL_DEFS = [
   {key:'price',  label:'מחיר',       defaultOn:true},
   {key:'score',  label:'ציון SEPA',  defaultOn:true},
   {key:'rs',     label:'RS',         defaultOn:true},
+  {key:'pivot',  label:'Pivot',      defaultOn:true},
   {key:'adr',    label:'ADR%',       defaultOn:true},
   {key:'rsline', label:'קו RS',      defaultOn:false},
   {key:'perfY',  label:'ביצʹ 1Y',  defaultOn:true},
@@ -2363,6 +2364,7 @@ async function validateExact(list, scr, onProgress, signal){
 }
 let colVis = _lsJSON('sepa_colvis', null) || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
 if(!('adr' in colVis)) colVis.adr = true;
+if(!('pivot' in colVis)) colVis.pivot = true;
 let searchQuery = '';
 let newToday = new Set();
 // 'screener|ticker' -> 'YYYY-MM-DD' the ticker first appeared in THAT
@@ -2430,6 +2432,14 @@ const fmtVol = v => {
   return v.toString();
 };
 const col = (key, html) => colVis[key] ? html : '';
+// The buy point a breakout trader acts on: the base's last swing high (from
+// _vcp) and how far price sits from it — green inside the entry window (up to
+// 3% under, 2% over), red once extended past it.
+function pivotHtml(v){
+  if(v?.pivot==null || v.distToPivot==null) return '<span class="mn" style="color:var(--text3)">—</span>';
+  const d=v.distToPivot, c=d>2?'var(--red)':d>=-3?'var(--green)':'var(--text2)';
+  return '<span class="mn">$'+(v.pivot>=100?v.pivot.toFixed(0):v.pivot.toFixed(2))+'</span> <span class="mn" style="color:'+c+'">'+(d>0?'+':'')+d.toFixed(1)+'%</span>';
+}
 // 'YYYY-MM-DD' -> 'DD/MM' (or 'DD/MM/YY' across a year boundary), 'היום'/'אתמול'
 // for the two dates a user actually cares to distinguish at a glance. Missing
 // (checkAndSaveHistory hasn't resolved yet, or never ran — logged-out preview)
@@ -3884,6 +3894,7 @@ const SORTS={
   // compares 0 against everything, which makes the comparator non-transitive
   // and jumbles the whole list, not just the null rows.
   mc:r=>r.mc??-1e9, vol:r=>r.vol??0, liq:r=>r.dollarVol??0, fromHigh:r=>r.fromHighPct,
+  pivot:r=>r.vcp?.distToPivot??-1e9,
   perfY:r=>r.perfY??-1e9, perf3:r=>r.perf3??-1e9, eps:r=>r.eps??-1e9,
   rev:r=>r.rev??-1e9, roe:r=>r.roe??-1e9, nm:r=>r.nm??-1e9, range:r=>r.rangePos,
   // Rank a clean, tightening base above a loose one; ties break on how close
@@ -4150,12 +4161,14 @@ function renderTable(rows){
     : scKind==='qulla'
     ? 'ציון Qullamaggie 0–100: מהלך 6ח׳ (20%) + EPS (15%) + ביצוע שנתי (15%) + צמידות ל-EMA (15%) + ADR (10%) + הידוק שבועי (10%) + RS (10%) + הכנסות (5%)'
     : 'ציון מומנטום 0–100: RS (30%) + EPS (20%) + קרבה לשיא (15%) + ביצוע 3-6ח׳ (15%) + ביצוע שנתי (15%) + הכנסות (5%)';
+  const showPivot=colVis.pivot && rows.some(r=>r.vcp?.pivot!=null);
   const head='<tr>'
     +'<th style="width:30px"></th>'
     +th('מניה','ticker')
     +(colVis.price ? th('מחיר','close','מחיר סגירה אחרון') : '')
     +(colVis.score ? th(scHeadLbl,'score',scHeadTip) : '')
     +(colVis.rs    ? th('RS','rs','דירוג יחסי 1–99') : '')
+    +(showPivot    ? th('Pivot','pivot','נקודת הפריצה של הבסיס והמרחק ממנה — ירוק: באזור הכניסה, אדום: מתוח מעבר לה') : '')
     +(colVis.adr   ? th('ADR%','adr','תנודתיות יומית ממוצעת — בסיס לגודל פוזיציה וסטופ') : '')
     +(colVis.rsline? th('קו RS','rsline','קו העוצמה היחסית מול SPY — שיא חדש לפני פריצת המחיר הוא סימן חוזק') : '')
     +(colVis.perfY ? th('ביצֹ 1Y','perfY','שינוי מחיר ב-12 חודשים האחרונים') : '')
@@ -4272,6 +4285,7 @@ function renderTable(rows){
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
+      +(showPivot ? '<td>'+pivotHtml(r.vcp)+'</td>' : '')
       +col('adr',    (()=>{const a=r.adrPct??r.volD;const c=a==null?'var(--text3)':a>=5?'var(--green)':a>=3.5?'var(--yellow)':'var(--text3)';return '<td><span class="mn" style="color:'+c+';font-weight:600">'+(a==null?'—':a.toFixed(1)+'%')+'</span></td>';})())
       +col('rsline', (()=>{
           const l=r.rsLine;
@@ -4379,7 +4393,9 @@ function renderGallery(srcRows){
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
       +stat('EPS YoY', r.eps, r.epsQoq!=null?'שנה מול שנה: '+pct(r.eps)+' · רבעון מול הקודם: '+pct(r.epsQoq):'צמיחת רווח למניה, שנה מול שנה')
-      +'<div class="gstat" title="מרחק מהשיא של 52 שבועות"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(fhUp?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>'
+      +((activeScreener==='vcp'||activeScreener==='cleanbase') && r.vcp?.pivot!=null
+        ? '<div class="gstat" title="נקודת פריצה $'+r.vcp.pivot.toFixed(2)+' — מרחק המחיר ממנה"><div class="gstat-lbl">Pivot</div><div class="gstat-val">'+pivotHtml(r.vcp).split('</span> ')[1]+'</div></div>'
+        : '<div class="gstat" title="מרחק מהשיא של 52 שבועות"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(fhUp?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>')
       +'</div></div>';
   });
 
@@ -4679,6 +4695,7 @@ async function loadUserData(){
   }
   if(prefData?.col_vis) colVis = prefData.col_vis;
   if(!('adr' in colVis)) colVis.adr = true;
+  if(!('pivot' in colVis)) colVis.pivot = true;
 
   const wlChanged = [...watchlist].sort().join(',') !== wlBefore;
   // The watchlist arrives from Supabase AFTER boot, and nothing awaits it — a

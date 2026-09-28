@@ -433,6 +433,19 @@
     check('_barsStore: bars survive a round trip through IndexedDB', back && back.bars[0].c === 1, 'got ' + JSON.stringify(back));
   }
 
+  // ── the buy point (2026-09-28): _vcp computed it, but it only reached the
+  // CSV export — never the table or the cards ──
+  {
+    check('pivot: shown as a default column', COL_DEFS.some(c => c.key === 'pivot' && c.defaultOn));
+    check('pivot: no base measured → a dash, not a number', /—/.test(pivotHtml(null)) && /—/.test(pivotHtml({ pivot: null, distToPivot: null })));
+    const near = pivotHtml({ pivot: 52.4, distToPivot: -1.5 });
+    check('pivot: shows the price and the distance', /52\.40/.test(near) && /-1\.5%/.test(near), near);
+    check('pivot: inside the entry window reads green', /var\(--green\)/.test(near), near);
+    check('pivot: more than 2% past the pivot reads as extended (red)', /var\(--red\)/.test(pivotHtml({ pivot: 50, distToPivot: 3.1 })));
+    check('pivot: far below the pivot is neither green nor red', !/var\(--(green|red)\)/.test(pivotHtml({ pivot: 50, distToPivot: -8 })));
+    check('pivot: sortable by distance', SORTS.pivot({ vcp: { distToPivot: -1 } }) > SORTS.pivot({ vcp: { distToPivot: -5 } }) && SORTS.pivot({}) === -1e9);
+  }
+
   // ── cleanbase is registered like every other screener ──
   {
     check('SCREENERS.cleanbase is registered', !!SCREENERS.cleanbase);
