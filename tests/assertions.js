@@ -446,6 +446,33 @@
     check('pivot: sortable by distance', SORTS.pivot({ vcp: { distToPivot: -1 } }) > SORTS.pivot({ vcp: { distToPivot: -5 } }) && SORTS.pivot({}) === -1e9);
   }
 
+  // ── screener performance (2026-09-28): each stock's close on the day it
+  // first entered the screener against the close N sessions later ──
+  {
+    // one bar per calendar day at 12:00 ET, Sep 1..40 (2026), close = 100 + day
+    const day = i => ({ t: Date.UTC(2026, 8, 1 + i, 16) / 1000, o: 100 + i, h: 101 + i, l: 99 + i, c: 100 + i, v: 1000 });
+    const bars = Array.from({ length: 40 }, (_, i) => day(i));
+    const f = _forwardReturns(bars, '2026-09-03');
+    check('_forwardReturns: entry is the close on the day it entered', f && f.date === '2026-09-03', JSON.stringify(f));
+    check('_forwardReturns: 5 sessions later', f && Math.abs(f[5].r - (107 / 102 - 1) * 100) < 1e-9, JSON.stringify(f));
+    const late = _forwardReturns(bars, '2026-10-08');
+    check('_forwardReturns: no 20-session history yet → null for that horizon only', late && late[20] === null && late[5] === null, JSON.stringify(late));
+    const gap = bars.filter((b, i) => i !== 5);   // no bar on Sep 6 (a weekend, say)
+    check('_forwardReturns: a scan on a day with no bar enters at the last close before it', _forwardReturns(gap, '2026-09-06')?.date === '2026-09-05');
+    check('_forwardReturns: entered before any bar → null', _forwardReturns(bars, '2026-08-01') === null);
+
+    const flat = Array.from({ length: 40 }, (_, i) => ({ ...day(i), c: 100 }));   // SPY flat
+    const down = Array.from({ length: 40 }, (_, i) => ({ ...day(i), c: 200 - i }));
+    const p = _screenerPerf([{ ticker: 'UP', first_seen: '2026-09-03' }, { ticker: 'DN', first_seen: '2026-09-03' }],
+      t => t === 'UP' ? bars : down, bars);   // SPY rises exactly like UP
+    check('_screenerPerf: counts entries per horizon', p[5].n === 2 && p[20].n === 2, JSON.stringify(p));
+    check('_screenerPerf: share of entries that rose', p[5].win === 50, JSON.stringify(p[5]));
+    const upR = (107 / 102 - 1) * 100, dnR = (193 / 198 - 1) * 100;
+    check('_screenerPerf: average return', Math.abs(p[5].avg - (upR + dnR) / 2) < 1e-9, JSON.stringify(p[5]));
+    check('_screenerPerf: return over SPY for the same sessions', Math.abs(p[5].excess - (p[5].avg - upR)) < 1e-9, JSON.stringify(p[5]));
+    check('_screenerPerf: a stock with no bars is skipped, not counted as zero', _screenerPerf([{ ticker: 'X', first_seen: '2026-09-03' }], () => null, flat)[5].n === 0);
+  }
+
   // ── cleanbase is registered like every other screener ──
   {
     check('SCREENERS.cleanbase is registered', !!SCREENERS.cleanbase);

@@ -905,6 +905,12 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 10px 18px; border-bottom: 1px solid var(--border); background: var(--bg2);
 }
 .sector-strength:empty { display: none; }
+.perf-panel { margin: 0 0 10px; padding: 8px 12px; border: 1px solid var(--border2); border-radius: 10px; }
+.perf-panel summary { cursor: pointer; font: 600 11px var(--sans); color: var(--text2); min-height: 24px; display: flex; align-items: center; }
+.perf-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+.perf-table th, .perf-table td { padding: 6px 8px; text-align: right; border-top: 1px solid var(--border2); }
+.perf-table th { color: var(--text3); font-weight: 600; }
+.perf-note { color: var(--text3); font-size: 11px; margin-top: 6px; }
 .ss-title { font: 600 10px var(--sans); letter-spacing: 1px; text-transform: uppercase; color: var(--text3); margin-left: 4px; }
 .ss-chip {
   position: relative; overflow: hidden; cursor: pointer;
@@ -1139,6 +1145,7 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
     </div>
     <div id="sectorStrength" class="sector-strength"></div>
+    <details id="perfPanel" class="perf-panel" ontoggle="if(this.open) loadScreenerPerf()"><summary>ביצועי המסנן — מניות שנכנסו ב-60 הימים האחרונים</summary><div id="perfBody"></div></details>
     <div id="wlMissing" class="wl-missing" style="display:none"></div>
     <div id="tableView" class="table-wrap"></div>
     <div id="galleryView" class="gallery" style="display:none"></div>
@@ -3193,6 +3200,7 @@ function setScreener(key, applyDef=true){
   // which must not yank a user who opened straight onto the watchlist.
   if(applyDef && mode==='watch') setMode('screen');
   const prevScreener=activeScreener, switching=applyDef && prevScreener!==key;
+  const pp=$('perfPanel'); if(pp && prevScreener!==key){ pp.open=false; $('perfBody').innerHTML=''; pp.style.display=key==='commodities'?'none':''; }
   // A user who scrolls to the bottom of a filter's results and immediately
   // switches to the next one (the normal fast workflow) can beat the
   // 'scroll' listener: the passive scroll event that would have reported
@@ -3295,6 +3303,58 @@ function showSkeleton(){
   _tableResetWindow();
 }
 
+// "Did this screener's picks actually work?" — each stock's close on the day
+// it first entered the screener (screener_history.first_seen; a weekend or
+// pre-open scan enters at the last close before it) against the close N
+// sessions later, and SPY over the same sessions.
+function _forwardReturns(bars, entryDate, horizons=[5,10,20]){
+  if(!bars?.length) return null;
+  const done=_completedBars(bars), day=b=>_etDay.format(new Date(b.t*1000));
+  let i=-1; for(let k=done.length-1;k>=0;k--) if(day(done[k])<=entryDate){ i=k; break; }
+  if(i<0) return null;
+  const out={date:day(done[i])};
+  for(const h of horizons) out[h] = i+h<done.length ? {r:(done[i+h].c/done[i].c-1)*100, end:day(done[i+h])} : null;
+  return out;
+}
+function _screenerPerf(entries, barsFor, spyBars, horizons=[5,10,20]){
+  const spy=new Map((spyBars||[]).map(b=>[_etDay.format(new Date(b.t*1000)), b.c]));
+  const agg=Object.fromEntries(horizons.map(h=>[h,{rs:[],ex:[]}]));
+  for(const {ticker,first_seen} of entries){
+    const f=_forwardReturns(barsFor(ticker), first_seen, horizons); if(!f) continue;
+    for(const h of horizons){
+      const x=f[h]; if(!x) continue;
+      agg[h].rs.push(x.r);
+      const s0=spy.get(f.date), s1=spy.get(x.end);
+      if(s0 && s1) agg[h].ex.push(x.r-(s1/s0-1)*100);
+    }
+  }
+  const avg=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:null;
+  return Object.fromEntries(horizons.map(h=>{ const {rs,ex}=agg[h];
+    return [h,{n:rs.length, avg:avg(rs), win:rs.length?rs.filter(v=>v>0).length/rs.length*100:null, excess:avg(ex)}]; }));
+}
+const PERF_DAYS=60;
+async function loadScreenerPerf(){
+  const body=$('perfBody'), scr=activeScreener;
+  if(!_currentUser || !_sb){ body.innerHTML='<div class="perf-note">צריך להתחבר — הביצועים מחושבים מההיסטוריה של הסריקות שלך.</div>'; return; }
+  body.innerHTML='<div class="perf-note"><span class="spinner"></span> מחשב…</div>';
+  const since=new Date(Date.now()-PERF_DAYS*86400000).toISOString().slice(0,10);
+  const {data, error}=await _sb.from('screener_history').select('ticker,first_seen')
+    .eq('user_id',_currentUser.id).eq('screener',scr).gte('first_seen',since);
+  if(scr!==activeScreener) return;
+  if(error){ body.innerHTML='<div class="perf-note">שגיאה בטעינת ההיסטוריה.</div>'; return; }
+  const rows=data||[];
+  if(!rows.length){ body.innerHTML='<div class="perf-note">אין עדיין כניסות מתועדות למסנן הזה ב-'+PERF_DAYS+' הימים האחרונים.</div>'; return; }
+  await _fetchBars1yWarm(['SPY', ...rows.map(r=>r.ticker)]).catch(()=>{});
+  const spy=await _fetchBars1y('SPY'), bars=new Map();
+  await Promise.all(rows.map(async r=>bars.set(r.ticker, await _fetchBars1y(r.ticker))));
+  if(scr!==activeScreener) return;
+  const p=_screenerPerf(rows, t=>bars.get(t), spy);
+  const fmt=v=>v==null?'—':(v>0?'+':'')+v.toFixed(1)+'%', cls=v=>v==null?'':v>0?'pos':'neg';
+  body.innerHTML='<table class="perf-table"><thead><tr><th scope="col">אחרי</th><th scope="col">מניות</th><th scope="col">תשואה ממוצעת</th><th scope="col">עלו</th><th scope="col">מול SPY</th></tr></thead><tbody>'
+    +[5,10,20].map(h=>{ const x=p[h];
+      return '<tr><td>'+h+' ימי מסחר</td><td class="mn">'+x.n+'</td><td class="mn '+cls(x.avg)+'">'+fmt(x.avg)+'</td><td class="mn">'+(x.win==null?'—':Math.round(x.win)+'%')+'</td><td class="mn '+cls(x.excess)+'">'+fmt(x.excess)+'</td></tr>'; }).join('')
+    +'</tbody></table><div class="perf-note">'+rows.length+' כניסות מאז '+since.split('-').reverse().join('/')+' · כניסה = סגירה ביום שהמניה נכנסה למסנן · נרשם רק מה שנסרק בפועל</div>';
+}
 async function checkAndSaveHistory(tickers){
   if(!_currentUser || !_sb || !tickers.length) return;
   // Captured once, not re-read from the global mid-function — this function
