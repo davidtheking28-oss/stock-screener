@@ -1153,7 +1153,11 @@
       check('settings: the gear is reachable in the gallery view too', getComputedStyle($('featWrap')).display !== 'none' && getComputedStyle($('colPickerWrap')).display === 'none');
       setLayout(lay);
       $('featBtn').click();
-      check('settings: the gear opens one switch per feature', $('featPanel').classList.contains('open') && $('featPanel').querySelectorAll('input[type=checkbox]').length === FEATURE_DEFS.length);
+      check('settings: the gear opens one switch per feature', $('featPanel').classList.contains('open') && $('featToggles').querySelectorAll('input[type=checkbox]').length === FEATURE_DEFS.length);
+      check('settings: columns and export live inside the gear menu, not in the toolbar',
+        $('colPickerPanel').querySelectorAll('input[type=checkbox]').length === COL_DEFS.length
+        && [...$('featPanel').querySelectorAll('button')].map(b => b.textContent).join('|') === 'העתק רשימה|ייצוא CSV'
+        && ![...document.querySelectorAll('button')].some(b => /ייצוא CSV|העתק רשימה/.test(b.textContent) && !$('featPanel').contains(b)));
       $('featBtn').click();
       const v = { pivot: 341, distToPivot: -1, baseHigh: 408, distToBase: -17.3 };
       colVis.f_baseHigh = false;

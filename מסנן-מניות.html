@@ -513,7 +513,13 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: co
   box-shadow: 0 8px 28px rgba(0,0,0,0.5);
 }
 .col-picker-panel.open { display: grid; }
-.feat-panel { grid-template-columns: 1fr; }
+.feat-panel { grid-template-columns: 1fr; gap: 6px; width: 280px; max-height: 70vh; overflow-y: auto; }
+.fp-sec { font: 700 11px var(--sans); color: var(--text3); margin-top: 6px; }
+.fp-sec:first-child { margin-top: 0; }
+.fp-list { display: grid; gap: 8px; }
+.fp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+.fp-row { display: flex; gap: 8px; }
+.fp-hint { font-size: 10px; color: var(--text3); border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
 .col-picker-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text2); cursor: pointer; user-select: none; white-space: nowrap; }
 .col-picker-item input { accent-color: var(--accent); flex-shrink: 0; }
 .col-picker-item:hover { color: var(--text); }
@@ -1132,17 +1138,23 @@ tbody tr:last-child td { border-bottom: none; }
         <input type="search" id="tickerSearch" class="ticker-search" placeholder="חיפוש מניה..." aria-label="חיפוש מניה"
           oninput="_searchInput(this.value)"
           onkeydown="if(event.key==='Escape'){this.value='';_searchInput('',true);}event.stopPropagation()">
-        <div class="col-picker" id="colPickerWrap" style="display:none">
-          <button class="btn-ghost" id="colPickerBtn" onclick="toggleColPicker(event)" title="בחר עמודות" aria-haspopup="true" aria-expanded="false" aria-controls="colPickerPanel">עמודות &#8862;</button>
-          <div class="col-picker-panel" id="colPickerPanel"></div>
-        </div>
         <div class="col-picker" id="featWrap">
-          <button class="btn-ghost" id="featBtn" onclick="toggleFeatPanel(event)" title="הגדרות תצוגה" aria-label="הגדרות תצוגה" aria-haspopup="true" aria-expanded="false" aria-controls="featPanel">&#9881;</button>
-          <div class="col-picker-panel feat-panel" id="featPanel"></div>
+          <button class="btn-ghost" id="featBtn" onclick="toggleFeatPanel(event)" title="הגדרות" aria-label="הגדרות" aria-haspopup="true" aria-expanded="false" aria-controls="featPanel">&#9881;</button>
+          <div class="col-picker-panel feat-panel" id="featPanel">
+            <div class="fp-sec">מה להציג</div>
+            <div class="fp-list" id="featToggles"></div>
+            <div id="colPickerWrap" style="display:none">
+              <div class="fp-sec">עמודות בטבלה</div>
+              <div class="fp-cols" id="colPickerPanel"></div>
+            </div>
+            <div class="fp-sec">ייצוא</div>
+            <div class="fp-row">
+              <button class="btn-ghost" onclick="exportTickers()" title="העתק את כל הטיקרים ללוח">העתק רשימה</button>
+              <button class="btn-ghost" onclick="exportCSV()">ייצוא CSV</button>
+            </div>
+            <div class="fp-hint" id="kbdHint">קיצורי מקלדת: j/k לזוז · Enter לגרף · w למעקב · Esc לסגור</div>
+          </div>
         </div>
-        <button class="btn-ghost" onclick="exportTickers()" title="העתק כל הטיקרים לקליפבורד">העתק רשימה</button>
-        <button class="btn-ghost" onclick="exportCSV()">ייצוא CSV</button>
-        <span class="kbd-hint" id="kbdHint" title="ניווט מקלדת: j/k לזוז · Enter לפתוח גרף · w להוסיף/הסיר ממעקב · Esc לסגור">j/k/w &#8629;</span>
       </div>
     </div>
     <div id="sectorStrength" class="sector-strength"></div>
@@ -2696,9 +2708,9 @@ function buildColPicker(){
 function toggleFeatPanel(e){
   e.stopPropagation();
   const panel=$('featPanel'), btn=$('featBtn');
-  $('colPickerPanel')?.classList.remove('open');
   if(panel.classList.contains('open')){ panel.classList.remove('open'); btn.setAttribute('aria-expanded','false'); return; }
-  panel.innerHTML=FEATURE_DEFS.map(f=>
+  buildColPicker();
+  $('featToggles').innerHTML=FEATURE_DEFS.map(f=>
     '<label class="col-picker-item"><input type="checkbox" '+(colVis[f.key]!==false?'checked':'')+' onchange="setFeature(\''+f.key+'\',this.checked)"> '+f.label+'</label>').join('');
   const rect=e.currentTarget.getBoundingClientRect();
   panel.style.top=(rect.bottom+6)+'px';
@@ -2711,20 +2723,6 @@ async function setFeature(key, on){
   await setColVis(key, on);
   _renderWlBreakouts();
 }
-function toggleColPicker(e){
-  e.stopPropagation();
-  const panel=$('colPickerPanel'); if(!panel) return;
-  $('featPanel')?.classList.remove('open');
-  if(!panel.innerHTML) buildColPicker();
-  const btn=$('colPickerBtn');
-  if(panel.classList.contains('open')){ panel.classList.remove('open'); btn?.setAttribute('aria-expanded','false'); return; }
-  const rect=e.currentTarget.getBoundingClientRect();
-  panel.style.top=(rect.bottom+6)+'px';
-  panel.style.left=rect.left+'px';
-  panel.classList.add('open');
-  btn?.setAttribute('aria-expanded','true');
-}
-
 async function setColVis(key, on){
   colVis[key]=on;
   if(_currentUser && _sb){
@@ -2737,12 +2735,10 @@ async function setColVis(key, on){
 }
 
 document.addEventListener('click', e=>{
-  const wrap=$('colPickerWrap');
-  if(wrap && !wrap.contains(e.target)) $('colPickerPanel')?.classList.remove('open');
   if(!$('featWrap')?.contains(e.target)) $('featPanel')?.classList.remove('open');
 });
-document.addEventListener('scroll', ()=>{ $('colPickerPanel')?.classList.remove('open'); $('featPanel')?.classList.remove('open'); }, {passive:true, capture:true});
-window.addEventListener('resize', ()=>{ $('colPickerPanel')?.classList.remove('open'); $('featPanel')?.classList.remove('open'); });
+document.addEventListener('scroll', e=>{ if(!$('featPanel')?.contains(e.target)) $('featPanel')?.classList.remove('open'); }, {passive:true, capture:true});
+window.addEventListener('resize', ()=>{ $('featPanel')?.classList.remove('open'); });
 
 /* ════════════════════════════════════
    SEPA SCORE  (0-100)
@@ -4783,7 +4779,7 @@ function exportTickers(){
    KEYBOARD NAV  (j/k/w/Enter)
 ════════════════════════════════════ */
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape'){ closeModal(); closeAuthModal(); $('colPickerPanel')?.classList.remove('open'); $('colPickerBtn')?.setAttribute('aria-expanded','false'); return; }
+  if(e.key==='Escape'){ closeModal(); closeAuthModal(); $('featPanel')?.classList.remove('open'); $('featBtn')?.setAttribute('aria-expanded','false'); return; }
   const tag=document.activeElement?.tagName;
   if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA') return;
   // Leaving watch mode first, like every other screener entry point: scan()
