@@ -1111,6 +1111,18 @@
     closeModal();
   }
 
+  {
+    const host = document.createElement('div');
+    host.innerHTML = _wlBrkHtml([{ t: 'AAA', date: '2026-09-22', pivot: 95.76, volX: 1.6 }, { t: 'BBB', date: '2026-09-21', pivot: 136.75, volX: 1.64 }]);
+    const items = [...host.querySelectorAll('.wl-bo')];
+    check('each watchlist breakout gets its own box with its own button',
+      items.length === 2 && items.every(i => i.querySelectorAll('button').length === 1),
+      items.map(i => i.textContent).join(' | '));
+    check('breakout box reads as a sentence',
+      items[1]?.querySelector('b')?.textContent === 'BBB' && items[1]?.querySelector('span')?.textContent === 'פרצה ב-21/09 מעל $136.75, ווליום פי 1.6',
+      items[1]?.textContent);
+  }
+
   setScreener('sepa', true); // restore
   return R;
 })()
