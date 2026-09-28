@@ -485,16 +485,26 @@
       const j = i - 200, c = i < 200 ? 100 + i * 0.4 : 179.6 * (1 - 0.08 * (1 - j / 50) * (1 + Math.sin(j / 2)) / 2);
       return mk(i, c);
     });
-    const pv = _vcp(base).pivot;
+    const pv = Math.max(...base.slice(-60).map(b => b.h));
     const tail = (moves) => { let c = base.at(-1).c; return base.concat(moves.map(([m, v], k) => mk(250 + k, c = c * (1 + m), v))); };
-    const brk = tail([[0.002, 900], [pv * 1.02 / (base.at(-1).c * 1.002) - 1, 2000], [0.003, 1100]]);
+    const through = (p) => p * 1.02 / (base.at(-1).c * 1.002) - 1;
+    const brk = tail([[0.002, 900], [through(pv), 2000], [0.003, 1100]]);
     const b = _recentBreakout(brk);
-    check('_recentBreakout: a close through the pivot on heavy volume is found', b && b.date && Math.abs(b.pivot - pv) < 1e-9 && b.volX >= 1.4, JSON.stringify(b) + ' pv ' + pv);
+    check('_recentBreakout: a close above the base high on heavy volume is found', b && b.date && Math.abs(b.pivot - Math.max(...brk.slice(-62, -2).map(x => x.h))) < 1e-9 && b.volX >= 1.4, JSON.stringify(b) + ' pv ' + pv);
     check('_recentBreakout: dated on the day it crossed, not a later day above it', b && b.date === _etDay.format(new Date(brk.at(-2).t * 1000)), JSON.stringify(b));
-    const follow = tail([[0.002, 900], [pv * 1.02 / (base.at(-1).c * 1.002) - 1, 2000], [0.003, 2100]]);
+    const follow = tail([[0.002, 900], [through(pv), 2000], [0.003, 2100]]);
     check('_recentBreakout: a heavy day that merely stays above the pivot is not a new breakout', _recentBreakout(follow)?.date === _etDay.format(new Date(follow.at(-2).t * 1000)), JSON.stringify(_recentBreakout(follow)));
-    const quietBrk = tail([[0.002, 900], [pv * 1.02 / (base.at(-1).c * 1.002) - 1, 1000], [0.003, 1100]]);
+    const quietBrk = tail([[0.002, 900], [through(pv), 1000], [0.003, 1100]]);
     check('_recentBreakout: crossing on ordinary volume is not a breakout', _recentBreakout(quietBrk) === null, JSON.stringify(_recentBreakout(quietBrk)));
+    const path = [...Array.from({ length: 200 }, (_, i) => 100 + i * 0.4),
+      ...Array.from({ length: 30 }, (_, i) => 179.6 * (1 - 0.2 * (i + 1) / 30)),
+      ...Array.from({ length: 10 }, (_, i) => 143.7 * (1 + 0.05 * (i + 1) / 10)),
+      ...Array.from({ length: 10 }, (_, i) => 150.9 * (1 - 0.06 * (i + 1) / 10))];
+    const dip = path.map((c, i) => mk(i, c));
+    const swing = Math.max(...dip.slice(-20).map(b => b.h));
+    const bounce = dip.concat([mk(250, swing * 1.02, 2500)]);
+    check('_recentBreakout: clearing a lower swing high inside a correction is a bounce, not a breakout (ROG 22/09)',
+      swing * 1.1 < Math.max(...dip.slice(-60).map(b => b.h)) && _recentBreakout(bounce) === null, JSON.stringify(_recentBreakout(bounce)));
     check('_recentBreakout: still under the pivot → none', _recentBreakout(tail([[0.002, 2000], [0.001, 2000]])) === null);
     check('_recentBreakout: too little history → none', _recentBreakout(base.slice(0, 40)) === null);
     const found = [{ t: 'AAA', date: '2026-09-24' }, { t: 'BBB', date: '2026-09-24' }, { t: 'CCC', date: '2026-09-24' }, { t: 'DDD', date: '2026-09-24' }];

@@ -1959,11 +1959,11 @@ function _recentBreakout(bars, lookback=5, now=Date.now()){
   const done=_completedBars(bars, now);
   if(!done || done.length<70) return null;
   for(let d=done.length-1; d>=done.length-lookback; d--){
-    const v=_vcp(done.slice(0,d), 90, now);
-    if(!v?.pivot || v.contractions<2) continue;
+    const base=done.slice(d-60,d);
+    const hi=Math.max(...base.map(b=>b.h));
     const prev=done[d-1], cur=done[d], vol50=done.slice(d-50,d).reduce((s,b)=>s+b.v,0)/50;
-    if(cur.c>v.pivot && prev.c<=v.pivot && vol50>0 && cur.v>=1.4*vol50)
-      return {date:_etDay.format(new Date(cur.t*1000)), pivot:v.pivot, close:cur.c, volX:cur.v/vol50};
+    if(cur.c>hi && prev.c<=hi && vol50>0 && cur.v>=1.4*vol50)
+      return {date:_etDay.format(new Date(cur.t*1000)), pivot:hi, close:cur.c, volX:cur.v/vol50};
   }
   return null;
 }
