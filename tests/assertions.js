@@ -1144,6 +1144,26 @@
       items[1]?.textContent);
   }
 
+  {
+    const saved = { ...colVis };
+    try {
+      check('settings: every display feature is on by default', FEATURE_DEFS.every(f => colVis[f.key] === true), JSON.stringify(FEATURE_DEFS.map(f => [f.key, colVis[f.key]])));
+      $('colPickerWrap').style.display = '';
+      $('featBtn').click();
+      check('settings: the gear opens one switch per feature', $('featPanel').classList.contains('open') && $('featPanel').querySelectorAll('input[type=checkbox]').length === FEATURE_DEFS.length);
+      $('featBtn').click();
+      const v = { pivot: 341, distToPivot: -1, baseHigh: 408, distToBase: -17.3 };
+      colVis.f_baseHigh = false;
+      check('settings: base high off hides its line under the pivot', !/שיא הבסיס/.test(pivotHtml(v)) && /\$341/.test(pivotHtml(v)), pivotHtml(v));
+      colVis.f_journalBtn = false;
+      openChart('NASDAQ:ABC', 'ABC', 'Abc Inc');
+      check('settings: journal button off stays hidden', $('modalJournal').hidden === true);
+      closeModal();
+    } finally {
+      Object.keys(colVis).forEach(k => delete colVis[k]); Object.assign(colVis, saved);
+    }
+  }
+
   setScreener('sepa', true); // restore
   return R;
 })()

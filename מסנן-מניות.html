@@ -513,6 +513,8 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: co
   box-shadow: 0 8px 28px rgba(0,0,0,0.5);
 }
 .col-picker-panel.open { display: grid; }
+.feat-panel { grid-template-columns: 1fr; }
+.col-picker { display: flex; gap: 6px; }
 .col-picker-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text2); cursor: pointer; user-select: none; white-space: nowrap; }
 .col-picker-item input { accent-color: var(--accent); flex-shrink: 0; }
 .col-picker-item:hover { color: var(--text); }
@@ -1134,6 +1136,8 @@ tbody tr:last-child td { border-bottom: none; }
         <div class="col-picker" id="colPickerWrap" style="display:none">
           <button class="btn-ghost" id="colPickerBtn" onclick="toggleColPicker(event)" title="בחר עמודות" aria-haspopup="true" aria-expanded="false" aria-controls="colPickerPanel">עמודות &#8862;</button>
           <div class="col-picker-panel" id="colPickerPanel"></div>
+          <button class="btn-ghost" id="featBtn" onclick="toggleFeatPanel(event)" title="הגדרות תצוגה" aria-label="הגדרות תצוגה" aria-haspopup="true" aria-expanded="false" aria-controls="featPanel">&#9881;</button>
+          <div class="col-picker-panel feat-panel" id="featPanel"></div>
         </div>
         <button class="btn-ghost" onclick="exportTickers()" title="העתק כל הטיקרים לקליפבורד">העתק רשימה</button>
         <button class="btn-ghost" onclick="exportCSV()">ייצוא CSV</button>
@@ -1798,7 +1802,7 @@ async function _ohlcDraw(el){
     const volCol = hiContrast ? (isLight?'rgba(51,65,85,0.45)':'rgba(255,255,255,0.5)') : (_cv('--chart-vol')||'rgba(255,255,255,0.25)');
     vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:volCol})));
     const row=results.find(x=>x.ticker===el.dataset.ticker)||ttUniverse[el.dataset.ticker];
-    _pivotLines(row?.vcp?.pivot!=null ? row.vcp : _vcp(bars)).forEach(l=>bs.createPriceLine({
+    (colVis.f_pivotLines===false ? [] : _pivotLines(row?.vcp?.pivot!=null ? row.vcp : _vcp(bars)).filter(l=>!l.base || colVis.f_baseHigh!==false)).forEach(l=>bs.createPriceLine({
       price:l.price, title:l.title, color:_rgbColor(_cv(l.base?'--text3':'--accent')), lineWidth:l.base?1:2,
       lineStyle:l.base?LightweightCharts.LineStyle.Dashed:LightweightCharts.LineStyle.Solid, axisLabelVisible:true}));
     _fitChart(chart, bars.length);
@@ -2390,9 +2394,16 @@ async function validateExact(list, scr, onProgress, signal){
   await Promise.all(Array.from({length:Math.min(20,total)}, worker));
   return list.filter(r=>!r._exactFail);
 }
+const FEATURE_DEFS = [
+  {key:'f_pivotLines', label:'קו Pivot בגרפים'},
+  {key:'f_baseHigh',   label:'שיא הבסיס (בטבלה ובגרפים)'},
+  {key:'f_breakouts',  label:'פס "פרצו לאחרונה" במעקב'},
+  {key:'f_journalBtn', label:'כפתור "הוסף ליומן"'},
+];
 let colVis = _lsJSON('sepa_colvis', null) || Object.fromEntries(COL_DEFS.map(c=>[c.key, c.defaultOn]));
 if(!('adr' in colVis)) colVis.adr = true;
 if(!('pivot' in colVis)) colVis.pivot = true;
+FEATURE_DEFS.forEach(f=>{ if(!(f.key in colVis)) colVis[f.key] = true; });
 let searchQuery = '';
 let newToday = new Set();
 // 'screener|ticker' -> 'YYYY-MM-DD' the ticker first appeared in THAT
@@ -2479,7 +2490,7 @@ function pivotHtml(v){
   if(v?.pivot==null || v.distToPivot==null) return '<span class="mn" style="color:var(--text3)">—</span>';
   const d=v.distToPivot, c=d>2?'var(--red)':d>=-3?'var(--green)':'var(--text2)';
   const px=p=>'$'+(p>=100?p.toFixed(0):p.toFixed(2));
-  const base=v.baseHigh!=null && v.baseHigh>v.pivot*1.02
+  const base=colVis.f_baseHigh!==false && v.baseHigh!=null && v.baseHigh>v.pivot*1.02
     ? '<div class="piv-base" title="השיא של 60 ימי המסחר האחרונים. פריצה אמיתית היא מעליו; מעל ה-Pivot בלבד זה עדיין בתוך התיקון">שיא הבסיס '+px(v.baseHigh)+' <span class="mn">'+v.distToBase.toFixed(1)+'%</span></div>' : '';
   return '<span class="mn">'+px(v.pivot)+'</span> <span class="mn" style="color:'+c+'">'+(d>0?'+':'')+d.toFixed(1)+'%</span>'+base;
 }
@@ -2681,9 +2692,28 @@ function buildColPicker(){
   ).join('');
 }
 
+function toggleFeatPanel(e){
+  e.stopPropagation();
+  const panel=$('featPanel'), btn=$('featBtn');
+  $('colPickerPanel')?.classList.remove('open');
+  if(panel.classList.contains('open')){ panel.classList.remove('open'); btn.setAttribute('aria-expanded','false'); return; }
+  panel.innerHTML=FEATURE_DEFS.map(f=>
+    '<label class="col-picker-item"><input type="checkbox" '+(colVis[f.key]!==false?'checked':'')+' onchange="setFeature(\''+f.key+'\',this.checked)"> '+f.label+'</label>').join('');
+  const rect=e.currentTarget.getBoundingClientRect();
+  panel.style.top=(rect.bottom+6)+'px';
+  panel.style.left=rect.left+'px';
+  panel.classList.add('open');
+  btn.setAttribute('aria-expanded','true');
+}
+async function setFeature(key, on){
+  _ohlcDisposeAll(); _galleryKey=''; _tableKey='';
+  await setColVis(key, on);
+  _renderWlBreakouts();
+}
 function toggleColPicker(e){
   e.stopPropagation();
   const panel=$('colPickerPanel'); if(!panel) return;
+  $('featPanel')?.classList.remove('open');
   if(!panel.innerHTML) buildColPicker();
   const btn=$('colPickerBtn');
   if(panel.classList.contains('open')){ panel.classList.remove('open'); btn?.setAttribute('aria-expanded','false'); return; }
@@ -2707,10 +2737,10 @@ async function setColVis(key, on){
 
 document.addEventListener('click', e=>{
   const wrap=$('colPickerWrap');
-  if(wrap && !wrap.contains(e.target)) $('colPickerPanel')?.classList.remove('open');
+  if(wrap && !wrap.contains(e.target)){ $('colPickerPanel')?.classList.remove('open'); $('featPanel')?.classList.remove('open'); }
 });
-document.addEventListener('scroll', ()=>{ $('colPickerPanel')?.classList.remove('open'); }, {passive:true, capture:true});
-window.addEventListener('resize', ()=>{ $('colPickerPanel')?.classList.remove('open'); });
+document.addEventListener('scroll', ()=>{ $('colPickerPanel')?.classList.remove('open'); $('featPanel')?.classList.remove('open'); }, {passive:true, capture:true});
+window.addEventListener('resize', ()=>{ $('colPickerPanel')?.classList.remove('open'); $('featPanel')?.classList.remove('open'); });
 
 /* ════════════════════════════════════
    SEPA SCORE  (0-100)
@@ -4101,7 +4131,7 @@ function _untradedBreakouts(found, trades, missed){
 let _wlBrk=[], _wlBrkKey='';
 function _renderWlBreakouts(){
   const el=$('wlBreakouts'); if(!el) return;
-  if(mode!=='watch' || !_currentUser || !_sb || !watchlist.size){ el.style.display='none'; return; }
+  if(mode!=='watch' || !_currentUser || !_sb || !watchlist.size || colVis.f_breakouts===false){ el.style.display='none'; return; }
   const key=[...watchlist].sort().join(',');
   if(key!==_wlBrkKey){ _wlBrkKey=key; _wlBrk=[]; _loadWlBreakouts(key); }
   if(!_wlBrk.length){ el.style.display='none'; el.innerHTML=''; return; }
@@ -4657,7 +4687,7 @@ function openChart(sym, ticker, name){
   _modalReturnFocus=document.activeElement;
   _setBgInert('modal', true);
   $('modalTitle').textContent=ticker; $('modalSub').textContent=name;
-  _modalTicker=ticker; $('modalJournal').hidden=!IN_JOURNAL;
+  _modalTicker=ticker; $('modalJournal').hidden=!IN_JOURNAL || colVis.f_journalBtn===false;
   const wrap=$('modalChart'); wrap.innerHTML='';
   const config=JSON.stringify({
     autosize:true, symbol:sym, interval:"D", timezone:"Etc/UTC",
@@ -4851,6 +4881,7 @@ async function loadUserData(){
   if(prefData?.col_vis) colVis = prefData.col_vis;
   if(!('adr' in colVis)) colVis.adr = true;
   if(!('pivot' in colVis)) colVis.pivot = true;
+  FEATURE_DEFS.forEach(f=>{ if(!(f.key in colVis)) colVis[f.key] = true; });
 
   const wlChanged = [...watchlist].sort().join(',') !== wlBefore;
   // The watchlist arrives from Supabase AFTER boot, and nothing awaits it — a
