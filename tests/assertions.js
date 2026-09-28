@@ -1171,6 +1171,8 @@
     }
   }
 
+  check('the nightly scan banner is gone', !document.getElementById('dailyBanner') && typeof dismissDaily === 'undefined');
+
   setScreener('sepa', true); // restore
   return R;
 })()

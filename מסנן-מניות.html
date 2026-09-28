@@ -568,10 +568,9 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: co
 }
 .src-tab:hover { color: var(--text2); }
 .src-tab.active { color: var(--text); background: var(--surface); border-color: var(--border); }
-/* Scan-only chrome (nightly banner, sector strength, sector dropdown) describes
+/* Scan-only chrome (sector strength, sector dropdown) describes
    the SCAN's population, so on the watchlist it captioned rows it had nothing
-   to do with. Hidden by class, not inline style — dailyBanner's own show/hide
-   writes element.style.display and would fight it. */
+   to do with. */
 .scan-only-hidden { display: none !important; }
 .kbd-hint {
   font: 500 11px var(--mono); color: var(--text3);
@@ -763,23 +762,6 @@ tbody tr:last-child td { border-bottom: none; }
 /* ── Toast ── */
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(14px); background: var(--surface); border: 1px solid rgba(255,255,255,0.1); color: var(--text); padding: 10px 20px; border-radius: 14px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity 0.2s ease-out, transform 0.2s var(--ease-out-strong); z-index: 200; pointer-events: none; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-/* ── Daily banner ── */
-.daily-banner {
-  display: flex; align-items: center; gap: 8px 18px; flex-wrap: wrap;
-  background: linear-gradient(135deg, rgba(79,131,255,0.09), rgba(79,131,255,0.02));
-  border: 1px solid rgba(79,131,255,0.22); border-radius: 14px;
-  padding: 10px 16px; margin-bottom: 14px;
-  font-size: 12.5px; color: var(--text2); line-height: 1.7;
-}
-.db-title { font-weight: 700; color: var(--accent2); white-space: nowrap; }
-.db-list { direction: ltr; unicode-bidi: isolate; font-family: var(--mono-data); font-size: 12px; }
-.db-close {
-  margin-right: auto; background: transparent; border: 1px solid var(--border);
-  color: var(--text3); border-radius: 7px; width: 26px; height: 26px;
-  font-size: 12px; display: grid; place-items: center; flex-shrink: 0;
-}
-.db-close:hover { color: var(--text); background: var(--bg3); }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -1001,7 +983,6 @@ tbody tr:last-child td { border-bottom: none; }
 <main class="main">
   <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">מסנן מניות SEPA — Minervini Trend Template</h1>
 
-  <div id="dailyBanner" class="daily-banner" style="display:none"></div>
 
   <!-- Filter -->
   <div class="filter-panel open" id="filterPanel">
@@ -4215,7 +4196,7 @@ function applyView(){
   const kh=$('kbdHint'); if(kh) kh.style.display=(layout==='gallery')?'none':'';
   const cpw=$('colPickerWrap'); if(cpw) cpw.style.display=(layout==='gallery'||!allResults.length)?'none':'';
   // Everything in this list describes the SCAN, not a saved list.
-  ['dailyBanner','sectorWrap','sectorStrength'].forEach(id=>$(id)?.classList.toggle('scan-only-hidden', isWl));
+  ['sectorWrap','sectorStrength'].forEach(id=>$(id)?.classList.toggle('scan-only-hidden', isWl));
   if(isWl) $('resultsPanel').style.display='block';
   _syncWlTopbarBtn();
   // The watchlist is a saved list, not a scan — the preset row stays
@@ -4975,27 +4956,6 @@ async function loadDailyStatus(){
     if(!r.ok) return;
     const rows=await r.json(); if(!rows.length) return;
     drawBreadthSpark(rows);
-    const {scan_date, summary}=rows[0];
-    if(localStorage.getItem('sepa_daily_dismissed')===scan_date) return;
-    const ent=summary?.entries||[], ex=summary?.exits||[], perf=summary?.perf;
-    const perfBits=[];
-    if(perf) ['d5','d10','d20'].forEach(k=>{
-      const p=perf[k]; if(!p||!p.n) return;
-      perfBits.push(k.slice(1)+' ימים: <b class="'+(p.avg>=0?'pos':'neg')+'">'+(p.avg>=0?'+':'')+p.avg.toFixed(1)+'%</b> ('+p.n+' מניות)');
-    });
-    if(!ent.length && !ex.length && !perfBits.length) return;
-    // Tickers come from the screener_daily row rather than the live scan, so
-    // escape them like any other stored value before they reach innerHTML.
-    const mark=t=>watchlist.has(t)?'<b style="color:var(--yellow)">★'+escHtml(t)+'</b>':escHtml(t);
-    const fmt=a=>a.slice(0,12).map(mark).join(', ')+(a.length>12?' +'+(a.length-12):'');
-    const dateHe=escHtml(String(scan_date).slice(5).split('-').reverse().join('/'));
-    const el=$('dailyBanner');
-    el.innerHTML='<span class="db-title">סריקת לילה '+dateHe+'</span>'
-      +(ent.length?'<span><b style="color:var(--green)">נכנסו ('+ent.length+'):</b> <span class="db-list">'+fmt(ent)+'</span></span>':'')
-      +(ex.length?'<span><b style="color:var(--red)">יצאו ('+ex.length+'):</b> <span class="db-list">'+fmt(ex)+'</span></span>':'')
-      +(perfBits.length?'<span title="תשואה ממוצעת עד היום של המניות שנכנסו לסינון לפני X ימי מסחר"><b style="color:var(--accent2)">ביצועי כניסות עבר:</b> '+perfBits.join(' · ')+'</span>':'')
-      +'<button class="db-close" onclick="dismissDaily(\''+esc(String(scan_date))+'\')" aria-label="סגור">✕</button>';
-    el.style.display='flex';
   }catch(e){ console.error('[dailyStatus]', e); }
 }
 function drawBreadthSpark(rows){
@@ -5009,10 +4969,6 @@ function drawBreadthSpark(rows){
   el.innerHTML='<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true"><polyline points="'+poly+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
   el.title='בריאות שוק — אחוז המניות במגמת עלייה, '+n+' סריקות לילה אחרונות (עדכני: '+last+'%)';
   el.classList.add('show');
-}
-function dismissDaily(d){
-  try{ localStorage.setItem('sepa_daily_dismissed', d); }catch(e){}
-  $('dailyBanner').style.display='none';
 }
 
 // Bump alongside any new migration added in loadFilterPrefs — this used to be
