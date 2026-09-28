@@ -477,6 +477,33 @@
     check('_screenerPerf: a stock with no bars is skipped, not counted as zero', _screenerPerf([{ ticker: 'X', first_seen: '2026-09-03' }], () => null, flat)[5].n === 0);
   }
 
+  // ── watchlist breakouts (2026-09-28): several logged misses say "it was on
+  // the watchlist and I didn't notice" ──
+  {
+    const mk = (i, c, v = 1000) => ({ t: Date.UTC(2025, 0, 1) / 1000 + i * 86400, o: c, h: c * 1.01, l: c * 0.99, c, v });
+    const base = Array.from({ length: 250 }, (_, i) => {
+      const j = i - 200, c = i < 200 ? 100 + i * 0.4 : 179.6 * (1 - 0.08 * (1 - j / 50) * (1 + Math.sin(j / 2)) / 2);
+      return mk(i, c);
+    });
+    const pv = _vcp(base).pivot;
+    const tail = (moves) => { let c = base.at(-1).c; return base.concat(moves.map(([m, v], k) => mk(250 + k, c = c * (1 + m), v))); };
+    const brk = tail([[0.002, 900], [pv * 1.02 / (base.at(-1).c * 1.002) - 1, 2000], [0.003, 1100]]);
+    const b = _recentBreakout(brk);
+    check('_recentBreakout: a close through the pivot on heavy volume is found', b && b.date && Math.abs(b.pivot - pv) < 1e-9 && b.volX >= 1.4, JSON.stringify(b) + ' pv ' + pv);
+    check('_recentBreakout: dated on the day it crossed, not a later day above it', b && b.date === _etDay.format(new Date(brk.at(-2).t * 1000)), JSON.stringify(b));
+    const quietBrk = tail([[0.002, 900], [pv * 1.02 / (base.at(-1).c * 1.002) - 1, 1000], [0.003, 1100]]);
+    check('_recentBreakout: crossing on ordinary volume is not a breakout', _recentBreakout(quietBrk) === null, JSON.stringify(_recentBreakout(quietBrk)));
+    check('_recentBreakout: still under the pivot → none', _recentBreakout(tail([[0.002, 2000], [0.001, 2000]])) === null);
+    check('_recentBreakout: too little history → none', _recentBreakout(base.slice(0, 40)) === null);
+    const found = [{ t: 'AAA', date: '2026-09-24' }, { t: 'BBB', date: '2026-09-24' }, { t: 'CCC', date: '2026-09-24' }, { t: 'DDD', date: '2026-09-24' }];
+    const left = _untradedBreakouts(found,
+      [{ symbol: 'AAA', entry_date: '2026-09-23' }, { symbol: 'DDD', entry_date: '2026-08-01' }],
+      [{ symbol: 'BBB', date: '2026-09-24' }]).map(b => b.t);
+    check('breakouts: one you traded around the breakout is not offered', !left.includes('AAA'), left.join());
+    check('breakouts: one already logged as missed is not offered again', !left.includes('BBB'), left.join());
+    check('breakouts: an old trade in the same stock does not hide a new breakout', left.includes('DDD') && left.includes('CCC'), left.join());
+  }
+
   // ── cleanbase is registered like every other screener ──
   {
     check('SCREENERS.cleanbase is registered', !!SCREENERS.cleanbase);

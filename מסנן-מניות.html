@@ -1134,6 +1134,7 @@ tbody tr:last-child td { border-bottom: none; }
     <div id="sectorStrength" class="sector-strength"></div>
     <details id="perfPanel" class="perf-panel" ontoggle="if(this.open) loadScreenerPerf()"><summary>ביצועי המסנן — מניות שנכנסו ב-60 הימים האחרונים</summary><div id="perfBody"></div></details>
     <div id="wlMissing" class="wl-missing" style="display:none"></div>
+    <div id="wlBreakouts" class="wl-missing" style="display:none"></div>
     <div id="tableView" class="table-wrap"></div>
     <div id="galleryView" class="gallery" style="display:none"></div>
   </div>
@@ -1940,6 +1941,22 @@ async function _fetchBars1yWarm(tickers, signal){
   need.forEach(t=>_warmInflight.set(t,job));
   try{ await Promise.all([job, ...waits]); }
   finally{ need.forEach(t=>{ if(_warmInflight.get(t)===job) _warmInflight.delete(t); }); }
+}
+// A watchlist name that just cleared its base: the most recent completed
+// session in the last `lookback` that closed through the pivot of the base as
+// it stood the day before (a later day that merely stays above it is not
+// re-counted), on at least 1.4x its 50-day volume.
+function _recentBreakout(bars, lookback=5, now=Date.now()){
+  const done=_completedBars(bars, now);
+  if(!done || done.length<70) return null;
+  for(let d=done.length-1; d>=done.length-lookback; d--){
+    const v=_vcp(done.slice(0,d), 90, now);
+    if(!v?.pivot || v.contractions<2) continue;
+    const prev=done[d-1], cur=done[d], vol50=done.slice(d-50,d).reduce((s,b)=>s+b.v,0)/50;
+    if(cur.c>v.pivot && prev.c<=v.pivot && vol50>0 && cur.v>=1.4*vol50)
+      return {date:_etDay.format(new Date(cur.t*1000)), pivot:v.pivot, close:cur.c, volX:cur.v/vol50};
+  }
+  return null;
 }
 function _sma(c, end, period){ if(end-period+1<0) return null; let s=0; for(let i=end-period+1;i<=end;i++) s+=c[i]; return s/period; }
 function _ma200Rising(bars){
@@ -4015,6 +4032,7 @@ function render(){
   if(mode==='watch') layout==='gallery' ? renderWatchlistGallery() : renderWatchlist();
   else               layout==='gallery' ? renderGallery()          : renderTable();
   _renderWlMissing();
+  _renderWlBreakouts();
 }
 
 // forceTickers can only rescue a ticker that is still IN the scanned universe.
@@ -4037,6 +4055,52 @@ function _renderWlMissing(){
   el.innerHTML='במעקב ללא נתונים מהסריקה האחרונה: '
     +missing.map(t=>'<b>'+escHtml(t)+'</b>').join(', ')
     +reason;
+}
+
+// Watchlist names that broke out in the last 5 sessions and were neither
+// traded nor logged as missed — several logged misses read "it was on the
+// watchlist and I didn't notice". One click writes the journal's own
+// missed_opportunities row (same Supabase user, same table the journal reads).
+const _brkDaysBefore=(d,n)=>new Date(Date.parse(d)-n*86400000).toISOString().slice(0,10);
+function _untradedBreakouts(found, trades, missed){
+  return found.filter(b=>{ const from=_brkDaysBefore(b.date,3);
+    return !(trades||[]).some(x=>x.symbol===b.t && x.entry_date>=from) && !(missed||[]).some(x=>x.symbol===b.t && x.date>=from); });
+}
+let _wlBrk=[], _wlBrkKey='';
+function _renderWlBreakouts(){
+  const el=$('wlBreakouts'); if(!el) return;
+  if(mode!=='watch' || !_currentUser || !_sb || !watchlist.size){ el.style.display='none'; return; }
+  const key=[...watchlist].sort().join(',');
+  if(key!==_wlBrkKey){ _wlBrkKey=key; _wlBrk=[]; _loadWlBreakouts(key); }
+  if(!_wlBrk.length){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='';
+  el.innerHTML='פרצו לאחרונה ולא נכנסת: '+_wlBrk.map(b=>'<b>'+escHtml(b.t)+'</b> <span class="mn">'
+    +b.date.slice(5).split('-').reverse().join('/')+' · Pivot $'+b.pivot.toFixed(2)+' · ווליום ×'+b.volX.toFixed(1)+'</span> '
+    +'<button class="btn-ghost" onclick="logMissedBreakout(\''+escHtml(b.t)+'\')">רשום כפספוס</button>').join(' · ');
+}
+async function _loadWlBreakouts(key){
+  const tickers=[...watchlist];
+  await _fetchBars1yWarm(tickers).catch(()=>{});
+  const found=[];
+  for(const t of tickers){ const b=_recentBreakout(await _fetchBars1y(t)); if(b) found.push({t, ...b}); }
+  if(key!==_wlBrkKey || !found.length) return;
+  const from=_brkDaysBefore(found.map(b=>b.date).sort()[0],3), syms=found.map(b=>b.t);
+  const [tr, ms]=await Promise.all([
+    _sb.from('trades').select('symbol,entry_date').eq('user_id',_currentUser.id).is('deleted_at',null).in('symbol',syms).gte('entry_date',from),
+    _sb.from('missed_opportunities').select('symbol,date').eq('user_id',_currentUser.id).in('symbol',syms).gte('date',from)]);
+  // Without both answers a traded name would be offered as "missed".
+  if(key!==_wlBrkKey || tr.error || ms.error) return;
+  _wlBrk=_untradedBreakouts(found, tr.data, ms.data);
+  _renderWlBreakouts();
+}
+async function logMissedBreakout(t){
+  const b=_wlBrk.find(x=>x.t===t); if(!b) return;
+  _wlBrk=_wlBrk.filter(x=>x!==b); _renderWlBreakouts();
+  const {error}=await _sb.from('missed_opportunities').insert({user_id:_currentUser.id, symbol:t, date:b.date,
+    price:+b.close.toFixed(2), sector:ttUniverse[t]?.sector||'',
+    note:'פרצה מ-Pivot $'+b.pivot.toFixed(2)+' על ווליום ×'+b.volX.toFixed(1)+' — זוהה אוטומטית מרשימת המעקב'});
+  if(error){ _wlBrk.push(b); _renderWlBreakouts(); toast('השמירה נכשלה — נסה שוב'); return; }
+  toast(t+' נרשמה ב"פוספסו" ביומן ✓');
 }
 
 function setMode(m){
