@@ -399,6 +399,17 @@
       _completedBars(tueBars.slice(0, 1), utc('2026-09-22T15:00:00')).length === 1);
     check('_closedSessionKey: the 15-minute finalization buffer after the bell counts as open',
       _closedSessionKey(utc('2026-09-22T20:10:00')) === null);
+    // rAF never fires in a background tab (or the screener iframe while the
+    // journal shows another tab) — measured 1.76s per yield live, x3 per scan.
+    {
+      const realRaf = window.requestAnimationFrame;
+      window.requestAnimationFrame = () => 0;
+      const t0 = performance.now();
+      let settled = false;
+      try { await Promise.race([_yieldToMain().then(() => { settled = true; }), new Promise(r => setTimeout(r, 500))]); }
+      finally { window.requestAnimationFrame = realRaf; }
+      check('_yieldToMain: still resolves when animation frames never fire (background tab)', settled, 'waited ' + Math.round(performance.now() - t0) + 'ms');
+    }
     // Batch warm-up (2026-09-28, live): cleanbase's 6 concurrent source screens
     // sent 990 symbols for a ~500-name pool, and every later scan re-sent
     // symbols fetched seconds earlier.

@@ -2304,13 +2304,15 @@ async function validateExact(list, scr, onProgress, signal){
   const vcpOpts={minC:num('vcpContractions')||3, maxDepth:num('vcpDepthMax')||12,
                  maxBelow:num('pivotBelow')||10, reqDryUp:chk('vcpDryUp')};
   const consolBars=(num('consolWeeks')||2)*5;
-  // One benchmark fetch for the whole pass — the RS line is price/SPY.
-  const spy=await _fetchBars1y('SPY', signal).catch(()=>null);
   // Warm the cache in a handful of batched requests before the per-ticker
   // pool below — each worker's _fetchBars1y then resolves from cache instead
   // of one more network round trip; anything a batch missed (error, or a
   // symbol added after the batch ran) still falls back to fetching itself.
-  await _fetchBars1yWarm(list.map(r=>r.ticker), signal).catch(()=>{});
+  // SPY rides in the same batch: fetched on its own first, it was requested
+  // once per concurrent cleanbase source and held every batch back ~1s.
+  await _fetchBars1yWarm(['SPY', ...list.map(r=>r.ticker)], signal).catch(()=>{});
+  // One benchmark for the whole pass — the RS line is price/SPY.
+  const spy=await _fetchBars1y('SPY', signal).catch(()=>null);
   async function worker(){
     while(idx<list.length){
       const r=list[idx++];
@@ -3248,8 +3250,11 @@ function setScreener(key, applyDef=true){
 // to freeze input and the loading text's own repaint on a slower device. This
 // just gives the browser a frame between each blocking step so it can paint
 // and stay responsive — no filter/scoring logic changes.
+// Two frames lets the status text paint, but rAF never fires in a background
+// tab (or the journal's hidden screener iframe) and a busy page stretched it
+// to 1.76s per yield live — so a short timeout caps the wait either way.
 function _yieldToMain(){
-  return new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
+  return new Promise(res => { requestAnimationFrame(() => requestAnimationFrame(res)); setTimeout(res, 50); });
 }
 function _setScanLoading(on){
   const panel=$('scanBtnPanel'); if(panel){panel.disabled=on;panel.textContent=on?'סורק...':'סרוק את השוק';}
