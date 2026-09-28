@@ -3821,7 +3821,7 @@ function buildSectorFilter(){
   const sectors=[...new Set(allResults.map(r=>r.sector))].sort();
   const saved=localStorage.getItem('sepa_sector')||'';
   const wrap=$('sectorWrap'); if(!wrap) return;
-  wrap.innerHTML='<select id="sectorFilter" class="filter-select" onchange="applySectorFilter();sortResults();render();renderSectorStrength();try{localStorage.setItem(\'sepa_sector\',this.value)}catch(e){}">'
+  wrap.innerHTML='<select id="sectorFilter" class="filter-select" aria-label="סינון לפי סקטור" onchange="applySectorFilter();sortResults();render();renderSectorStrength();try{localStorage.setItem(\'sepa_sector\',this.value)}catch(e){}">'
     +'<option value="" '+(saved?'':'selected')+'>כל הסקטורים ('+allResults.length+')</option>'
     +sectors.map(s=>'<option value="'+escHtml(s)+'" '+(saved===s?'selected':'')+'>'+escHtml(s)+' ('+allResults.filter(r=>r.sector===s).length+')</option>').join('')
     +'</select>';
