@@ -491,6 +491,8 @@
     const b = _recentBreakout(brk);
     check('_recentBreakout: a close through the pivot on heavy volume is found', b && b.date && Math.abs(b.pivot - pv) < 1e-9 && b.volX >= 1.4, JSON.stringify(b) + ' pv ' + pv);
     check('_recentBreakout: dated on the day it crossed, not a later day above it', b && b.date === _etDay.format(new Date(brk.at(-2).t * 1000)), JSON.stringify(b));
+    const follow = tail([[0.002, 900], [pv * 1.02 / (base.at(-1).c * 1.002) - 1, 2000], [0.003, 2100]]);
+    check('_recentBreakout: a heavy day that merely stays above the pivot is not a new breakout', _recentBreakout(follow)?.date === _etDay.format(new Date(follow.at(-2).t * 1000)), JSON.stringify(_recentBreakout(follow)));
     const quietBrk = tail([[0.002, 900], [pv * 1.02 / (base.at(-1).c * 1.002) - 1, 1000], [0.003, 1100]]);
     check('_recentBreakout: crossing on ordinary volume is not a breakout', _recentBreakout(quietBrk) === null, JSON.stringify(_recentBreakout(quietBrk)));
     check('_recentBreakout: still under the pivot → none', _recentBreakout(tail([[0.002, 2000], [0.001, 2000]])) === null);
