@@ -1105,6 +1105,12 @@
     }
   }
 
+  {
+    openChart('NASDAQ:ABC', 'ABC', 'Abc Inc');
+    check('journal button stays hidden outside the journal', $('modalJournal').hidden === true);
+    closeModal();
+  }
+
   setScreener('sepa', true); // restore
   return R;
 })()

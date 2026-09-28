@@ -723,6 +723,8 @@ tbody tr:last-child td { border-bottom: none; }
 .modal-name { font-size: 12px; color: var(--text3); margin-top: 2px; }
 .modal-close { width: 36px; height: 36px; border-radius: 14px; background: var(--fill2); border: 1px solid var(--border); color: var(--text2); font-size: 16px; display: grid; place-items: center; }
 .modal-close:hover { color: var(--text); background: var(--fill3); }
+.modal-journal { height: 36px; padding: 0 14px; border-radius: 14px; background: var(--fill2); border: 1px solid var(--accent); color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; }
+.modal-journal:hover { background: var(--fill3); }
 #modalChart { flex: 1; min-height: 0; }
 
 /* ── Empty ── */
@@ -1164,7 +1166,10 @@ tbody tr:last-child td { border-bottom: none; }
   <div class="modal-box">
     <div class="modal-head">
       <div><div class="modal-ticker" id="modalTitle"></div><div class="modal-name" id="modalSub"></div></div>
-      <button class="modal-close" onclick="closeModal()" aria-label="סגור">&#10005;</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="modal-journal" id="modalJournal" onclick="addToJournal()" hidden>+ הוסף ליומן</button>
+        <button class="modal-close" onclick="closeModal()" aria-label="סגור">&#10005;</button>
+      </div>
     </div>
     <div id="modalChart"></div>
   </div>
@@ -4621,6 +4626,7 @@ function openChart(sym, ticker, name){
   _modalReturnFocus=document.activeElement;
   _setBgInert('modal', true);
   $('modalTitle').textContent=ticker; $('modalSub').textContent=name;
+  _modalTicker=ticker; $('modalJournal').hidden=!IN_JOURNAL;
   const wrap=$('modalChart'); wrap.innerHTML='';
   const config=JSON.stringify({
     autosize:true, symbol:sym, interval:"D", timezone:"Etc/UTC",
@@ -4643,6 +4649,13 @@ function openChart(sym, ticker, name){
   // behind on a row button that's now covered by the dialog; the close button
   // is the one native, always-present, always-actionable target inside it.
   document.querySelector('#modal .modal-close')?.focus();
+}
+let _modalTicker=null;
+function addToJournal(){
+  const r=results.find(x=>x.ticker===_modalTicker)||ttUniverse[_modalTicker];
+  try{ window.parent.postMessage({type:'tj:add-trade', symbol:_modalTicker, price:r?.close??null,
+    setup:mode==='screen'?activeScreener:null}, JOURNAL_ORIGIN); }catch(e){}
+  closeModal();
 }
 function closeModal(){
   $('modal').classList.remove('open'); $('modalChart').innerHTML='';
