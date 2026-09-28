@@ -399,7 +399,25 @@
       _completedBars(tueBars.slice(0, 1), utc('2026-09-22T15:00:00')).length === 1);
     check('_closedSessionKey: the 15-minute finalization buffer after the bell counts as open',
       _closedSessionKey(utc('2026-09-22T20:10:00')) === null);
-    await _barsStore.put('ZZTEST', { bars: [{ t: 1, c: 1 }], t: Date.now(), key: 'k' });
+    // Batch warm-up (2026-09-28, live): cleanbase's 6 concurrent source screens
+    // sent 990 symbols for a ~500-name pool, and every later scan re-sent
+    // symbols fetched seconds earlier.
+    {
+      const realFetch = window.fetch, sent = [];
+      window.fetch = async (u, o) => {
+        const b = JSON.parse(o.body); sent.push(...b.symbols);
+        await new Promise(r => setTimeout(r, 20));
+        return new Response(JSON.stringify({ results: b.symbols.map(s => ({ symbol: s.replace('.', '-'), bars: [{ t: 1, o: 1, h: 1, l: 1, c: 1, v: 1 }] })) }));
+      };
+      _valBars.set('ZWFRESH', { bars: [{ t: 1, c: 1 }], t: Date.now(), key: null });
+      try { await Promise.all([_fetchBars1yWarm(['ZWA', 'ZWB', 'ZW.C', 'ZWFRESH']), _fetchBars1yWarm(['ZWB', 'ZWD'])]); }
+      finally { window.fetch = realFetch; }
+      check('batch warm: a symbol two screeners both need is fetched once', sent.filter(s => s === 'ZWB').length === 1, 'sent ' + sent);
+      check('batch warm: a symbol already fresh locally is not re-fetched', !sent.includes('ZWFRESH'), 'sent ' + sent);
+      check('batch warm: bars are cached under the ticker asked for, not the server-mapped one', !!_valBars.get('ZW.C'));
+      check('batch warm: every needed symbol still gets fetched', ['ZWA', 'ZWB', 'ZW.C', 'ZWD'].every(s => sent.includes(s)), 'sent ' + sent);
+    }
+    await _barsStore.put('ZZTEST',{ bars: [{ t: 1, c: 1 }], t: Date.now(), key: 'k' });
     const back = await _barsStore.get('ZZTEST');
     check('_barsStore: bars survive a round trip through IndexedDB', back && back.bars[0].c === 1, 'got ' + JSON.stringify(back));
   }

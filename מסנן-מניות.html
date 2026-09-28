@@ -1899,7 +1899,7 @@ async function _fetchBars1y(sym, signal){
 // path for anything not already warm, so a batch failure degrades to the old
 // behavior rather than dropping the symbols outright.
 async function _fetchBars1yBatch(symbols, signal){
-  if(!HAS_SUPABASE || !symbols.length) return;
+  if(!symbols.length) return;
   try{
     const sig = signal ? AbortSignal.any([AbortSignal.timeout(SCAN_TIMEOUT), signal]) : AbortSignal.timeout(SCAN_TIMEOUT);
     const r=await fetch(SUPABASE_URL+'/functions/v1/ohlc',{method:'POST',
@@ -1908,21 +1908,41 @@ async function _fetchBars1yBatch(symbols, signal){
     if(!r.ok) return;
     const j=await r.json(); const results=Array.isArray(j.results)?j.results:[];
     const now=Date.now();
-    for(const res of results){
-      const bars=Array.isArray(res.bars)?res.bars:[];
-      if(!bars.length) continue;
+    // Results come back in request order; key the cache by the ticker the
+    // client asked for — the server's mapped name (BRK.B -> BRK-B) is not
+    // what _fetchBars1y will look up.
+    results.forEach((res,i)=>{
+      const bars=Array.isArray(res?.bars)?res.bars:[];
+      if(!bars.length || !symbols[i]) return;
       const entry={bars,t:now,key:_closedSessionKey(now)};
-      _valBars.set(res.symbol,entry);
-      _barsStore.put(res.symbol,entry);
-    }
+      _valBars.set(symbols[i],entry);
+      _barsStore.put(symbols[i],entry);
+    });
   }catch(e){}
 }
 const BATCH_CHUNK=60, BATCH_CONCURRENCY=4;
+// cleanbase runs its six source screens at once over overlapping pools, so a
+// symbol already being fetched by one of them is awaited, not re-requested;
+// and anything already fresh in memory or IndexedDB is skipped outright.
+const _warmInflight=new Map();
 async function _fetchBars1yWarm(tickers, signal){
-  const chunks=[]; for(let i=0;i<tickers.length;i+=BATCH_CHUNK) chunks.push(tickers.slice(i,i+BATCH_CHUNK));
-  let idx=0;
-  async function worker(){ while(idx<chunks.length) await _fetchBars1yBatch(chunks[idx++], signal); }
-  await Promise.all(Array.from({length:Math.min(BATCH_CONCURRENCY,chunks.length)}, worker));
+  const waits=new Set(), need=[];
+  for(const t of new Set(tickers)){
+    if(_barsFresh(_valBars.get(t))) continue;
+    const p=_warmInflight.get(t);
+    if(p) waits.add(p); else need.push(t);
+  }
+  const job=(async()=>{
+    const cold=[];
+    await Promise.all(need.map(async t=>{ const s=await _barsStore.get(t); if(_barsFresh(s)) _valBars.set(t,s); else cold.push(t); }));
+    const chunks=[]; for(let i=0;i<cold.length;i+=BATCH_CHUNK) chunks.push(cold.slice(i,i+BATCH_CHUNK));
+    let idx=0;
+    async function worker(){ while(idx<chunks.length) await _fetchBars1yBatch(chunks[idx++], signal); }
+    await Promise.all(Array.from({length:Math.min(BATCH_CONCURRENCY,chunks.length)}, worker));
+  })();
+  need.forEach(t=>_warmInflight.set(t,job));
+  try{ await Promise.all([job, ...waits]); }
+  finally{ need.forEach(t=>{ if(_warmInflight.get(t)===job) _warmInflight.delete(t); }); }
 }
 function _sma(c, end, period){ if(end-period+1<0) return null; let s=0; for(let i=end-period+1;i<=end;i++) s+=c[i]; return s/period; }
 function _ma200Rising(bars){
