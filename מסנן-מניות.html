@@ -1797,6 +1797,10 @@ async function _ohlcDraw(el){
     vs.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
     const volCol = hiContrast ? (isLight?'rgba(51,65,85,0.45)':'rgba(255,255,255,0.5)') : (_cv('--chart-vol')||'rgba(255,255,255,0.25)');
     vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:volCol})));
+    const row=results.find(x=>x.ticker===el.dataset.ticker)||ttUniverse[el.dataset.ticker];
+    _pivotLines(row?.vcp?.pivot!=null ? row.vcp : _vcp(bars)).forEach(l=>bs.createPriceLine({
+      price:l.price, title:l.title, color:_rgbColor(_cv(l.base?'--text3':'--accent')), lineWidth:l.base?1:2,
+      lineStyle:l.base?LightweightCharts.LineStyle.Dashed:LightweightCharts.LineStyle.Solid, axisLabelVisible:true}));
     _fitChart(chart, bars.length);
     // Re-fit on every resize, not just re-width. fitContent ran once against
     // whatever width the box had at creation, and lightweight-charts keeps the
@@ -2459,6 +2463,18 @@ const col = (key, html) => colVis[key] ? html : '';
 // The buy point a breakout trader acts on: the base's last swing high (from
 // _vcp) and how far price sits from it — green inside the entry window (up to
 // 3% under, 2% over), red once extended past it.
+function _rgbColor(c){
+  const x=document.createElement('canvas').getContext('2d');
+  x.fillStyle=c; x.fillRect(0,0,1,1);
+  const d=x.getImageData(0,0,1,1).data;
+  return 'rgb('+d[0]+','+d[1]+','+d[2]+')';
+}
+function _pivotLines(v){
+  if(v?.pivot==null) return [];
+  const lines=[{price:v.pivot, title:'Pivot', base:false}];
+  if(v.baseHigh!=null && v.baseHigh>v.pivot*1.02) lines.push({price:v.baseHigh, title:'שיא הבסיס', base:true});
+  return lines;
+}
 function pivotHtml(v){
   if(v?.pivot==null || v.distToPivot==null) return '<span class="mn" style="color:var(--text3)">—</span>';
   const d=v.distToPivot, c=d>2?'var(--red)':d>=-3?'var(--green)':'var(--text2)';

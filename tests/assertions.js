@@ -449,6 +449,10 @@
       const v = _vcp(Array.from({ length: 120 }, (_, i) => ({ t: Date.UTC(2025, 0, 1) / 1000 + i * 86400, o: 1, c: 100 - (i % 10), h: (i === 70 ? 130 : 101) - (i % 10), l: 95 - (i % 10), v: 1000 })));
       check('_vcp: baseHigh is the highest high of the last 60 sessions', v?.baseHigh === 130 && Math.abs(v.distToBase - (91 / 130 - 1) * 100) < 1e-9, JSON.stringify(v && { b: v.baseHigh, d: v.distToBase }));
     }
+    check('chart lines: a pivot at the base high draws one line', JSON.stringify(_pivotLines({ pivot: 100, baseHigh: 101 }).map(l => l.price)) === '[100]');
+    check('chart lines: a pivot well under the base high draws both, base dashed', (() => { const l = _pivotLines({ pivot: 341, baseHigh: 408 }); return l.length === 2 && l[0].price === 341 && !l[0].base && l[1].price === 408 && l[1].base; })());
+    check('chart lines: an oklch theme color is handed to the chart as rgb', /^rgb\(\d+,\d+,\d+\)$/.test(_rgbColor('oklch(64% 0.2 258)')) && _rgbColor('#ff0000') === 'rgb(255,0,0)', _rgbColor('oklch(64% 0.2 258)'));
+    check('chart lines: no pivot, no line', _pivotLines(null).length === 0 && _pivotLines({ pivot: null }).length === 0);
     check('pivot: far below the pivot is neither green nor red', !/var\(--(green|red)\)/.test(pivotHtml({ pivot: 50, distToPivot: -8 })));
     check('pivot: sortable by distance', SORTS.pivot({ vcp: { distToPivot: -1 } }) > SORTS.pivot({ vcp: { distToPivot: -5 } }) && SORTS.pivot({}) === -1e9);
   }
