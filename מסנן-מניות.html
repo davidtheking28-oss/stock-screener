@@ -879,6 +879,7 @@ tbody tr:last-child td { border-bottom: none; }
   font: 500 11px var(--sans); color: var(--text3); line-height: 1.7;
 }
 .wl-missing b { color: var(--text2); font-family: var(--mono); font-weight: 600; }
+.piv-base { font-size: 10px; color: var(--text3); margin-top: 2px; white-space: nowrap; }
 .wl-bo-title { font-weight: 600; color: var(--text2); margin-bottom: 6px; }
 .wl-bo-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .wl-bo { display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; background: var(--fill2); border: 1px solid var(--border); border-radius: 10px; font-size: 12px; color: var(--text2); }
@@ -2014,8 +2015,9 @@ function _vcp(bars, lookback=90, now=Date.now()){
   const real=legs.filter(l=>l.depth>=3);            // ignore noise-level dips
   const pivot=w[highs[highs.length-1]].h;           // the level a breakout clears
   const distToPivot=(last/pivot-1)*100;
+  const baseHigh=Math.max(...w.slice(-60).map(b=>b.h)), distToBase=(last/baseHigh-1)*100;
   if(real.length<2) return {contractions:real.length, lastDepth:real.length?real[real.length-1].depth:null,
-                            tighteningOK:false, volDryUp:null, pivot, distToPivot};
+                            tighteningOK:false, volDryUp:null, pivot, distToPivot, baseHigh, distToBase};
   const tighteningOK=real[real.length-1].depth<real[real.length-2].depth;
   // Volume across the newest contraction vs the rest of the base — Minervini
   // wants it drying up as the pattern tightens.
@@ -2028,7 +2030,7 @@ function _vcp(bars, lookback=90, now=Date.now()){
   // on the Trend Template but far too loose as a screener's primary test — a
   // noisy mega-cap drift produces 8-10 legs and passes on whichever two happen
   // to shrink at the end (measured live: GOOG, XOM, WELL all did).
-  return {contractions:real.length, lastDepth:real[real.length-1].depth, tighteningOK, volDryUp, pivot, distToPivot,
+  return {contractions:real.length, lastDepth:real[real.length-1].depth, tighteningOK, volDryUp, pivot, distToPivot, baseHigh, distToBase,
           depths:real.map(l=>+l.depth.toFixed(2))};
 }
 // Relative-strength line = price / benchmark. Minervini and IBD both read the
@@ -2458,7 +2460,10 @@ const col = (key, html) => colVis[key] ? html : '';
 function pivotHtml(v){
   if(v?.pivot==null || v.distToPivot==null) return '<span class="mn" style="color:var(--text3)">—</span>';
   const d=v.distToPivot, c=d>2?'var(--red)':d>=-3?'var(--green)':'var(--text2)';
-  return '<span class="mn">$'+(v.pivot>=100?v.pivot.toFixed(0):v.pivot.toFixed(2))+'</span> <span class="mn" style="color:'+c+'">'+(d>0?'+':'')+d.toFixed(1)+'%</span>';
+  const px=p=>'$'+(p>=100?p.toFixed(0):p.toFixed(2));
+  const base=v.baseHigh!=null && v.baseHigh>v.pivot*1.02
+    ? '<div class="piv-base" title="השיא של 60 ימי המסחר האחרונים. פריצה אמיתית היא מעליו; מעל ה-Pivot בלבד זה עדיין בתוך התיקון">שיא הבסיס '+px(v.baseHigh)+' <span class="mn">'+v.distToBase.toFixed(1)+'%</span></div>' : '';
+  return '<span class="mn">'+px(v.pivot)+'</span> <span class="mn" style="color:'+c+'">'+(d>0?'+':'')+d.toFixed(1)+'%</span>'+base;
 }
 // 'YYYY-MM-DD' -> 'DD/MM' (or 'DD/MM/YY' across a year boundary), 'היום'/'אתמול'
 // for the two dates a user actually cares to distinguish at a glance. Missing

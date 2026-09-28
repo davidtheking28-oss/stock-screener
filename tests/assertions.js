@@ -442,6 +442,13 @@
     check('pivot: shows the price and the distance', /52\.40/.test(near) && /-1\.5%/.test(near), near);
     check('pivot: inside the entry window reads green', /var\(--green\)/.test(near), near);
     check('pivot: more than 2% past the pivot reads as extended (red)', /var\(--red\)/.test(pivotHtml({ pivot: 50, distToPivot: 3.1 })));
+    const under = pivotHtml({ pivot: 341, distToPivot: -1, baseHigh: 408, distToBase: -17.3 });
+    check('pivot: a pivot well under the base high also shows the base high', /שיא הבסיס \$408/.test(under) && /-17\.3%/.test(under), under);
+    check('pivot: a pivot at the base high shows no second line', !/שיא הבסיס/.test(pivotHtml({ pivot: 100, distToPivot: -1, baseHigh: 101, distToBase: -2 })));
+    {
+      const v = _vcp(Array.from({ length: 120 }, (_, i) => ({ t: Date.UTC(2025, 0, 1) / 1000 + i * 86400, o: 1, c: 100 - (i % 10), h: (i === 70 ? 130 : 101) - (i % 10), l: 95 - (i % 10), v: 1000 })));
+      check('_vcp: baseHigh is the highest high of the last 60 sessions', v?.baseHigh === 130 && Math.abs(v.distToBase - (91 / 130 - 1) * 100) < 1e-9, JSON.stringify(v && { b: v.baseHigh, d: v.distToBase }));
+    }
     check('pivot: far below the pivot is neither green nor red', !/var\(--(green|red)\)/.test(pivotHtml({ pivot: 50, distToPivot: -8 })));
     check('pivot: sortable by distance', SORTS.pivot({ vcp: { distToPivot: -1 } }) > SORTS.pivot({ vcp: { distToPivot: -5 } }) && SORTS.pivot({}) === -1e9);
   }
