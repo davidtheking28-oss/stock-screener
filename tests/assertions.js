@@ -470,6 +470,10 @@
     const upR = (107 / 102 - 1) * 100, dnR = (193 / 198 - 1) * 100;
     check('_screenerPerf: average return', Math.abs(p[5].avg - (upR + dnR) / 2) < 1e-9, JSON.stringify(p[5]));
     check('_screenerPerf: return over SPY for the same sessions', Math.abs(p[5].excess - (p[5].avg - upR)) < 1e-9, JSON.stringify(p[5]));
+    const pp = document.getElementById('perfPanel');
+    check('perf panel: exactly one, visible, and still holds its body', document.querySelectorAll('#perfPanel').length === 1 && !!pp?.querySelector('#perfBody') && getComputedStyle(pp).display !== 'none');
+    setScreener('vcp', true); setScreener('qulla', true);
+    check('perf panel: switching screeners keeps it intact', !!document.querySelector('#perfPanel #perfBody') && !document.getElementById('perfPanel').open);
     check('_screenerPerf: a stock with no bars is skipped, not counted as zero', _screenerPerf([{ ticker: 'X', first_seen: '2026-09-03' }], () => null, flat)[5].n === 0);
   }
 
