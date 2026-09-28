@@ -1171,6 +1171,15 @@
     }
   }
 
+  {
+    const tiny = [...document.querySelectorAll('body *')].filter(el => el.offsetParent
+      && [...el.childNodes].some(n => n.nodeType === 3 && /[\p{L}\d]{2}/u.test(n.textContent))
+      && parseFloat(getComputedStyle(el).fontSize) < 11)
+      .map(el => (el.className || el.tagName) + ' ' + getComputedStyle(el).fontSize + ' «' + el.textContent.trim().slice(0, 20) + '»');
+    check('no visible text below 11px', tiny.length === 0, tiny.slice(0, 5).join(' | '));
+    const ft = parseFloat(getComputedStyle(document.querySelector('.filter-title')).fontSize), fs = parseFloat(getComputedStyle(document.querySelector('.filter-sub')).fontSize);
+    check('the filter panel title is larger than its subtitle', ft > fs, ft + ' vs ' + fs);
+  }
   check('the nightly scan banner is gone', !document.getElementById('dailyBanner') && typeof dismissDaily === 'undefined');
 
   setScreener('sepa', true); // restore

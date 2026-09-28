@@ -250,7 +250,7 @@ body {
 }
 .filter-header:hover { background: var(--fill); }
 .filter-body { border-radius: 0 0 var(--r4) var(--r4); }
-.filter-title { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 700; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; }
+.filter-title { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--text2); }
 .filter-title::before { content: ''; width: 3px; height: 11px; border-radius: 1px; background: var(--accent2); flex-shrink: 0; }
 .filter-sub { font-size: 11px; color: var(--text3); }
 .filter-arrow { margin-right: auto; color: var(--text3); font-size: 11px; transition: transform 0.2s; }
@@ -376,8 +376,8 @@ body {
   display: flex; flex-direction: column;
 }
 .filter-section h3 {
-  font-size: 10px; font-weight: 700; letter-spacing: 1px;
-  text-transform: uppercase; margin-bottom: 14px;
+  font-size: 12px; font-weight: 700;
+  margin-bottom: 14px;
   display: flex; align-items: center; gap: 8px;
 }
 .filter-section h2.tech-head { color: #7ba4ff; }
@@ -413,7 +413,7 @@ body {
 }
 .field label {
   grid-column: 1; grid-row: 1; align-self: center; text-align: right;
-  font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.2px;
+  font-size: 12px; color: var(--text2); font-weight: 600; letter-spacing: 0.2px;
 }
 .field .field-combo { grid-column: 2; grid-row: 1; width: 86px; }
 .field .hint {
@@ -519,7 +519,7 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: co
 .fp-list { display: grid; gap: 8px; }
 .fp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
 .fp-row { display: flex; gap: 8px; }
-.fp-hint { font-size: 10px; color: var(--text3); border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
+.fp-hint { font-size: 11px; color: var(--text3); border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
 .col-picker-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text2); cursor: pointer; user-select: none; white-space: nowrap; }
 .col-picker-item input { accent-color: var(--accent); flex-shrink: 0; }
 .col-picker-item:hover { color: var(--text); }
@@ -613,7 +613,7 @@ thead th {
      offset — both position:sticky elements racing for the same pixel row. */
   position: sticky; top: var(--thead-top, 54px); z-index: 2;
   background: var(--bg2); color: var(--text3);
-  font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: 0.5px;
+  font: 600 12px var(--sans); text-transform: uppercase; letter-spacing: 0.5px;
   padding: 10px 11px; text-align: right; cursor: pointer; white-space: nowrap;
   border-bottom: 1px solid var(--border); user-select: none;
   transition: color 0.12s, background 0.12s;
@@ -637,7 +637,7 @@ tbody tr:last-child td { border-bottom: none; }
 /* table cells */
 .sym { font: 700 15px var(--mono); color: var(--text); cursor: copy; letter-spacing: 0.3px; }
 @media (hover: hover) and (pointer: fine) { .sym:hover { color: var(--accent2); } }
-.cname { font-size: 11px; color: var(--text3); margin-top: 2px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; direction: ltr; text-align: right; white-space: nowrap; }
+.cname { font-size: 12px; color: var(--text3); margin-top: 2px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; direction: ltr; text-align: right; white-space: nowrap; }
 .mn { font: 500 13px var(--mono-data); color: var(--text2); direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
 .mn.hi { color: var(--text); font-weight: 600; }
 .pos { color: var(--green); } .neg { color: var(--red); }
@@ -660,7 +660,7 @@ tbody tr:last-child td { border-bottom: none; }
 .range-track { width: 52px; height: 4px; border-radius: 2px; background: var(--fill2); position: relative; flex-shrink: 0; }
 .range-dot { position: absolute; top: -3px; width: 10px; height: 10px; border-radius: 50%; transform: translateX(-50%); border: 2px solid var(--bg2); }
 
-.sector-tag { font-size: 11px; color: var(--text3); background: var(--fill); border: 1px solid var(--border); padding: 2px 7px; border-radius: 4px; }
+.sector-tag { font-size: 12px; color: var(--text3); background: var(--fill); border: 1px solid var(--border); padding: 2px 7px; border-radius: 4px; }
 .sector-lock-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .sector-tag.locked { color: var(--accent2); background: rgba(79,131,255,0.1); border-color: rgba(79,131,255,0.28); font-weight: 600; }
 
@@ -697,7 +697,7 @@ tbody tr:last-child td { border-bottom: none; }
 .gcard-badges { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .gcard-tags { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
 .gcard-tags .earn-badge { margin: 0; }
-.gbadge { direction: ltr; display: inline-flex; align-items: baseline; gap: 5px; height: 23px; padding: 0 10px; border-radius: 6px; font: 700 10px var(--sans); letter-spacing: 0.2px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); white-space: nowrap; }
+.gbadge { direction: ltr; display: inline-flex; align-items: baseline; gap: 5px; height: 23px; padding: 0 10px; border-radius: 6px; font: 700 11px var(--sans); letter-spacing: 0.2px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); white-space: nowrap; }
 /* gb-lbl used opacity:0.75 to read as secondary next to the bold number —
    but that dims the SAME color the badge sets (inherited from .gbadge's
    inline style), which already sits right at AA's 4.5:1 floor for the
@@ -713,7 +713,7 @@ tbody tr:last-child td { border-bottom: none; }
 .gcard-stats { display: grid; grid-template-columns: repeat(3,1fr); border-top: 1px solid var(--border2); background: linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0)); }
 .gstat { padding: 10px 8px 11px; text-align: center; border-left: 1px solid var(--border2); }
 .gstat:last-child { border-left: none; }
-.gstat-lbl { font: 600 8.5px var(--sans); color: var(--text3); text-transform: uppercase; letter-spacing: 1.1px; }
+.gstat-lbl { font: 600 11px var(--sans); color: var(--text3); text-transform: uppercase; letter-spacing: 0.4px; }
 .gstat-val { font: 700 14px var(--mono-data); margin-top: 5px; letter-spacing: -0.2px; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 3px; justify-content: center; direction: ltr; unicode-bidi: isolate; }
 .gstat-arrow { font-size: 8px; line-height: 1; opacity: 0.9; }
 
@@ -794,7 +794,7 @@ tbody tr:last-child td { border-bottom: none; }
      scroll position. Measured: wrap.top 966, th.top 1020, first row top 998.
      Inside its own scroller the offset must be 0; the 54px only makes sense
      when thead sticks against the page, under the topbar. */
-  thead th { font-size: 10px; padding: 8px 7px; top: 0; }
+  thead th { font-size: 11px; padding: 8px 7px; top: 0; }
   /* Mobile's topbar height is variable (auto, min 54px) and thead sticks
      against .table-wrap's own scrollport here, not the page — the desktop
      top-offset math above doesn't apply, so the header just scrolls away
@@ -851,13 +851,13 @@ tbody tr:last-child td { border-bottom: none; }
 
 /* ── New badge ── */
 .new-badge {
-  display: inline-block; font: 700 9px var(--sans); color: var(--green);
+  display: inline-block; font: 700 11px var(--sans); color: var(--green);
   background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.2);
   padding: 1px 5px; border-radius: 4px; letter-spacing: 0.5px;
   text-transform: uppercase; margin-right: 4px; vertical-align: middle;
 }
 .earn-badge {
-  display: inline-block; font: 700 9px var(--sans); color: var(--text3);
+  display: inline-block; font: 700 11px var(--sans); color: var(--text3);
   background: var(--fill2); border: 1px solid var(--border);
   padding: 1px 5px; border-radius: 4px; letter-spacing: 0.3px;
   margin-right: 5px; vertical-align: middle;
@@ -868,15 +868,15 @@ tbody tr:last-child td { border-bottom: none; }
   font: 500 11px var(--sans); color: var(--text3); line-height: 1.7;
 }
 .wl-missing b { color: var(--text2); font-family: var(--mono); font-weight: 600; }
-.piv-base { font-size: 10px; color: var(--text3); margin-top: 2px; white-space: nowrap; }
+.piv-base { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; }
 .gstat-val:has(.piv-base) { flex-direction: column; gap: 2px; }
-.gstat-val .piv-base { direction: rtl; font: 500 10px var(--sans); }
+.gstat-val .piv-base { direction: rtl; font: 500 11px var(--sans); }
 .wl-bo-title { font-weight: 600; color: var(--text2); margin-bottom: 6px; }
 .wl-bo-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .wl-bo { display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; background: var(--fill2); border: 1px solid var(--border); border-radius: 10px; font-size: 12px; color: var(--text2); }
 .wl-bo b { font-size: 13px; color: var(--text); }
 .tt-badge {
-  display: inline-block; font: 700 9px var(--sans); color: var(--text3);
+  display: inline-block; font: 700 11px var(--sans); color: var(--text3);
   background: var(--fill2); border: 1px dashed var(--border);
   padding: 1px 5px; border-radius: 4px; letter-spacing: 0.3px;
   /* margin-RIGHT, like .earn-badge and .new-badge: on this RTL page that is the
@@ -896,7 +896,7 @@ tbody tr:last-child td { border-bottom: none; }
 .perf-table th, .perf-table td { padding: 6px 8px; text-align: right; border-top: 1px solid var(--border2); }
 .perf-table th { color: var(--text3); font-weight: 600; }
 .perf-note { color: var(--text3); font-size: 11px; margin-top: 6px; }
-.ss-title { font: 600 10px var(--sans); letter-spacing: 1px; text-transform: uppercase; color: var(--text3); margin-left: 4px; }
+.ss-title { font: 600 11px var(--sans); color: var(--text3); margin-left: 4px; }
 .ss-chip {
   position: relative; overflow: hidden; cursor: pointer;
   display: inline-flex; align-items: center; gap: 8px; min-height: 30px;
@@ -4967,7 +4967,7 @@ function drawBreadthSpark(rows){
   const last=pts[n-1];
   const col=last>=50?'var(--green)':last>=35?'var(--yellow)':'var(--red)';
   el.innerHTML='<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true"><polyline points="'+poly+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
-  el.title='בריאות שוק — אחוז המניות במגמת עלייה, '+n+' סריקות לילה אחרונות (עדכני: '+last+'%)';
+  el.title='בריאות שוק — אחוז המניות במגמת עלייה, '+n+' ימי מסחר אחרונים (עדכני: '+last+'%)';
   el.classList.add('show');
 }
 
