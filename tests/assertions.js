@@ -1149,6 +1149,9 @@
     try {
       check('settings: every display feature is on by default', FEATURE_DEFS.every(f => colVis[f.key] === true), JSON.stringify(FEATURE_DEFS.map(f => [f.key, colVis[f.key]])));
       $('colPickerWrap').style.display = '';
+      const lay = layout; setLayout('gallery');
+      check('settings: the gear is reachable in the gallery view too', getComputedStyle($('featWrap')).display !== 'none' && getComputedStyle($('colPickerWrap')).display === 'none');
+      setLayout(lay);
       $('featBtn').click();
       check('settings: the gear opens one switch per feature', $('featPanel').classList.contains('open') && $('featPanel').querySelectorAll('input[type=checkbox]').length === FEATURE_DEFS.length);
       $('featBtn').click();

@@ -514,7 +514,6 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: co
 }
 .col-picker-panel.open { display: grid; }
 .feat-panel { grid-template-columns: 1fr; }
-.col-picker { display: flex; gap: 6px; }
 .col-picker-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text2); cursor: pointer; user-select: none; white-space: nowrap; }
 .col-picker-item input { accent-color: var(--accent); flex-shrink: 0; }
 .col-picker-item:hover { color: var(--text); }
@@ -1136,6 +1135,8 @@ tbody tr:last-child td { border-bottom: none; }
         <div class="col-picker" id="colPickerWrap" style="display:none">
           <button class="btn-ghost" id="colPickerBtn" onclick="toggleColPicker(event)" title="בחר עמודות" aria-haspopup="true" aria-expanded="false" aria-controls="colPickerPanel">עמודות &#8862;</button>
           <div class="col-picker-panel" id="colPickerPanel"></div>
+        </div>
+        <div class="col-picker" id="featWrap">
           <button class="btn-ghost" id="featBtn" onclick="toggleFeatPanel(event)" title="הגדרות תצוגה" aria-label="הגדרות תצוגה" aria-haspopup="true" aria-expanded="false" aria-controls="featPanel">&#9881;</button>
           <div class="col-picker-panel feat-panel" id="featPanel"></div>
         </div>
@@ -2737,7 +2738,8 @@ async function setColVis(key, on){
 
 document.addEventListener('click', e=>{
   const wrap=$('colPickerWrap');
-  if(wrap && !wrap.contains(e.target)){ $('colPickerPanel')?.classList.remove('open'); $('featPanel')?.classList.remove('open'); }
+  if(wrap && !wrap.contains(e.target)) $('colPickerPanel')?.classList.remove('open');
+  if(!$('featWrap')?.contains(e.target)) $('featPanel')?.classList.remove('open');
 });
 document.addEventListener('scroll', ()=>{ $('colPickerPanel')?.classList.remove('open'); $('featPanel')?.classList.remove('open'); }, {passive:true, capture:true});
 window.addEventListener('resize', ()=>{ $('colPickerPanel')?.classList.remove('open'); $('featPanel')?.classList.remove('open'); });
