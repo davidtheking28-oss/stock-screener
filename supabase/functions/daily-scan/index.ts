@@ -57,6 +57,7 @@ async function fetchBars(symbol: string): Promise<Bar[] | null> {
   try {
     const r = await fetch(`${SB_URL}/functions/v1/ohlc?symbol=${encodeURIComponent(symbol)}&range=3mo`, {
       headers: { Authorization: 'Bearer ' + SB_KEY },
+      signal: AbortSignal.timeout(8000),
     });
     if (!r.ok) return null;
     const d = await r.json();
@@ -93,7 +94,8 @@ async function sendEmails(scanDate: string, entries: string[], exits: string[], 
   const userIds = new Set(users.map(u => u.id));
   const wlTickers = [...new Set(wlRows.filter(w => userIds.has(w.user_id)).map(w => w.ticker))];
   const approaching = new Map<string, { pivot: number; distPct: number }>();
-  for (let i = 0; i < wlTickers.length; i += 10) {
+  const barsDeadline = Date.now() + 60_000;
+  for (let i = 0; i < wlTickers.length && Date.now() < barsDeadline; i += 10) {
     await Promise.all(wlTickers.slice(i, i + 10).map(async t => {
       const r = approachingPivot(await fetchBars(t));
       if (r) approaching.set(t, r);
