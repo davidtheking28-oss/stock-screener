@@ -1194,6 +1194,16 @@
       sb.scrollWidth > sb.clientWidth, 'scrollWidth ' + sb.scrollWidth + ' clientWidth ' + sb.clientWidth);
     topbar.style.width = savedW; sb.innerHTML = savedHtml;
   }
+  {
+    const h1 = earnBadgeHtml(1), h5 = earnBadgeHtml(5), h3 = earnBadgeHtml(3), h10 = earnBadgeHtml(10), hNone = earnBadgeHtml(20);
+    check('an imminent earnings badge (<=2 days) reads red', /class="earn-badge imminent"/.test(h1), h1);
+    check('a soon earnings badge (3-5 days) reads yellow, not red', /class="earn-badge soon"/.test(h5) && !/imminent/.test(h5), h5);
+    check('3 days away is still soon, not imminent', /class="earn-badge soon"/.test(h3), h3);
+    check('6-14 days away gets the plain badge class', /class="earn-badge"/.test(h10) && !/soon|imminent/.test(h10), h10);
+    check('more than 14 days away shows no badge at all', hNone === '', hNone);
+    const host = document.createElement('div'); host.innerHTML = h1;
+    check('the day count and its unit never touch — a digit glued to "י" reads as a geresh mark', / \d+ ימ&#39;/.test(host.innerHTML) || / \d+ ימ'/.test(h1), h1);
+  }
   check('the nightly scan banner is gone', !document.getElementById('dailyBanner') && typeof dismissDaily === 'undefined');
 
   setScreener('sepa', true); // restore

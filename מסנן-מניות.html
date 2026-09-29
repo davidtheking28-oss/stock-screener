@@ -869,6 +869,7 @@ tbody tr:last-child td { border-bottom: none; }
   margin-right: 5px; vertical-align: middle;
 }
 .earn-badge.soon { color: var(--yellow); background: rgba(245,185,74,0.12); border-color: rgba(245,185,74,0.3); }
+.earn-badge.imminent { color: var(--red); background: rgba(231,76,60,0.14); border-color: rgba(231,76,60,0.35); }
 .wl-missing {
   padding: 9px 18px; border-top: 1px solid var(--border);
   font: 500 11px var(--sans); color: var(--text3); line-height: 1.7;
@@ -2479,6 +2480,18 @@ function _rgbColor(c){
   x.fillStyle=c; x.fillRect(0,0,1,1);
   const d=x.getImageData(0,0,1,1).data;
   return 'rgb('+d[0]+','+d[1]+','+d[2]+')';
+}
+function earnBadgeHtml(earnIn){
+  if(earnIn==null || earnIn<0 || earnIn>14) return '';
+  // A bare Hebrew Yod ("י") glued straight onto a digit — "1י" — reads as
+  // the digit plus a geresh mark ("1׳"), not as "1 day": confirmed live,
+  // zoomed into the rendered badge. "ימ'" (the standard two-letter+geresh
+  // abbreviation for ימים) with a space before it doesn't collapse into the
+  // digit the same way a single letter does.
+  // Color escalates with how soon the gap-risk actually is, instead of
+  // treating 1 day away the same as 5.
+  const cls = earnIn<=2 ? ' imminent' : earnIn<=5 ? ' soon' : '';
+  return '<span class="earn-badge'+cls+'" title="דוח כספי בעוד '+earnIn+' ימים">דוח '+earnIn+' ימ\'</span>';
 }
 function _pivotLines(v){
   if(v?.pivot==null) return [];
@@ -4439,7 +4452,7 @@ function renderTable(rows){
     // from the list outright (9 of 16 names simply absent). It stays, marked.
     const ttB = (mode==='watch' && r.ttPass===false)
       ? '<span class="tt-badge" title="במעקב, אך אינה עוברת כרגע את ה-Trend Template">מחוץ למגמה</span>' : '';
-    const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
+    const earnB = earnBadgeHtml(r.earnIn);
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
       +'</td>'
@@ -4527,7 +4540,7 @@ function renderGallery(srcRows){
   _ohlcDisposeAll();
   const cards=rows.map(r=>{
     const wl=watchlist.has(r.ticker);
-    const earnB = (r.earnIn!=null && r.earnIn>=0 && r.earnIn<=14) ? '<span class="earn-badge'+(r.earnIn<=5?' soon':'')+'" title="דוח כספי בעוד '+r.earnIn+' ימים">דוח '+r.earnIn+'י</span>' : '';
+    const earnB = earnBadgeHtml(r.earnIn);
     // The same badge renderTable draws. Without it a watchlist name that fails
     // the Trend Template looked identical to one that passes, as soon as you
     // switched the watchlist to גרפים.
