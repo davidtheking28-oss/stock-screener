@@ -163,7 +163,13 @@ body {
   position: sticky;
   top: 0;
   z-index: 40;
-  flex-wrap: wrap;
+  /* Was flex-wrap:wrap over a hardcoded height:54px (not min-height) — with
+     no room to grow, a wrapped second row (long #statBar loading text +
+     the breadth chip + the topbar-end buttons not fitting one line) simply
+     overflowed the box instead of being clipped, spilling down onto
+     .filter-header, which sticks right below at a hardcoded top:54px built
+     on the same "topbar is exactly 54px" assumption. #statBar is the one
+     child whose content actually varies in length; it truncates instead. */
 }
 .logo-mark { font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--text); white-space: nowrap; }
 .logo-mark em { color: var(--accent); font-style: normal; }
@@ -186,7 +192,7 @@ body {
 .breadth-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .breadth-spark { display: none; align-items: center; cursor: help; flex-shrink: 0; }
 .breadth-spark.show { display: flex; padding-right: 8px; border-right: 1px solid var(--border); }
-#statBar { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text2); flex-wrap: wrap; }
+#statBar { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text2); min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 #statBar b { color: var(--text); font-weight: 700; font-family: var(--mono-data); font-variant-numeric: tabular-nums; }
 .topbar-end { margin-right: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 #scanTime { font-family: var(--mono); font-size: 11px; color: var(--text3); font-variant-numeric: tabular-nums; }

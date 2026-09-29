@@ -1180,6 +1180,20 @@
     const ft = parseFloat(getComputedStyle(document.querySelector('.filter-title')).fontSize), fs = parseFloat(getComputedStyle(document.querySelector('.filter-sub')).fontSize);
     check('the filter panel title is larger than its subtitle', ft > fs, ft + ' vs ' + fs);
   }
+  {
+    // Viewport width varies by test runner, so a real-length message may not
+    // force the wrap the fix guards against — pin the topbar itself to a
+    // narrow width to force the overflow condition regardless of viewport.
+    const topbar = document.querySelector('.topbar'), sb = document.getElementById('statBar');
+    const savedW = topbar.style.width, savedHtml = sb.innerHTML;
+    topbar.style.width = '360px';
+    sb.innerHTML = '<span class="spinner"></span> מושך נתונים מ-TradingView… מושך נתונים מ-TradingView… מושך נתונים מ-TradingView…';
+    check('a long loading message in statBar does not grow the topbar past its own height',
+      topbar.getBoundingClientRect().height <= 54.5, topbar.getBoundingClientRect().height);
+    check('the overflowing text is clipped, not left overlapping the filter panel below',
+      sb.scrollWidth > sb.clientWidth, 'scrollWidth ' + sb.scrollWidth + ' clientWidth ' + sb.clientWidth);
+    topbar.style.width = savedW; sb.innerHTML = savedHtml;
+  }
   check('the nightly scan banner is gone', !document.getElementById('dailyBanner') && typeof dismissDaily === 'undefined');
 
   setScreener('sepa', true); // restore
