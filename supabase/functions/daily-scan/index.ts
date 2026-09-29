@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { COLUMNS, C, FILTERS, Row, computeRS, applyClassicSEPA } from './scoring.ts';
+import { approachingPivot, Bar } from './pivot.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -52,6 +53,17 @@ async function fetchUniverse(): Promise<Row[]> {
   return stocks.concat(drs.filter(r => !seen.has(r.s)));
 }
 
+async function fetchBars(symbol: string): Promise<Bar[] | null> {
+  try {
+    const r = await fetch(`${SB_URL}/functions/v1/ohlc?symbol=${encodeURIComponent(symbol)}&range=3mo`, {
+      headers: { Authorization: 'Bearer ' + SB_KEY },
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d?.bars) ? d.bars : null;
+  } catch { return null; }
+}
+
 async function sendEmails(scanDate: string, entries: string[], exits: string[], results: ReturnType<typeof applyClassicSEPA>, breadth: number) {
   if (!RESEND_KEY) return { sent: 0, reason: 'no RESEND_API_KEY' };
   const usersRes = await sb('/auth/v1/admin/users?per_page=200');
@@ -78,16 +90,27 @@ async function sendEmails(scanDate: string, entries: string[], exits: string[], 
   ]);
   const users = allUsers.filter(u => screenerUserIds.has(u.id));
   const top = results.slice(0, 10);
+  const userIds = new Set(users.map(u => u.id));
+  const wlTickers = [...new Set(wlRows.filter(w => userIds.has(w.user_id)).map(w => w.ticker))];
+  const approaching = new Map<string, { pivot: number; distPct: number }>();
+  for (let i = 0; i < wlTickers.length; i += 10) {
+    await Promise.all(wlTickers.slice(i, i + 10).map(async t => {
+      const r = approachingPivot(await fetchBars(t));
+      if (r) approaching.set(t, r);
+    }));
+  }
   let sent = 0;
   for (const u of users) {
     const wl = new Set(wlRows.filter(w => w.user_id === u.id).map(w => w.ticker));
     const wlEnt = entries.filter(t => wl.has(t)), wlEx = exits.filter(t => wl.has(t));
+    const wlNear = [...wl].filter(t => approaching.has(t)).sort((a, b) => approaching.get(b)!.distPct - approaching.get(a)!.distPct);
     const mark = (t: string) => wl.has(t) ? `<b style="color:#b45309">★${t}</b>` : t;
     const list = (a: string[]) => a.map(mark).join(', ') || '—';
     const html = `<!DOCTYPE html><html dir="rtl" lang="he"><body style="font-family:Arial,sans-serif;background:#f5f7fb;padding:24px;color:#1a2433">
 <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:14px;padding:28px;border:1px solid #e3e9f2">
 <h2 style="margin:0 0 4px">SEPA Screener — סריקת לילה ${scanDate}</h2>
 <p style="color:#5b6b85;margin:0 0 18px">רוחב שוק: ${breadth}% מהמניות במגמת עלייה · ${results.length} מניות עוברות את הסינון</p>
+${wlNear.length ? `<div style="background:#eefaf1;border:1px solid #bfe3c9;border-radius:10px;padding:12px 16px;margin-bottom:16px"><b>מתקרבות ל-Pivot ברשימת המעקב שלך:</b><br><span dir="ltr">${wlNear.map(t => `<b>${t}</b> ${approaching.get(t)!.distPct.toFixed(1)}%`).join(' · ')}</span></div>` : ''}
 ${wlEnt.length || wlEx.length ? `<div style="background:#fff8e6;border:1px solid #f0dfae;border-radius:10px;padding:12px 16px;margin-bottom:16px"><b>ברשימת המעקב שלך:</b><br>${wlEnt.length ? 'נכנסו: ' + wlEnt.join(', ') + '<br>' : ''}${wlEx.length ? 'יצאו: ' + wlEx.join(', ') : ''}</div>` : ''}
 <p><b style="color:#15803d">נכנסו היום (${entries.length}):</b> <span dir="ltr">${list(entries)}</span></p>
 <p><b style="color:#b91c1c">יצאו (${exits.length}):</b> <span dir="ltr">${list(exits)}</span></p>
