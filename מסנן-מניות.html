@@ -551,6 +551,7 @@ button { font-family: var(--sans); cursor: pointer; border: none; transition: co
   border-radius: 14px 14px 0 0;
 }
 .results-count { color: var(--accent2); }
+.scan-status { display: flex; align-items: center; gap: 8px; }
 .results-controls { display: flex; align-items: center; gap: 8px; margin-right: auto; flex-wrap: wrap; }
 .view-tabs { display: flex; gap: 2px; background: var(--bg2); border-radius: var(--r2); padding: 3px; height: var(--ctl-h); }
 .view-tab {
@@ -980,8 +981,6 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
   <div id="statBar"></div>
   <div class="topbar-end">
-    <span id="scanTime"></span>
-    <button class="btn-rescan" id="scanBtn" onclick="if(mode==='watch')setMode('screen');scan(true)" style="display:none">&#8635; סרוק שנית</button>
     <button class="btn-ghost" id="wlTopbarBtn" style="font-size:12px" onclick="setMode('watch')" title="רשימת מעקב">&#9733; מעקב</button>
     <div id="authChip"><button class="btn-ghost" style="font-size:12px" onclick="toggleAuthModal()">כניסה</button></div>
   </div>
@@ -1116,6 +1115,10 @@ tbody tr:last-child td { border-bottom: none; }
              half-built tab widget is worse than an honest button. -->
         <button class="src-tab active" id="tabScreen" aria-selected="true" onclick="setMode('screen')">תוצאות סריקה <span class="results-count" id="resCount"></span></button>
         <button class="src-tab" id="tabWatch" aria-selected="false" onclick="setMode('watch')">&#9733; מעקב <span class="results-count" id="wlCount"></span></button>
+      </div>
+      <div class="scan-status">
+        <span id="scanTime"></span>
+        <button class="btn-rescan" id="scanBtn" onclick="if(mode==='watch')setMode('screen');scan(true)" style="display:none">&#8635; סרוק שנית</button>
       </div>
       <div id="sectorWrap"></div>
       <div class="results-controls">

@@ -1204,6 +1204,10 @@
     const host = document.createElement('div'); host.innerHTML = h1;
     check('the day count and its unit never touch — a digit glued to "י" reads as a geresh mark', / \d+ ימ&#39;/.test(host.innerHTML) || / \d+ ימ'/.test(h1), h1);
   }
+  check('the rescan button and scan time sit next to the results tabs, not alone in the topbar',
+    document.querySelector('.results-header .scan-status #scanBtn') != null
+    && document.querySelector('.topbar #scanBtn') == null
+    && document.querySelector('.results-header .scan-status #scanTime') != null, 'moved: ' + (document.querySelector('.results-header .scan-status #scanBtn') != null));
   check('the nightly scan banner is gone', !document.getElementById('dailyBanner') && typeof dismissDaily === 'undefined');
 
   setScreener('sepa', true); // restore
