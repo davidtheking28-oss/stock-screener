@@ -1305,16 +1305,28 @@ if (IN_JOURNAL) {
 // the same "יצאו/נכנסו לסינון" toasts kept firing repeatedly). One hand-off
 // is enough — Supabase's own client keeps the session alive afterward.
 let _ssoApplied = false;
+let _ssoInFlight = false;
 if (IN_JOURNAL && _sb) {
   window.addEventListener('message', (e) => {
-    if (_ssoApplied) return;
+    if (_ssoApplied || _ssoInFlight) return;
     if (e.origin !== JOURNAL_ORIGIN || e.source !== window.parent) return;
     const msg = e.data;
     if (!msg || msg.type !== 'tj:session' || !msg.accessToken || !msg.refreshToken) return;
-    _ssoApplied = true;
-    _sb.auth.setSession({ access_token: msg.accessToken, refresh_token: msg.refreshToken }).then(() => {
+    _ssoInFlight = true;
+    // setSession resolves with {error} instead of throwing. Marking the hand-off
+    // done before looking at it meant one rejected token (a refresh token the
+    // journal had already rotated, common on a tablet that wakes from sleep)
+    // left this tab signed out for good, with every later session message
+    // ignored — stars and settings stayed on the device only.
+    _sb.auth.setSession({ access_token: msg.accessToken, refresh_token: msg.refreshToken }).then(({ error }) => {
+      _ssoInFlight = false;
+      if (error) {
+        _reportClientError('sso_set_session', error.message || String(error), {});
+        return;
+      }
+      _ssoApplied = true;
       if (allResults.length) checkAndSaveHistory(allResults.map(r => r.ticker)).then(() => render());
-    });
+    }, () => { _ssoInFlight = false; });
   });
   // A single ping on `load` is a one-shot handshake with no recovery if it's
   // ever lost — and on a tablet/phone it routinely is: Safari restores a
@@ -1333,11 +1345,14 @@ if (IN_JOURNAL && _sb) {
   };
   window.addEventListener('load', _pingScreenerReady);
   window.addEventListener('pageshow', _pingScreenerReady);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) _pingScreenerReady(); });
+  // Twenty one-second tries gave up after 20s — a tablet whose journal tab was
+  // still restoring its own session by then never connected. Keep trying, slower.
   let _ssoRetries = 0;
   const _ssoRetryTimer = setInterval(() => {
-    if (_ssoApplied || ++_ssoRetries > 20) { clearInterval(_ssoRetryTimer); return; }
+    if (_ssoApplied || ++_ssoRetries > 150) { clearInterval(_ssoRetryTimer); return; }
     _pingScreenerReady();
-  }, 1000);
+  }, 2000);
 }
 
 /* ════════════════════════════════════
@@ -2572,6 +2587,7 @@ async function saveWL(ticker, adding){
     }
   } else {
     localStorage.setItem('sepa_wl', JSON.stringify([...watchlist]));
+    if (IN_JOURNAL) { try{ localStorage.setItem('sepa_wl_dirty', '1'); }catch(e){} }
     // Embedded in the journal but with no session applied means the SSO
     // handshake hasn't gone through yet (or was lost) — the star still lights
     // up, but it's only on THIS device until that resolves. A standalone,
@@ -4871,6 +4887,18 @@ async function loadUserData(){
   const wlBeforeSet = new Set(watchlist);
   const cvBefore = JSON.stringify(colVis);
 
+  // Stars added while the hand-off with the journal had not connected only
+  // reached localStorage. Push them up now instead of letting the server copy
+  // overwrite them — otherwise they vanish the moment sync finally works.
+  if(wlData && localStorage.getItem('sepa_wl_dirty')==='1'){
+    const onServer = new Set(wlData.map(r=>r.ticker));
+    const localOnly = _lsJSON('sepa_wl', []).filter(t=>typeof t==='string' && !onServer.has(t));
+    if(localOnly.length){
+      const { error } = await _sb.from('screener_watchlist').upsert(localOnly.map(ticker=>({user_id:_currentUser.id, ticker})));
+      if(!error) localOnly.forEach(t=>wlData.push({ticker:t, created_at:new Date().toISOString()}));
+    }
+    try{ localStorage.removeItem('sepa_wl_dirty'); }catch(e){}
+  }
   if(wlData) {
     watchlist = new Set(wlData.map(r=>r.ticker));
     watchlistAddedAt = new Map(wlData.map(r=>[r.ticker, (r.created_at||'').slice(0,10)]));
