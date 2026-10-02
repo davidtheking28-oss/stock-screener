@@ -1210,6 +1210,10 @@
     && document.querySelector('.results-header .scan-status #scanTime') != null, 'moved: ' + (document.querySelector('.results-header .scan-status #scanBtn') != null));
   check('the nightly scan banner is gone', !document.getElementById('dailyBanner') && typeof dismissDaily === 'undefined');
 
+  // ── journal hand-off origins ──
+  check('journal hand-off: both journal origins are trusted, an unrelated one is not',
+    TRUSTED_JOURNAL_ORIGINS.includes('https://davidtheking28-oss.github.io') && TRUSTED_JOURNAL_ORIGINS.includes('https://trading-journal-ashy-eta.vercel.app') && !TRUSTED_JOURNAL_ORIGINS.includes('https://evil.example'));
+
   // ── settings sync ──
   {
     const keep = {};

@@ -1286,7 +1286,16 @@ window.addEventListener('unhandledrejection', (e) => {
    own session's tokens down: this pings it once embedded, the journal
    replies with tj:session, and this calls setSession with them. */
 const IN_JOURNAL = (() => { try { return window.parent && window.parent !== window; } catch (e) { return false; } })();
-const JOURNAL_ORIGIN = location.origin;
+// The journal is served from two origins (GitHub Pages and a Vercel mirror).
+// Pinning this to the screener's own origin meant the hand-off only ever worked
+// from GitHub Pages: opened from the other one, every ping was silently dropped
+// by the browser and every session message rejected, so nothing connected.
+const TRUSTED_JOURNAL_ORIGINS = [location.origin, 'https://davidtheking28-oss.github.io', 'https://trading-journal-ashy-eta.vercel.app'];
+let JOURNAL_ORIGIN = (() => {
+  try { const a = location.ancestorOrigins && location.ancestorOrigins[0]; if (a && TRUSTED_JOURNAL_ORIGINS.includes(a)) return a; } catch (e) {}
+  try { const r = new URL(document.referrer).origin; if (TRUSTED_JOURNAL_ORIGINS.includes(r)) return r; } catch (e) {}
+  return null;
+})();
 // The journal's own header already carries its branding — this app's own
 // logo in the topbar is redundant (and a second, unrelated brand name) once
 // embedded. Same reasoning as hiding authChip in updateAuthUI() below.
@@ -1309,9 +1318,10 @@ let _ssoInFlight = false;
 if (IN_JOURNAL && _sb) {
   window.addEventListener('message', (e) => {
     if (_ssoApplied || _ssoInFlight) return;
-    if (e.origin !== JOURNAL_ORIGIN || e.source !== window.parent) return;
+    if (!TRUSTED_JOURNAL_ORIGINS.includes(e.origin) || e.source !== window.parent) return;
     const msg = e.data;
     if (!msg || msg.type !== 'tj:session' || !msg.accessToken || !msg.refreshToken) return;
+    JOURNAL_ORIGIN = e.origin;
     _ssoInFlight = true;
     // setSession resolves with {error} instead of throwing. Marking the hand-off
     // done before looking at it meant one rejected token (a refresh token the
@@ -1341,7 +1351,7 @@ if (IN_JOURNAL && _sb) {
   // replies to tj:screener-ready whenever it arrives.
   const _pingScreenerReady = () => {
     if (_ssoApplied) return;
-    window.parent.postMessage({ type: 'tj:screener-ready' }, JOURNAL_ORIGIN);
+    (JOURNAL_ORIGIN ? [JOURNAL_ORIGIN] : TRUSTED_JOURNAL_ORIGINS).forEach(o => window.parent.postMessage({ type: 'tj:screener-ready' }, o));
   };
   window.addEventListener('load', _pingScreenerReady);
   window.addEventListener('pageshow', _pingScreenerReady);
@@ -4791,7 +4801,7 @@ let _modalTicker=null;
 function addToJournal(){
   const r=results.find(x=>x.ticker===_modalTicker)||ttUniverse[_modalTicker];
   try{ window.parent.postMessage({type:'tj:add-trade', symbol:_modalTicker, price:r?.close??null,
-    setup:mode==='screen'?activeScreener:null}, JOURNAL_ORIGIN); }catch(e){}
+    setup:mode==='screen'?activeScreener:null}, JOURNAL_ORIGIN||location.origin); }catch(e){}
   closeModal();
 }
 function closeModal(){
@@ -5269,7 +5279,7 @@ function _recordScreenerReviewed(key){
     // it instead of the review silently not counting anywhere.
     toast('הסינון לא נספר — הסנכרון עם היומן עוד לא התחבר, נסה לגלול שוב בעוד רגע');
   }
-  try{ window.parent.postMessage({type:'tj:screener-used', key}, JOURNAL_ORIGIN); }catch(e){}
+  try{ window.parent.postMessage({type:'tj:screener-used', key}, JOURNAL_ORIGIN||location.origin); }catch(e){}
 }
 function _maybeReportScreenerReviewed(fromSwitch){
   if(!IN_JOURNAL || mode!=='screen' || !results.length) return;
