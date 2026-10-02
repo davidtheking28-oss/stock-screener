@@ -4573,9 +4573,7 @@ function renderGallery(srcRows){
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
       +stat('EPS YoY', r.eps, r.epsQoq!=null?'שנה מול שנה: '+pct(r.eps)+' · רבעון מול הקודם: '+pct(r.epsQoq):'צמיחת רווח למניה, שנה מול שנה')
-      +((activeScreener==='vcp'||activeScreener==='cleanbase') && r.vcp?.pivot!=null
-        ? '<div class="gstat" title="נקודת פריצה $'+r.vcp.pivot.toFixed(2)+' — מרחק המחיר ממנה"><div class="gstat-lbl">Pivot</div><div class="gstat-val">'+pivotHtml(r.vcp).split('</span> ')[1]+'</div></div>'
-        : '<div class="gstat" title="מרחק מהשיא של 52 שבועות"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(fhUp?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>')
+      +'<div class="gstat" title="מרחק מהשיא של 52 שבועות"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(fhUp?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>'
       +'</div></div>';
   });
 
