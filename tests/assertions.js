@@ -1210,6 +1210,31 @@
     && document.querySelector('.results-header .scan-status #scanTime') != null, 'moved: ' + (document.querySelector('.results-header .scan-status #scanBtn') != null));
   check('the nightly scan banner is gone', !document.getElementById('dailyBanner') && typeof dismissDaily === 'undefined');
 
+  // ── settings sync ──
+  {
+    const keep = {};
+    ['sepa_mode','sepa_sort_x','sepa_prefs_dirty','sepa_layout'].forEach(k => { keep[k] = localStorage.getItem(k); });
+    const wasTouched = _userTouched;
+    localStorage.setItem('sepa_mode', 'watch'); localStorage.setItem('sepa_sort_x', '{"a":1}');
+    const col = _collectPrefs();
+    check('settings sync: collects the fixed keys and every sort bucket', col.sepa_mode === 'watch' && col.sepa_sort_x === '{"a":1}');
+    check('settings sync: signature ignores key order', _prefsSig({ a: '1', b: '2' }) === _prefsSig({ b: '2', a: '1' }) && _prefsSig({ a: '1' }) !== _prefsSig({ a: '2' }));
+    _userTouched = false; localStorage.removeItem('sepa_prefs_dirty');
+    _queuePrefsPush(); clearTimeout(_prefsTimer);
+    check('settings sync: a boot-time write with no user action is not pushed', localStorage.getItem('sepa_prefs_dirty') == null);
+    _userTouched = true;
+    _queuePrefsPush(); clearTimeout(_prefsTimer);
+    check('settings sync: a user change is marked dirty until it reaches the server', localStorage.getItem('sepa_prefs_dirty') === '1');
+    _reconcilePrefs({ sepa_mode: 'screen' });
+    check('settings sync: a dirty local change is not overwritten by the server copy', localStorage.getItem('sepa_mode') === 'watch');
+    localStorage.removeItem('sepa_prefs_dirty');
+    _reconcilePrefs(_collectPrefs());
+    check('settings sync: identical server copy changes nothing', localStorage.getItem('sepa_mode') === 'watch');
+    _userTouched = wasTouched;
+    Object.entries(keep).forEach(([k, v]) => v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v));
+    localStorage.removeItem('sepa_sort_x');
+  }
+
   setScreener('sepa', true); // restore
   return R;
 })()

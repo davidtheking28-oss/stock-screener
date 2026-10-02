@@ -2739,6 +2739,60 @@ function toggleFeatPanel(e){
   panel.classList.add('open');
   btn.setAttribute('aria-expanded','true');
 }
+/* ── Settings sync ──
+   Everything the user sets here besides the watchlist and the column picker
+   (those already live in the database) was device-local: screener type,
+   sector, sort order, mode, layout and every filter threshold. They are mirrored
+   as one blob in screener_prefs.prefs. Whole-blob last-write-wins. A change made
+   while the journal hand-off was not connected is marked dirty and pushed on the
+   next sign-in instead of being overwritten by the server copy. */
+let _userTouched = false;
+['pointerdown','keydown','change'].forEach(ev => document.addEventListener(ev, () => { _userTouched = true; }, {capture:true, passive:true}));
+function _collectPrefs(){
+  const out = {};
+  try{
+    ['sepa_screener','sepa_sector','sepa_mode','sepa_layout','sepa_filters'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) out[k]=v; });
+    for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.startsWith('sepa_sort_')) out[k]=localStorage.getItem(k); }
+  }catch(e){}
+  return out;
+}
+const _prefsSig = o => JSON.stringify(Object.keys(o||{}).sort().map(k=>[k,o[k]]));
+let _prefsTimer = null;
+function _queuePrefsPush(){
+  if(!_userTouched) return;
+  try{ localStorage.setItem('sepa_prefs_dirty','1'); }catch(e){}
+  clearTimeout(_prefsTimer);
+  _prefsTimer = setTimeout(_pushPrefs, 1500);
+}
+async function _pushPrefs(){
+  if(!_currentUser || !_sb) return;
+  const { error } = await _sb.from('screener_prefs').upsert({user_id:_currentUser.id, prefs:_collectPrefs(), updated_at:new Date().toISOString()});
+  if(error){ _reportClientError('prefs_push', error.message||String(error), {}); return; }
+  try{ localStorage.removeItem('sepa_prefs_dirty'); }catch(e){}
+}
+function _reconcilePrefs(serverPrefs){
+  const local = _collectPrefs();
+  const dirty = localStorage.getItem('sepa_prefs_dirty')==='1';
+  if(dirty || !serverPrefs || !Object.keys(serverPrefs).length){
+    if(dirty || Object.keys(local).length) _pushPrefs();
+    return;
+  }
+  if(_prefsSig(serverPrefs) === _prefsSig(local)) return;
+  let last = 0; try{ last = +sessionStorage.getItem('sepa_prefs_reloaded')||0; }catch(e){}
+  if(Date.now() - last < 60000) return;
+  try{
+    for(let i=localStorage.length-1;i>=0;i--){ const k=localStorage.key(i); if(k && k.startsWith('sepa_sort_')) localStorage.removeItem(k); }
+    Object.entries(serverPrefs).forEach(([k,v])=>{ if(/^sepa_(screener|sector|mode|layout|filters|sort_.+)$/.test(k) && typeof v==='string') localStorage.setItem(k,v); });
+    sessionStorage.setItem('sepa_prefs_reloaded', String(Date.now()));
+  }catch(e){ return; }
+  location.reload();
+}
+document.addEventListener('visibilitychange', async ()=>{
+  if(document.hidden || !_currentUser || !_sb) return;
+  const { data } = await _sb.from('screener_prefs').select('prefs').eq('user_id',_currentUser.id).maybeSingle();
+  if(data) _reconcilePrefs(data.prefs);
+});
+
 async function setFeature(key, on){
   _ohlcDisposeAll(); _galleryKey=''; _tableKey='';
   await setColVis(key, on);
@@ -3320,6 +3374,7 @@ function setScreener(key, applyDef=true){
     }
   }
   try{ localStorage.setItem('sepa_screener', key); }catch(e){}
+  _queuePrefsPush();
   const cfg=SCREENERS[key], panel=$('filterPanel');
   Object.keys(SCREENERS).forEach(k=>panel.classList.remove('panel-'+k));
   panel.classList.add('panel-'+key);
@@ -3988,6 +4043,7 @@ function selectSector(s){
   const sel=$('sectorFilter'); if(!sel) return;
   sel.value=s; applySectorFilter(); sortResults(); render();
   try{ localStorage.setItem('sepa_sector', s); }catch(e){}
+  _queuePrefsPush();
   renderSectorStrength();
 }
 
@@ -4100,6 +4156,7 @@ function setSort(k){
   _sortByMode[bucket]={key:sortKey,dir:sortDir};
   sortResults(); render();
   try{localStorage.setItem('sepa_sort_'+bucket,JSON.stringify({sortKey,sortDir}));}catch(e){}
+  _queuePrefsPush();
 }
 
 function render(){
@@ -4195,6 +4252,7 @@ function setMode(m){
   // doing nothing at all. applyView is idempotent.
   mode=m;
   try{ localStorage.setItem('sepa_mode', m); }catch(e){}
+  _queuePrefsPush();
   applyView();
   // A saved watchlist with no ttUniverse row for any of it (no scan this
   // session, cache expired) used to just sit on the "סרוק את השוק" empty
@@ -4212,6 +4270,7 @@ function setMode(m){
 function setLayout(l){
   layout=l;
   try{ localStorage.setItem('sepa_layout', l); }catch(e){}
+  _queuePrefsPush();
   applyView();
 }
 // The topbar button exists only to reach מעקב BEFORE resultsPanel has ever
@@ -4876,8 +4935,9 @@ async function initAuth(){
 async function loadUserData(){
   const [{data:wlData},{data:prefData}] = await Promise.all([
     _sb.from('screener_watchlist').select('ticker,created_at').eq('user_id',_currentUser.id),
-    _sb.from('screener_prefs').select('col_vis').eq('user_id',_currentUser.id).maybeSingle()
+    _sb.from('screener_prefs').select('col_vis,prefs').eq('user_id',_currentUser.id).maybeSingle()
   ]);
+  _reconcilePrefs(prefData?.prefs);
   // loadResultsCache() has already rendered from the local copy by the time this
   // resolves. Re-rendering unconditionally meant every single page load redrew
   // the whole table a beat after it first appeared — a visible flash that read
@@ -5047,6 +5107,7 @@ function saveFilterPrefs(){
       requireRevAccel:$('requireRevAccel')?.checked,requireMarginTrend:$('requireMarginTrend')?.checked,
       requireVCP:$('requireVCP')?.checked,requireRSLine:$('requireRSLine')?.checked
     }));
+    _queuePrefsPush();
   } catch(e){}
 }
 
