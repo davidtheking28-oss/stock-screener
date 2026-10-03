@@ -703,7 +703,15 @@ tbody tr:last-child td { border-bottom: none; }
 .gcard-sym { font: 700 15.5px var(--mono); letter-spacing: 0.3px; color: var(--text); }
 .gcard-price { font: 600 12px var(--mono-data); color: var(--text2); font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
 .gcard-name { font: 500 12px var(--sans); color: var(--text3); margin-top: 2px; letter-spacing: 0.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; direction: ltr; text-align: right; }
-.gcard-badges { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+/* Badges used to be flex-shrink:0 while the ticker side could not shrink either,
+   so on a ~380px tablet card a long sector name ("Cons. Discretionary") pushed
+   the RS badge over the price. The sector badge now gives way (ellipsis); RS and
+   the ticker/price never do. */
+.gcard-left { flex: 0 0 auto; }
+.gcard-badges { display: flex; align-items: center; gap: 5px; flex-shrink: 1; min-width: 0; }
+.gcard-badges .gbadge { flex-shrink: 0; }
+.gcard-badges .gbadge ~ .gbadge { flex-shrink: 1; min-width: 0; }
+.gcard-badges .gbadge ~ .gbadge .gb-lbl { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .gcard-tags { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
 .gcard-tags .earn-badge { margin: 0; }
 .gbadge { direction: ltr; display: inline-flex; align-items: baseline; gap: 5px; height: 23px; padding: 0 10px; border-radius: 6px; font: 700 11px var(--sans); letter-spacing: 0.2px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); white-space: nowrap; }

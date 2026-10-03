@@ -1210,6 +1210,20 @@
     && document.querySelector('.results-header .scan-status #scanTime') != null, 'moved: ' + (document.querySelector('.results-header .scan-status #scanBtn') != null));
   check('the nightly scan banner is gone', !document.getElementById('dailyBanner') && typeof dismissDaily === 'undefined');
 
+  // ── gallery card header on a narrow (tablet) card ──
+  {
+    const sec = '<span class="gbadge"><span class="gb-lbl">Cons. Discretionary</span> <b>#7</b></span>';
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;top:0;left:0;direction:rtl';
+    host.innerHTML = '<div class="gcard" style="width:290px"><div class="gcard-head"><div class="gcard-left"><button class="star-btn off">☆</button><div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">IMAX</span><span class="gcard-price">$52.72</span></div><div class="gcard-name">IMAX Corp…</div></div></div><div class="gcard-badges"><span class="gbadge"><span class="gb-lbl">RS</span> <b>89</b></span>' + sec + '</div></div></div>';
+    document.body.appendChild(host);
+    const L = host.querySelector('.gcard-price').getBoundingClientRect(), B = host.querySelector('.gcard-badges').getBoundingClientRect();
+    const rsLbl = host.querySelector('.gcard-badges .gb-lbl');
+    check('gallery card: on a narrow card the badges never overlap the ticker and price', B.right <= L.left + 0.5 || B.left >= L.right - 0.5, JSON.stringify({ L: [L.left, L.right], B: [B.left, B.right] }));
+    check('gallery card: the RS label is never the one that gets truncated', rsLbl.scrollWidth <= rsLbl.clientWidth);
+    host.remove();
+  }
+
   // ── journal hand-off origins ──
   check('journal hand-off: both journal origins are trusted, an unrelated one is not',
     TRUSTED_JOURNAL_ORIGINS.includes('https://davidtheking28-oss.github.io') && TRUSTED_JOURNAL_ORIGINS.includes('https://trading-journal-ashy-eta.vercel.app') && !TRUSTED_JOURNAL_ORIGINS.includes('https://evil.example'));
