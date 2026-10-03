@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { COLUMNS, C, FILTERS, Row, computeRS, applyClassicSEPA } from './scoring.ts';
 import { approachingPivot, Bar } from './pivot.ts';
+import { buildWatchlistAlert } from './alert.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -63,6 +64,35 @@ async function fetchBars(symbol: string): Promise<Bar[] | null> {
     const d = await r.json();
     return Array.isArray(d?.bars) ? d.bars : null;
   } catch { return null; }
+}
+
+// The email path needs RESEND_API_KEY, which this project has never had set, so
+// the nightly mail silently went nowhere. Telegram needs only secrets that
+// already exist (the data-health bot), so the owner's watchlist alert goes there.
+async function sendTelegramAlert(scanDate: string, entries: string[], exits: string[]) {
+  const sr = await sb('/rest/v1/app_secrets?select=key,value&key=in.(telegram_bot_token,telegram_chat_id,telegram_owner_user_id)');
+  if (!sr.ok) return { sent: 0, reason: 'secrets ' + sr.status };
+  const sec = Object.fromEntries(((await sr.json()) as { key: string; value: string }[]).map(r => [r.key, r.value]));
+  if (!sec.telegram_bot_token || !sec.telegram_chat_id || !sec.telegram_owner_user_id) return { sent: 0, reason: 'telegram not configured' };
+  const wr = await sb(`/rest/v1/screener_watchlist?select=ticker&user_id=eq.${encodeURIComponent(sec.telegram_owner_user_id)}`);
+  if (!wr.ok) return { sent: 0, reason: 'watchlist ' + wr.status };
+  const wl = new Set(((await wr.json()) as { ticker: string }[]).map(r => r.ticker));
+  const near = new Map<string, { pivot: number; distPct: number }>();
+  const tickers = [...wl];
+  const deadline = Date.now() + 60_000;
+  for (let i = 0; i < tickers.length && Date.now() < deadline; i += 10) {
+    await Promise.all(tickers.slice(i, i + 10).map(async t => {
+      const r = approachingPivot(await fetchBars(t));
+      if (r) near.set(t, r);
+    }));
+  }
+  const text = buildWatchlistAlert(scanDate, near, entries, exits, wl);
+  if (!text) return { sent: 0, reason: 'nothing to report' };
+  const tr = await fetch(`https://api.telegram.org/bot${sec.telegram_bot_token}/sendMessage`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: sec.telegram_chat_id, text }),
+  });
+  return tr.ok ? { sent: 1, near: near.size } : { sent: 0, reason: 'telegram ' + tr.status };
 }
 
 async function sendEmails(scanDate: string, entries: string[], exits: string[], results: ReturnType<typeof applyClassicSEPA>, breadth: number) {
@@ -206,8 +236,9 @@ Deno.serve(async (req: Request) => {
     if (!put.ok) throw new Error('save failed ' + put.status + ' ' + await put.text());
 
     const mail = await sendEmails(scanDate, entries, exits, results, breadth);
+    const telegram = await sendTelegramAlert(scanDate, entries, exits).catch(e => ({ sent: 0, reason: String(e) }));
 
-    return new Response(JSON.stringify({ ok: true, scanDate, count: results.length, entries: entries.length, exits: exits.length, breadth, mail }), {
+    return new Response(JSON.stringify({ ok: true, scanDate, count: results.length, entries: entries.length, exits: exits.length, breadth, mail, telegram }), {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (e) {
