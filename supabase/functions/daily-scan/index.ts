@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { COLUMNS, C, FILTERS, Row, computeRS, applyClassicSEPA } from './scoring.ts';
 import { approachingPivot, Bar } from './pivot.ts';
-import { buildWatchlistAlert } from './alert.ts';
+import { buildPivotAlert, nearItems, SCREENER_TITLES, SCREENER_ORDER, NearPivot } from './alert.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -69,30 +69,60 @@ async function fetchBars(symbol: string): Promise<Bar[] | null> {
 // The email path needs RESEND_API_KEY, which this project has never had set, so
 // the nightly mail silently went nowhere. Telegram needs only secrets that
 // already exist (the data-health bot), so the owner's watchlist alert goes there.
+const TG_MAX_PCT = 3;
+
 async function sendTelegramAlert(scanDate: string, entries: string[], exits: string[]) {
   const sr = await sb('/rest/v1/app_secrets?select=key,value&key=in.(telegram_bot_token,telegram_chat_id,telegram_owner_user_id)');
   if (!sr.ok) return { sent: 0, reason: 'secrets ' + sr.status };
   const sec = Object.fromEntries(((await sr.json()) as { key: string; value: string }[]).map(r => [r.key, r.value]));
   if (!sec.telegram_bot_token || !sec.telegram_chat_id || !sec.telegram_owner_user_id) return { sent: 0, reason: 'telegram not configured' };
-  const wr = await sb(`/rest/v1/screener_watchlist?select=ticker&user_id=eq.${encodeURIComponent(sec.telegram_owner_user_id)}`);
+  const owner = encodeURIComponent(sec.telegram_owner_user_id);
+  const [wr, hr] = await Promise.all([
+    sb(`/rest/v1/screener_watchlist?select=ticker&user_id=eq.${owner}`),
+    sb(`/rest/v1/screener_history?select=ticker,screener,last_seen&user_id=eq.${owner}&limit=5000`),
+  ]);
   if (!wr.ok) return { sent: 0, reason: 'watchlist ' + wr.status };
   const wl = new Set(((await wr.json()) as { ticker: string }[]).map(r => r.ticker));
-  const near = new Map<string, { pivot: number; distPct: number }>();
-  const tickers = [...wl];
-  const deadline = Date.now() + 60_000;
-  for (let i = 0; i < tickers.length && Date.now() < deadline; i += 10) {
-    await Promise.all(tickers.slice(i, i + 10).map(async t => {
-      const r = approachingPivot(await fetchBars(t));
+  // screener_history holds, per screener, the tickers that passed each scan the
+  // owner ran in the app. A screener's CURRENT list is the rows stamped with its
+  // newest last_seen; one not scanned for 4+ days is stale and left out rather
+  // than reported as if it were today's.
+  const hist = hr.ok ? ((await hr.json()) as { ticker: string; screener: string; last_seen: string }[]) : [];
+  const newest: Record<string, string> = {};
+  for (const h of hist) if (!newest[h.screener] || h.last_seen > newest[h.screener]) newest[h.screener] = h.last_seen;
+  const cutoff = new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10);
+  const byScreener: Record<string, string[]> = {};
+  for (const h of hist) {
+    if (SCREENER_TITLES[h.screener] && h.last_seen === newest[h.screener] && h.last_seen >= cutoff) (byScreener[h.screener] ||= []).push(h.ticker);
+  }
+  const wanted = [...wl, ...SCREENER_ORDER.flatMap(k => byScreener[k] || [])];
+  const tickers = [...new Set(wanted)];
+  const near = new Map<string, NearPivot>();
+  // The shared ohlc function is limited to 400 requests a minute per IP, so
+  // batches are paced; the watchlist goes first and the deadline cuts the tail.
+  const deadline = Date.now() + 100_000;
+  for (let i = 0; i < tickers.length && Date.now() < deadline; i += 8) {
+    const t0 = Date.now();
+    await Promise.all(tickers.slice(i, i + 8).map(async t => {
+      const r = approachingPivot(await fetchBars(t), -TG_MAX_PCT);
       if (r) near.set(t, r);
     }));
+    const wait = 1500 - (Date.now() - t0);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
   }
-  const text = buildWatchlistAlert(scanDate, near, entries, exits, wl);
-  if (!text) return { sent: 0, reason: 'nothing to report' };
+  const groups = [
+    { title: 'רשימת מעקב', items: nearItems(wl, near) },
+    ...SCREENER_ORDER.filter(k => byScreener[k]).map(k => ({
+      title: SCREENER_TITLES[k], asOf: newest[k], items: nearItems(byScreener[k], near, wl),
+    })),
+  ];
+  const text = buildPivotAlert(scanDate, groups, entries.filter(t => wl.has(t)), exits.filter(t => wl.has(t)), TG_MAX_PCT);
+  if (!text) return { sent: 0, reason: 'nothing to report', checked: tickers.length };
   const tr = await fetch(`https://api.telegram.org/bot${sec.telegram_bot_token}/sendMessage`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: sec.telegram_chat_id, text }),
+    body: JSON.stringify({ chat_id: sec.telegram_chat_id, text: text.slice(0, 4000) }),
   });
-  return tr.ok ? { sent: 1, near: near.size } : { sent: 0, reason: 'telegram ' + tr.status };
+  return tr.ok ? { sent: 1, near: near.size, checked: tickers.length } : { sent: 0, reason: 'telegram ' + tr.status };
 }
 
 async function sendEmails(scanDate: string, entries: string[], exits: string[], results: ReturnType<typeof applyClassicSEPA>, breadth: number) {
