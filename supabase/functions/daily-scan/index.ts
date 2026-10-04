@@ -76,6 +76,11 @@ async function sendTelegramAlert(scanDate: string, entries: string[], exits: str
   if (!sr.ok) return { sent: 0, reason: 'secrets ' + sr.status };
   const sec = Object.fromEntries(((await sr.json()) as { key: string; value: string }[]).map(r => [r.key, r.value]));
   if (!sec.telegram_bot_token || !sec.telegram_chat_id || !sec.telegram_owner_user_id) return { sent: 0, reason: 'telegram not configured' };
+  // Send only on days the US market traded: after the close SPY's newest bar is
+  // today's (New York date); on a holiday it is an earlier day.
+  const spy = await fetchBars('SPY');
+  const nyDay = (ms: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(ms));
+  if (spy?.length && nyDay(spy[spy.length - 1].t * 1000) !== nyDay(Date.now())) return { sent: 0, reason: 'market closed today' };
   const owner = encodeURIComponent(sec.telegram_owner_user_id);
   // Only the last 4 days: the table holds thousands of rows per user and the API
   // returns at most 1000, which silently truncated the lists to a fraction.
@@ -119,10 +124,10 @@ async function sendTelegramAlert(scanDate: string, entries: string[], exits: str
     })),
   ];
   const text = buildPivotAlert(scanDate, groups, entries.filter(t => wl.has(t)), exits.filter(t => wl.has(t)), TG_MAX_PCT);
-  if (!text) return { sent: 0, reason: 'nothing to report', checked: tickers.length };
+  const msg = text ?? `SEPA ${scanDate} — אין היום מניות עד ${TG_MAX_PCT}% מתחת ל-Pivot`;
   const tr = await fetch(`https://api.telegram.org/bot${sec.telegram_bot_token}/sendMessage`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: sec.telegram_chat_id, text: text.slice(0, 4000) }),
+    body: JSON.stringify({ chat_id: sec.telegram_chat_id, text: msg.slice(0, 4000) }),
   });
   return tr.ok ? { sent: 1, near: near.size, checked: tickers.length } : { sent: 0, reason: 'telegram ' + tr.status };
 }
