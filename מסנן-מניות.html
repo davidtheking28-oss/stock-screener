@@ -1352,6 +1352,15 @@ if (IN_JOURNAL && _sb) {
       _ssoApplied = true;
       if (allResults.length) checkAndSaveHistory(allResults.map(r => r.ticker)).then(() => render());
     }, () => { _ssoInFlight = false; });
+    // Measured on the tablet: the message arrived (msgs:4) but setSession never
+    // settled — applied:false, inFlight:true — and the in-flight flag then blocked
+    // every retry. Free it after 8s so the next ping can try again; a late success
+    // still lands through the handler above.
+    setTimeout(() => {
+      if (!_ssoInFlight) return;
+      _ssoInFlight = false;
+      _reportClientError('sso_set_session_timeout', 'setSession did not settle in 8s', {stack:_ssoDiag()});
+    }, 8000);
   });
   // A single ping on `load` is a one-shot handshake with no recovery if it's
   // ever lost — and on a tablet/phone it routinely is: Safari restores a
