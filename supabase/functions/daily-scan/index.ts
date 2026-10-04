@@ -77,9 +77,12 @@ async function sendTelegramAlert(scanDate: string, entries: string[], exits: str
   const sec = Object.fromEntries(((await sr.json()) as { key: string; value: string }[]).map(r => [r.key, r.value]));
   if (!sec.telegram_bot_token || !sec.telegram_chat_id || !sec.telegram_owner_user_id) return { sent: 0, reason: 'telegram not configured' };
   const owner = encodeURIComponent(sec.telegram_owner_user_id);
+  // Only the last 4 days: the table holds thousands of rows per user and the API
+  // returns at most 1000, which silently truncated the lists to a fraction.
+  const cutoff = new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10);
   const [wr, hr] = await Promise.all([
     sb(`/rest/v1/screener_watchlist?select=ticker&user_id=eq.${owner}`),
-    sb(`/rest/v1/screener_history?select=ticker,screener,last_seen&user_id=eq.${owner}&limit=5000`),
+    sb(`/rest/v1/screener_history?select=ticker,screener,last_seen&user_id=eq.${owner}&last_seen=gte.${cutoff}&order=last_seen.desc&limit=1000`),
   ]);
   if (!wr.ok) return { sent: 0, reason: 'watchlist ' + wr.status };
   const wl = new Set(((await wr.json()) as { ticker: string }[]).map(r => r.ticker));
@@ -90,10 +93,9 @@ async function sendTelegramAlert(scanDate: string, entries: string[], exits: str
   const hist = hr.ok ? ((await hr.json()) as { ticker: string; screener: string; last_seen: string }[]) : [];
   const newest: Record<string, string> = {};
   for (const h of hist) if (!newest[h.screener] || h.last_seen > newest[h.screener]) newest[h.screener] = h.last_seen;
-  const cutoff = new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10);
   const byScreener: Record<string, string[]> = {};
   for (const h of hist) {
-    if (SCREENER_TITLES[h.screener] && h.last_seen === newest[h.screener] && h.last_seen >= cutoff) (byScreener[h.screener] ||= []).push(h.ticker);
+    if (SCREENER_TITLES[h.screener] && h.last_seen === newest[h.screener]) (byScreener[h.screener] ||= []).push(h.ticker);
   }
   const wanted = [...wl, ...SCREENER_ORDER.flatMap(k => byScreener[k] || [])];
   const tickers = [...new Set(wanted)];
