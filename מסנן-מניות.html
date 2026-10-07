@@ -30,6 +30,9 @@
 }
 </script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230d1526'/%3E%3Cpath d='M15 70 L38 47 L52 58 L85 25' stroke='%232ecc71' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M63 25 L85 25 L85 47' stroke='%232ecc71' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<link rel="preload" href="fonts/heebo-hebrew.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preconnect" href="https://www.tradingview.com">
 <link rel="preconnect" href="https://s3.tradingview.com">
 <link rel="dns-prefetch" href="https://www.tradingview.com">
@@ -977,6 +980,25 @@ tbody tr:last-child td { border-bottom: none; }
   }
 }
 </style>
+<style>
+.gallery > .empty { grid-column:1 / -1; }
+.filter-panel.open .filter-body { max-height:none; }
+#authEmail { box-sizing:border-box; min-height:40px; padding:8px 12px; border:1px solid var(--border); border-radius:var(--r2); background:var(--bg2); color:var(--text); font:500 14px var(--sans); }
+#authEmail:focus-visible { outline:2px solid var(--accent2); outline-offset:2px; }
+.filter-panel > .screeners { margin:0; padding:12px 20px; border-bottom:1px solid var(--border2); }
+.advanced-filters summary { cursor:pointer; color:var(--text2); font:600 12px var(--sans); padding:8px 0; }
+.advanced-filters .toggle { margin:8px 0; }
+.feat-panel { width:340px; max-width:calc(100vw - 40px); padding:16px; }
+.feat-panel label { min-height:28px; align-items:center; }
+.fp-title { padding-top:10px; margin-bottom:8px; border-top:1px solid var(--border2); font-size:12px; }
+.fp-title:first-child { border-top:0; padding-top:0; }
+.cname, .gcard-name, .fp-hint { font-size:12px; }
+.validation-note { margin:4px 0 0; font:500 11px var(--sans); color:var(--text2); }
+@media(min-width:681px) {
+  .filter-sections.single .fields { grid-template-columns:repeat(2,minmax(0,360px)); gap:12px 28px; justify-content:start; }
+  .filter-sections.single .field { grid-column:auto; grid-template-columns:minmax(0,1fr) 86px; gap:12px; }
+}
+</style>
 </head>
 <body>
 
@@ -1007,7 +1029,6 @@ tbody tr:last-child td { border-bottom: none; }
       <span class="filter-sub" id="filterSub">Trend Template + SEPA</span>
       <span class="filter-arrow">&#9660;</span>
     </div>
-    <div class="filter-body">
       <div class="screeners">
         <span class="preset-label">מסנן:</span>
         <button class="screener-btn active" aria-pressed="true" data-screener="sepa" onclick="setScreener('sepa')">Minervini SEPA</button>
@@ -1019,6 +1040,7 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="screener-btn" aria-pressed="false" data-screener="growth" onclick="setScreener('growth')">מסנן פונדמנטלי</button>
         <button class="screener-btn" aria-pressed="false" data-screener="commodities" onclick="setScreener('commodities')">סחורות</button>
       </div>
+    <div class="filter-body">
       <div class="presets f-sepa">
         <span class="preset-label">פריסט:</span>
         <button class="preset-btn active" aria-pressed="true" onclick="applyPreset('classic',this)">קלאסי Minervini</button>
@@ -1099,12 +1121,14 @@ tbody tr:last-child td { border-bottom: none; }
           </div>
           <div class="filter-toggles">
             <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
+            <details class="advanced-filters"><summary>תנאים מתקדמים — רווחיות, צמיחה ובסיס</summary>
             <label class="toggle"><input type="checkbox" id="requireProfit" checked> שולי רווח חיוביים</label>
             <label class="toggle"><input type="checkbox" id="requireEpsAccel" checked> האצה ב-EPS (רבעון אחרון &ge; קודם)</label>
             <label class="toggle"><input type="checkbox" id="requireRevAccel" checked> האצה במכירות (רבעון אחרון &ge; קודם)</label>
             <label class="toggle"><input type="checkbox" id="requireMarginTrend"> שיפור שולי רווח (מול שנה קודמת)</label>
             <label class="toggle"><input type="checkbox" id="requireVCP"> בסיס VCP (2+ התכווצויות מתהדקות)</label>
             <label class="toggle"><input type="checkbox" id="requireRSLine"> קו RS בשיא חדש (מול S&amp;P 500)</label>
+            </details>
           </div>
         </div>
       </div>
@@ -1142,7 +1166,7 @@ tbody tr:last-child td { border-bottom: none; }
         <div class="col-picker" id="featWrap">
           <button class="btn-ghost" id="featBtn" onclick="toggleFeatPanel(event)" title="הגדרות" aria-label="הגדרות" aria-haspopup="true" aria-expanded="false" aria-controls="featPanel">&#9881;</button>
           <div class="col-picker-panel feat-panel" id="featPanel">
-            <div class="fp-sec">מה להציג</div>
+            <div class="fp-sec">תכונות הגרפים והמעקב</div>
             <div class="fp-list" id="featToggles"></div>
             <div id="colPickerWrap" style="display:none">
               <div class="fp-sec">עמודות בטבלה</div>
@@ -1292,7 +1316,7 @@ window.addEventListener('unhandledrejection', (e) => {
    into the journal does not carry over, since browser storage is per-origin
    even when this page is only ever reached via the journal's iframe. Without
    a session here, checkAndSaveHistory's `if(!_currentUser) return` bails
-   immediately, and "נוסף למעקב" silently stayed "—" for every row for every
+   immediately, and "הופיע לראשונה" silently stayed "—" for every row for every
    journal user — nobody had ever separately logged into the screener itself.
    The journal and the screener are both served from the same github.io
    account (different paths, same origin), so the parent can safely hand its
@@ -1516,7 +1540,7 @@ const COL_DEFS = [
   {key:'liq',    label:'נזילות $',   defaultOn:false},
   {key:'mc',     label:'שווי שוק',   defaultOn:false},
   {key:'sector', label:'סקטור',      defaultOn:true},
-  {key:'firstSeen', label:'נוסף למעקב', defaultOn:true},
+  {key:'firstSeen', label:'הופיע לראשונה', defaultOn:true},
 ];
 
 // v2: SECTOR_GROUPS collapsed the raw 21-way sector field into ~11 groups —
@@ -1607,6 +1631,23 @@ let _commUniverse = null, _commTime = 0;
 const UNIVERSE_TTL = 15*60*1000;
 const SCAN_TIMEOUT = 30*1000;
 let _currentUser = null;
+let _accountGeneration = 0;
+function _accountContext(){
+  return _currentUser ? {userId:_currentUser.id, generation:_accountGeneration} : null;
+}
+function _accountCurrent(account){
+  return !!account && account.userId===_currentUser?.id && account.generation===_accountGeneration;
+}
+function _setCurrentUser(user){
+  if(_currentUser?.id!==user?.id){
+    _accountGeneration++;
+    _wlPending.clear();
+    clearTimeout(_prefsTimer);
+    firstSeenByTicker.clear();
+    newToday.clear();
+  }
+  _currentUser=user;
+}
 // These three parse at script top level. One corrupted value used to throw here
 // and kill everything after it — prefs, cached results, auth, scroll handlers.
 const _lsJSON = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch(e) { return fb; } };
@@ -1789,9 +1830,9 @@ async function _ohlcDraw(el){
   const sym=el.dataset.sym;
   const OHLC_TTL=30*60*1000;
   try{
-    let bars=null;
+    let bars=await _galleryBarsFromValidated(sym);
     const mc=_ohlcCache.get(sym);
-    if(mc && Date.now()-mc.t<OHLC_TTL) bars=mc.bars;
+    if(!bars && mc && Date.now()-mc.t<OHLC_TTL) bars=mc.bars;
     if(!bars){
       try{
         const sc=JSON.parse(sessionStorage.getItem('ohlc_v2_'+sym));
@@ -2004,7 +2045,19 @@ const BATCH_CHUNK=60, BATCH_CONCURRENCY=4;
 // symbol already being fetched by one of them is awaited, not re-requested;
 // and anything already fresh in memory or IndexedDB is skipped outright.
 const _warmInflight=new Map();
+// Exact validation already owns a year of prices. Reuse the same 90-day
+// chart window, and await its in-flight batch rather than downloading twice.
+async function _galleryBarsFromValidated(sym, now=Date.now()){
+  const pending=_warmInflight.get(sym);
+  if(pending) await pending.catch(()=>{});
+  const entry=_valBars.get(sym);
+  if(!_barsFresh(entry,now) || !entry.bars?.length || !_barsSane(entry.bars)) return null;
+  const cutoff=Math.floor(now/1000)-90*86400;
+  const bars=entry.bars.filter(b=>b.t>=cutoff);
+  return bars.length ? bars : null;
+}
 async function _fetchBars1yWarm(tickers, signal){
+  signal?.throwIfAborted();
   const waits=new Set(), need=[];
   for(const t of new Set(tickers)){
     if(_barsFresh(_valBars.get(t))) continue;
@@ -2016,7 +2069,7 @@ async function _fetchBars1yWarm(tickers, signal){
     await Promise.all(need.map(async t=>{ const s=await _barsStore.get(t); if(_barsFresh(s)) _valBars.set(t,s); else cold.push(t); }));
     const chunks=[]; for(let i=0;i<cold.length;i+=BATCH_CHUNK) chunks.push(cold.slice(i,i+BATCH_CHUNK));
     let idx=0;
-    async function worker(){ while(idx<chunks.length) await _fetchBars1yBatch(chunks[idx++], signal); }
+    async function worker(){ while(idx<chunks.length){ signal?.throwIfAborted(); await _fetchBars1yBatch(chunks[idx++], signal); } }
     await Promise.all(Array.from({length:Math.min(BATCH_CONCURRENCY,chunks.length)}, worker));
   })();
   need.forEach(t=>_warmInflight.set(t,job));
@@ -2392,6 +2445,7 @@ async function _cleanbaseUniverse(universe, rsMap, signal){
   return [...byT.values()];
 }
 async function validateExact(list, scr, onProgress, signal){
+  signal?.throwIfAborted();
   if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp'&&scr!=='cleanbase')||!HAS_SUPABASE||!list.length) return list;
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   const adrMin=num('adrMin')||4, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
@@ -2407,13 +2461,16 @@ async function validateExact(list, scr, onProgress, signal){
   // SPY rides in the same batch: fetched on its own first, it was requested
   // once per concurrent cleanbase source and held every batch back ~1s.
   await _fetchBars1yWarm(['SPY', ...list.map(r=>r.ticker)], signal).catch(()=>{});
+  signal?.throwIfAborted();
   // One benchmark for the whole pass — the RS line is price/SPY.
   const spy=await _fetchBars1y('SPY', signal).catch(()=>null);
   async function worker(){
     while(idx<list.length){
+      signal?.throwIfAborted();
       const r=list[idx++];
       try{
         const raw=await _fetchBars1y(r.ticker, signal);
+        signal?.throwIfAborted();
         // A series that flips price scale is not the same as a missing one:
         // "no bars" is a fetch that failed and the screeners fall back, while
         // this is positive evidence the numbers are wrong. Nothing can be
@@ -2447,7 +2504,11 @@ async function validateExact(list, scr, onProgress, signal){
             if(!(runOld&&tight)) r._exactFail=true;
           }
         }
-      }catch(e){}
+        if(!r._exactFail){
+          const enough=bars?.length && (scr==='sepa' ? _ma200Rising(bars)!==null : scr==='power' ? bars.length>=45 : scr==='qulla' ? bars.length>=Math.max(25,move6Min>0?127:0,move3Min>0?64:0) : true);
+          r.validation={status:enough?'verified':'approximate', asOf:bars?.at(-1)?.t||null};
+        }
+      }catch(e){ if(signal?.aborted) throw e; r.validation={status:'approximate',asOf:null}; }
       done++;
       if(onProgress && (done%6===0||done===total)) onProgress(done,total);
     }
@@ -2480,7 +2541,7 @@ let firstSeenByTicker = new Map();
 const _fsKey = (screener, ticker) => screener + '|' + ticker;
 // ticker -> 'YYYY-MM-DD' the ticker was actually added to the watchlist
 // (screener_watchlist.created_at), populated by loadUserData and updated
-// optimistically by toggleWL. The "נוסף למעקב" COLUMN uses this, not
+// optimistically by toggleWL. The "הופיע לראשונה" COLUMN uses this, not
 // firstSeenByTicker above — those are two different questions
 // (first_seen is "when did a scan first surface this ticker", scoped per
 // screener type; this is "when did I star it"), and the column's own label
@@ -2609,11 +2670,13 @@ const _wlPending = new Map();
 let _wlSeq = 0;
 async function saveWL(ticker, adding){
   if(_currentUser && _sb){
+    const account=_accountContext();
     const mySeq = ++_wlSeq;
     _wlPending.set(ticker, mySeq);
     const { error } = adding
       ? await _sb.from('screener_watchlist').upsert({user_id:_currentUser.id, ticker})
       : await _sb.from('screener_watchlist').delete().eq('user_id',_currentUser.id).eq('ticker',ticker);
+    if(!_accountCurrent(account)) return;
     const isLatest = _wlPending.get(ticker)===mySeq;
     if(isLatest) _wlPending.delete(ticker);
     // Signed in, saveWL skips the localStorage fallback — so a failed write meant
@@ -2806,7 +2869,9 @@ function _queuePrefsPush(){
 }
 async function _pushPrefs(){
   if(!_currentUser || !_sb) return;
-  const { error } = await _sb.from('screener_prefs').upsert({user_id:_currentUser.id, prefs:_collectPrefs(), updated_at:new Date().toISOString()});
+  const account=_accountContext();
+  const { error } = await _sb.from('screener_prefs').upsert({user_id:account.userId, prefs:_collectPrefs(), updated_at:new Date().toISOString()});
+  if(!_accountCurrent(account)) return;
   if(error){ _reportClientError('prefs_push', error.message||String(error), {}); return; }
   try{ localStorage.removeItem('sepa_prefs_dirty'); }catch(e){}
 }
@@ -2829,7 +2894,9 @@ function _reconcilePrefs(serverPrefs){
 }
 document.addEventListener('visibilitychange', async ()=>{
   if(document.hidden || !_currentUser || !_sb) return;
-  const { data } = await _sb.from('screener_prefs').select('prefs').eq('user_id',_currentUser.id).maybeSingle();
+  const account=_accountContext();
+  const { data } = await _sb.from('screener_prefs').select('prefs').eq('user_id',account.userId).maybeSingle();
+  if(!_accountCurrent(account)) return;
   if(data) _reconcilePrefs(data.prefs);
 });
 
@@ -2841,7 +2908,9 @@ async function setFeature(key, on){
 async function setColVis(key, on){
   colVis[key]=on;
   if(_currentUser && _sb){
-    const { error } = await _sb.from('screener_prefs').upsert({user_id:_currentUser.id, col_vis:colVis, updated_at:new Date().toISOString()});
+    const account=_accountContext();
+    const { error } = await _sb.from('screener_prefs').upsert({user_id:account.userId, col_vis:colVis, updated_at:new Date().toISOString()});
+    if(!_accountCurrent(account)) return;
     if(error){ colVis[key]=!on; toast('שמירת העדפות העמודות נכשלה'); }
   } else {
     localStorage.setItem('sepa_colvis', JSON.stringify(colVis));
@@ -3514,19 +3583,21 @@ function _screenerPerf(entries, barsFor, spyBars, horizons=[5,10,20]){
 }
 const PERF_DAYS=60;
 async function loadScreenerPerf(){
-  const body=$('perfBody'), scr=activeScreener;
+  const body=$('perfBody'), scr=activeScreener, account=_accountContext();
   if(!_currentUser || !_sb){ body.innerHTML='<div class="perf-note">צריך להתחבר — הביצועים מחושבים מההיסטוריה של הסריקות שלך.</div>'; return; }
   body.innerHTML='<div class="perf-note"><span class="spinner"></span> מחשב…</div>';
   const since=new Date(Date.now()-PERF_DAYS*86400000).toISOString().slice(0,10);
   const {data, error}=await _sb.from('screener_history').select('ticker,first_seen')
     .eq('user_id',_currentUser.id).eq('screener',scr).gte('first_seen',since);
-  if(scr!==activeScreener) return;
+  if(scr!==activeScreener || !_accountCurrent(account)) return;
   if(error){ body.innerHTML='<div class="perf-note">שגיאה בטעינת ההיסטוריה.</div>'; return; }
   const rows=data||[];
   if(!rows.length){ body.innerHTML='<div class="perf-note">אין עדיין כניסות מתועדות למסנן הזה ב-'+PERF_DAYS+' הימים האחרונים.</div>'; return; }
   await _fetchBars1yWarm(['SPY', ...rows.map(r=>r.ticker)]).catch(()=>{});
   const spy=await _fetchBars1y('SPY'), bars=new Map();
+  if(scr!==activeScreener || !_accountCurrent(account)) return;
   await Promise.all(rows.map(async r=>bars.set(r.ticker, await _fetchBars1y(r.ticker))));
+  if(scr!==activeScreener || !_accountCurrent(account)) return;
   if(scr!==activeScreener) return;
   const p=_screenerPerf(rows, t=>bars.get(t), spy);
   const fmt=v=>v==null?'—':(v>0?'+':'')+v.toFixed(1)+'%', cls=v=>v==null?'':v>0?'pos':'neg';
@@ -3536,7 +3607,8 @@ async function loadScreenerPerf(){
     +'</tbody></table><div class="perf-note">'+rows.length+' כניסות מאז '+since.split('-').reverse().join('/')+' · כניסה = סגירה ביום שהמניה נכנסה למסנן · נרשם רק מה שנסרק בפועל</div>';
 }
 async function checkAndSaveHistory(tickers){
-  if(!_currentUser || !_sb || !tickers.length) return;
+  const account=_accountContext();
+  if(!account || !_sb || !tickers.length) return;
   // Captured once, not re-read from the global mid-function — this function
   // awaits a query, and the user can switch screener tabs (changing
   // activeScreener) before it resolves. Writing under whatever tab is active
@@ -3553,7 +3625,8 @@ async function checkAndSaveHistory(tickers){
   const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
   const currentSet = new Set(tickers);
   const {data:prev, error:histErr} = await _sb.from('screener_history')
-    .select('ticker,first_seen,last_seen').eq('user_id',_currentUser.id).eq('screener',scr);
+    .select('ticker,first_seen,last_seen').eq('user_id',account.userId).eq('screener',scr);
+  if(!_accountCurrent(account)) return;
   // A failed read used to look identical to "no history": every ticker was
   // flagged חדש and the whole list was re-inserted as duplicates.
   if(histErr){ console.error('[screener_history]', histErr); _reportClientError('screener_history_read', histErr.message||String(histErr)); return; }
@@ -3573,12 +3646,14 @@ async function checkAndSaveHistory(tickers){
   // (user_id, screener, ticker) primary key — plain insert 409s on the
   // second one, upsert+ignoreDuplicates just no-ops it.
   if(fresh.length) await _sb.from('screener_history').upsert(
-    fresh.map(t=>({user_id:_currentUser.id, screener:scr, ticker:t, first_seen:today, last_seen:today})),
+    fresh.map(t=>({user_id:account.userId, screener:scr, ticker:t, first_seen:today, last_seen:today})),
     { onConflict: 'user_id,screener,ticker', ignoreDuplicates: true }
   );
+  if(!_accountCurrent(account)) return;
   const seen = tickers.filter(t=>known.has(t));
   if(seen.length) await _sb.from('screener_history').update({last_seen:today})
-    .eq('user_id',_currentUser.id).eq('screener',scr).in('ticker',seen);
+    .eq('user_id',account.userId).eq('screener',scr).in('ticker',seen);
+  if(!_accountCurrent(account)) return;
   if(watchlist.size > 0){
     const wlNew = [...newToday].filter(t=>watchlist.has(t));
     if(wlNew.length) toast('נכנסו לסינון היום: '+wlNew.join(', '), 6000);
@@ -3689,7 +3764,7 @@ async function scan(force=false){
       }
     };
 
-    saveResultsCache();
+    if(!needsExact) saveResultsCache();
     // cleanbase's coarse list is ~10x its real result, so painting it first
     // reads as "the filter shows everything" — hold the skeleton instead.
     if(needsExact && activeScreener==='cleanbase' && mode!=='watch'){
@@ -3731,7 +3806,7 @@ async function scan(force=false){
         checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken){ saveResultsCache(); render(); } });
         toast('נמצאו '+results.length+' מניות');
         _maybeReportEmptyScreenerReviewed();
-      }).catch(()=>{ if(myToken===_scanToken){ finalize(false); _maybeReportEmptyScreenerReviewed(); } });
+      }).catch(()=>{ if(myToken===_scanToken){ finalize(true); $('statBar').textContent='האימות לא הושלם — מוצגים מועמדים בלבד. יש להריץ סריקה נוספת.'; } });
     } else {
       checkAndSaveHistory(allResults.map(r=>r.ticker)).then(()=>{ if(myToken===_scanToken){ saveResultsCache(); render(); } });
       toast('נמצאו '+results.length+' מניות');
@@ -3799,7 +3874,7 @@ const _universeBody = (typeFilter, primaryOnly) => ({
 async function fetchUniverse(){
   const [stocks, drs] = await Promise.all([
     _scanQuery(_universeBody({left:"type",operation:"equal",right:"stock"}, true)),
-    _scanQuery(_universeBody({left:"type",operation:"equal",right:"dr"}, false)).catch(()=>[]),
+    _scanQuery(_universeBody({left:"type",operation:"equal",right:"dr"}, false)),
   ]);
   const seen=new Set(stocks.map(r=>r.s));
   return stocks.concat(drs.filter(r=>!seen.has(r.s)));
@@ -4424,7 +4499,7 @@ function renderTable(rows){
   // rebuild of the whole table on every single click (hundreds of rows
   // regenerated: a visible flash, and the scroll position jumping). The
   // star-only fast path below now also patches the "חדש" badge and the
-  // "נוסף למעקב" cell directly, so it no longer needs to be in the key.
+  // "הופיע לראשונה" cell directly, so it no longer needs to be in the key.
   const _annot = rows.map(r => (r.vcp?'1':'0')+(r.rsLine?'1':'0')+(newToday.has(r.ticker)?'1':'0')).join('');
   const _tKey = (mode==='watch'?_wlDataGen:_dataGen)+'|'+mode+'|'+layout+'|'+sortKey+'|'+sortDir+'|'+scKind+'|'
     +COL_DEFS.map(c=>colVis[c.key]?1:0).join('')+'|'+rows.map(r=>r.sym).join(',')+'|'+_annot;
@@ -4477,7 +4552,7 @@ function renderTable(rows){
     +(colVis.liq   ? th('נזילות $','liq','נפח דולרי ממוצע ליום (מחיר × נפח ממוצע 10 ימים)') : '')
     +(colVis.mc    ? th('שווי שוק','mc','שווי שוק בדולרים') : '')
     +(colVis.sector? '<th>סקטור</th>' : '')
-    +(colVis.firstSeen? th('נוסף למעקב','firstSeen','התאריך שבו המניה הופיעה לראשונה בתוצאות הסינון הזה') : '')
+    +(colVis.firstSeen? th('הופיע לראשונה','firstSeen','התאריך שבו המניה הופיעה לראשונה בתוצאות הסינון הזה') : '')
     +'</tr>';
 
   const bodyRows=rows.map(r=>{
@@ -4576,7 +4651,7 @@ function renderTable(rows){
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
       +'</td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה"><span class="new-badge" style="'+(isNew?'':'display:none')+'">חדש</span>'+r.ticker+earnB+ttB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div></td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה"><span class="new-badge" style="'+(isNew?'':'display:none')+'">חדש</span>'+r.ticker+earnB+ttB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+_validationNote(r)+'</td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
@@ -4680,7 +4755,7 @@ function renderGallery(srcRows){
     const rsBg = rsHi?'rgba(46,204,113,0.13)':rsMid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
     return '<div class="gcard" role="button" tabindex="0" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&event.target===this){event.preventDefault();openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')}">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
-      +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
+      +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+_validationNote(r)
       +((earnB||ttB||viaB)?'<div class="gcard-tags">'+viaB+earnB+ttB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span>'+sectorBadgeHtml(r.sector,true)+'</div></div>'
@@ -4918,7 +4993,7 @@ document.addEventListener('keydown', e=>{
     const ticker=rows[activeRow].dataset.ticker; if(!ticker) return;
     const adding=!watchlist.has(ticker);
     // Must go through toggleWL, not re-implement it: this branch used to update
-    // only the Set, skipping watchlistAddedAt (so "נוסף למעקב" stayed "—", the
+    // only the Set, skipping watchlistAddedAt (so "הופיע לראשונה" stayed "—", the
     // חדש badge never fired and the firstSeen sort ranked it last) and the
     // ttUniverse row-copy (so the name had no row on the מעקב tab at all until
     // the next scan). The star button and the w key have to mean the same thing.
@@ -4942,6 +5017,12 @@ document.addEventListener('keydown', e=>{
 });
 
 const EMPTY_SVG='<svg class="empty-icon" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="22" cy="22" r="16" stroke="currentColor" stroke-width="1.5"/><circle cx="22" cy="22" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="22" y1="6" x2="22" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="22" y1="32" x2="22" y2="38" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="22" x2="12" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="32" y1="22" x2="38" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+function _validationNote(r){
+  if(!r.validation) return '';
+  const text=r.validation.status==='verified'?'אימות OHLC':'אימות חלקי — מבוסס גם על קירוב';
+  const date=r.validation.asOf ? ' · נתוני מחיר עד '+new Date(r.validation.asOf*1000).toLocaleDateString('he-IL') : '';
+  return '<div class="validation-note">'+escHtml(text+date)+'</div>';
+}
 function emptyHtml(msg,hint,actionHtml){
   return '<div class="empty">'+EMPTY_SVG+'<div class="empty-msg">'+msg+'</div><div class="empty-hint">'+(hint||'')+'</div>'+(actionHtml||'')+'</div>';
 }
@@ -4952,11 +5033,10 @@ function emptyHtml(msg,hint,actionHtml){
 async function initAuth(){
   if(!_sb) return;
   const {data:{session}} = await _sb.auth.getSession();
-  _currentUser = session?.user ?? null;
+  _setCurrentUser(session?.user ?? null);
   updateAuthUI();
-  if(_currentUser) await loadUserData();
   _sb.auth.onAuthStateChange(async(event, session)=>{
-    _currentUser = session?.user ?? null;
+    _setCurrentUser(session?.user ?? null);
     updateAuthUI();
     if(event==='SIGNED_IN') await loadUserData();
     if(event==='SIGNED_OUT'){
@@ -4970,13 +5050,18 @@ async function initAuth(){
       if(allResults.length || mode==='watch') applyView();
     }
   });
+  // Register account changes before waiting for the initial data request.
+  if(_currentUser) await loadUserData();
 }
 
 async function loadUserData(){
+  const account=_accountContext();
+  if(!account || !_sb) return;
   const [{data:wlData},{data:prefData}] = await Promise.all([
-    _sb.from('screener_watchlist').select('ticker,created_at').eq('user_id',_currentUser.id),
-    _sb.from('screener_prefs').select('col_vis,prefs').eq('user_id',_currentUser.id).maybeSingle()
+    _sb.from('screener_watchlist').select('ticker,created_at').eq('user_id',account.userId),
+    _sb.from('screener_prefs').select('col_vis,prefs').eq('user_id',account.userId).maybeSingle()
   ]);
+  if(!_accountCurrent(account)) return;
   _reconcilePrefs(prefData?.prefs);
   // loadResultsCache() has already rendered from the local copy by the time this
   // resolves. Re-rendering unconditionally meant every single page load redrew
@@ -4994,8 +5079,10 @@ async function loadUserData(){
     const onServer = new Set(wlData.map(r=>r.ticker));
     const localOnly = _lsJSON('sepa_wl', []).filter(t=>typeof t==='string' && !onServer.has(t));
     if(localOnly.length){
-      const { error } = await _sb.from('screener_watchlist').upsert(localOnly.map(ticker=>({user_id:_currentUser.id, ticker})));
-      if(!error) localOnly.forEach(t=>wlData.push({ticker:t, created_at:new Date().toISOString()}));
+      const { error } = await _sb.from('screener_watchlist').upsert(localOnly.map(ticker=>({user_id:account.userId, ticker})));
+      if(!_accountCurrent(account)) return;
+      if(error) return;
+      localOnly.forEach(t=>wlData.push({ticker:t, created_at:new Date().toISOString()}));
     }
     try{ localStorage.removeItem('sepa_wl_dirty'); }catch(e){}
   }

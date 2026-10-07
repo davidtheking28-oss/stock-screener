@@ -31,6 +31,13 @@ jobs:
           python -m pip install --quiet playwright
           python -m playwright install --with-deps chromium
 
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Run server regression suite
+        run: deno test --allow-read --allow-net supabase/functions/_shared/ supabase/functions/daily-scan/ supabase/functions/scan-universe/request_policy_test.ts
+
       - name: Run screener regression suite
         run: python tests/run-tests.py
 

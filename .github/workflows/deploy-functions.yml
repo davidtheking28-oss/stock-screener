@@ -25,7 +25,7 @@ jobs:
           deno-version: v2.x
 
       - name: Run edge function unit tests
-        run: deno test --allow-net supabase/functions/_shared/ supabase/functions/daily-scan/
+        run: deno test --allow-net --allow-read supabase/functions/_shared/ supabase/functions/daily-scan/ supabase/functions/scan-universe/request_policy_test.ts
 
   deploy:
     needs: test

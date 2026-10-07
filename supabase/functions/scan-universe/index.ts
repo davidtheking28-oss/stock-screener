@@ -1,17 +1,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { serveCached } from "../_shared/market_cache.ts";
 
+import { readScanRequest, trimMap } from "./request_policy.ts";
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function cacheKey(body: unknown): string {
-  const s = JSON.stringify(body);
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-  return 'scan:america:' + (h >>> 0).toString(36);
-}
+
 const mem = new Map<string, { data: unknown; time: number }>();
 const MEM_TTL = 5 * 60 * 1000;   // 5 min in-instance
 const DB_TTL = 5 * 60 * 1000;    // 5 min persistent freshness
@@ -44,21 +41,25 @@ function ok(data: unknown, src: string) {
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
+  if(req.method!=='POST') return new Response(JSON.stringify({error:'method not allowed'}),{status:405,headers:{...CORS,Allow:'POST, OPTIONS','Content-Type':'application/json'}});
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
   const now = Date.now();
   const rl = _rate.get(ip) || { count: 0, resetAt: now + 60_000 };
   if (rl.resetAt < now) { rl.count = 0; rl.resetAt = now + 60_000; }
   rl.count++;
   _rate.set(ip, rl);
+  for(const [key,value] of _rate) if(value.resetAt<now) _rate.delete(key);
+  trimMap(_rate,4096);
   if (rl.count > RATE_LIMIT) {
     return new Response(JSON.stringify({ error: 'Rate limit exceeded. Try again in a minute.' }), {
       status: 429, headers: { ...CORS, 'Content-Type': 'application/json', 'Retry-After': '60' },
     });
   }
 
-  let body: unknown = {};
-  try { body = await req.json(); } catch { /* empty body */ }
-  const key = cacheKey(body);
+  let parsed: Awaited<ReturnType<typeof readScanRequest>>;
+  try { parsed=await readScanRequest(req); }
+  catch(e){return new Response(JSON.stringify({error:e instanceof RangeError?'request too large':'unsupported or invalid scan query'}),{status:e instanceof RangeError?413:400,headers:{...CORS,'Content-Type':'application/json'}});}
+  const {key,body}=parsed;
 
   // 1. warm in-instance cache
   const m = mem.get(key);
@@ -69,6 +70,7 @@ Deno.serve(async (req: Request) => {
   try {
     const { data, src } = await serveCached(key, DB_TTL, MAX_STALE, () => fetchLive(body));
     mem.set(key, { data, time: Date.now() });
+    trimMap(mem,3);
     return ok(data, src);
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), { status: 502, headers: { ...CORS, 'Content-Type': 'application/json' } });

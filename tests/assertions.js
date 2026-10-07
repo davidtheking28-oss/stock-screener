@@ -1080,7 +1080,7 @@
     const scsrc = scan.toString();
     const calls = (scsrc.match(/_maybeReportEmptyScreenerReviewed\(\)/g) || []).length;
     check('scan() calls _maybeReportEmptyScreenerReviewed at both its true completion points',
-      calls >= 3, 'needsExact branch (success + catch) and the non-exact branch — found ' + calls);
+      calls === 2, 'only successful exact and non-exact completions count; failed validation does not — found ' + calls);
   }
 
   // 2026-09-24: "reached the bottom" was measured against the bottom of the

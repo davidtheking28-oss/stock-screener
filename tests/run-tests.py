@@ -56,6 +56,8 @@ def main():
                 "typeof applyFilters==='function' && typeof _powerPlayOK==='function' && typeof C==='object'"
             )
             results = page.evaluate(assertions)
+            improvements = (ROOT / "tests" / "improvements.js").read_text(encoding="utf-8")
+            results.extend(page.evaluate(improvements))
             browser.close()
     finally:
         server.terminate()
