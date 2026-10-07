@@ -4652,7 +4652,7 @@ function renderTable(rows){
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
       +'</td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה"><span class="new-badge" style="'+(isNew?'':'display:none')+'">חדש</span>'+r.ticker+earnB+ttB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+_validationNote(r)+'</td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה"><span class="new-badge" style="'+(isNew?'':'display:none')+'">חדש</span>'+r.ticker+earnB+ttB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+'</td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
@@ -4756,7 +4756,7 @@ function renderGallery(srcRows){
     const rsBg = rsHi?'rgba(46,204,113,0.13)':rsMid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
     return '<div class="gcard" role="button" tabindex="0" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&event.target===this){event.preventDefault();openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')}">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
-      +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+_validationNote(r)
+      +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
       +((earnB||ttB||viaB)?'<div class="gcard-tags">'+viaB+earnB+ttB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span>'+sectorBadgeHtml(r.sector,true)+'</div></div>'
