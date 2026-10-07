@@ -58,6 +58,8 @@ def main():
             results = page.evaluate(assertions)
             improvements = (ROOT / "tests" / "improvements.js").read_text(encoding="utf-8")
             results.extend(page.evaluate(improvements))
+            desktop = (ROOT / "tests" / "desktop.js").read_text(encoding="utf-8")
+            results.extend(page.evaluate(desktop))
             browser.close()
     finally:
         server.terminate()
