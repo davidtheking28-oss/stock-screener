@@ -47,6 +47,8 @@
 .filter-scan-action { margin:0; padding:14px 20px; }
 @media (pointer:coarse) { .filter-scan-action .btn-scan { min-height:44px; } }
 .filter-panel.wl-mode { display:none; }
+#wlSyncStatus{font-size:12px;color:var(--text2);line-height:1.5;padding:4px 8px;border:1px solid var(--border2);border-radius:var(--r2)}
+#wlSyncStatus[data-state="error"]{color:var(--red)}
 </style>
 <script>const _thq=new URLSearchParams(location.search).get('theme');if(_thq==='tj'||_thq==='tj-light')document.documentElement.dataset.theme=_thq;</script>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
@@ -1154,7 +1156,7 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="src-tab" id="tabWatch" aria-selected="false" onclick="setMode('watch')">&#9733; מעקב <span class="results-count" id="wlCount"></span></button>
       </div>
       <div class="scan-status">
-        <span id="scanTime"></span><button class="btn-rescan" id="watchRefreshBtn" onclick="scan(true)" style="display:none">רענן נתוני מעקב</button>
+        <span id="wlSyncStatus" role="status" aria-live="polite" aria-atomic="true"></span><span id="scanTime"></span><button class="btn-rescan" id="watchRefreshBtn" onclick="refreshWatchlist()" style="display:none">רענן נתוני מעקב</button>
         <button class="btn-rescan" id="scanBtn" onclick="if(mode==='watch')setMode('screen');scan(true)" style="display:none">&#8635; סרוק שנית</button>
       </div>
       <div id="sectorWrap"></div>
@@ -1645,11 +1647,13 @@ function _setCurrentUser(user){
   if(_currentUser?.id!==user?.id){
     _accountGeneration++;
     _wlPending.clear();
+    _wlSaveErrors.clear();_wlLoaded=false;_wlReadError=false;
     clearTimeout(_prefsTimer);
     firstSeenByTicker.clear();
     newToday.clear();
   }
   _currentUser=user;
+  _updateWlSyncStatus();
 }
 // These three parse at script top level. One corrupted value used to throw here
 // and kill everything after it — prefs, cached results, auth, scroll handlers.
@@ -2671,28 +2675,50 @@ function _toastNext(){ if(!_toastQ.length){_toastBusy=false;return;} _toastBusy=
 // already changed it would silently undo the user's actual final choice).
 const _wlPending = new Map();
 let _wlSeq = 0;
-async function saveWL(ticker, adding){
+const _wlSaveErrors = new Set();
+let _wlLoaded = false, _wlReadError = false;
+function _updateWlSyncStatus(){
+  const el=$('wlSyncStatus');if(!el)return;
+  let state,text;
+  if(_wlPending.size){state='saving';text='שומר את השינוי…';}
+  else if(_wlSaveErrors.size){state='error';text='השינוי לא נשמר — נסה שוב בכוכב';}
+  else if(!_currentUser){state='local';text='נשמר במכשיר בלבד — אין סנכרון לחשבון';}
+  else if(_wlReadError){state='error';text='לא ניתן לאמת סנכרון — רענן כשיש חיבור';}
+  else if(!_wlLoaded){state='loading';text='בודק סנכרון עם החשבון…';}
+  else {state='saved';text='מסונכרן עם החשבון';}
+  el.dataset.state=state;el.textContent=text;
+}
+async function saveWL(ticker, adding, previousAddedAt){
   if(_currentUser && _sb){
     const account=_accountContext();
     const mySeq = ++_wlSeq;
     _wlPending.set(ticker, mySeq);
-    const { error } = adding
-      ? await _sb.from('screener_watchlist').upsert({user_id:_currentUser.id, ticker})
-      : await _sb.from('screener_watchlist').delete().eq('user_id',_currentUser.id).eq('ticker',ticker);
+    _wlSaveErrors.delete(ticker);_updateWlSyncStatus();
+    let error;
+    try {
+      ({error} = adding
+        ? await _sb.from('screener_watchlist').upsert({user_id:account.userId, ticker})
+        : await _sb.from('screener_watchlist').delete().eq('user_id',account.userId).eq('ticker',ticker));
+    } catch(cause) { error=cause; }
     if(!_accountCurrent(account)) return;
     const isLatest = _wlPending.get(ticker)===mySeq;
     if(isLatest) _wlPending.delete(ticker);
     // Signed in, saveWL skips the localStorage fallback — so a failed write meant
     // the star stayed lit and the change vanished on the next reload, silently.
     if(error && isLatest){
+      _wlSaveErrors.add(ticker);
       if(adding) watchlist.delete(ticker); else watchlist.add(ticker);
-      watchlistAddedAt.delete(ticker);
+      if(!adding && previousAddedAt) watchlistAddedAt.set(ticker,previousAddedAt);
+      else watchlistAddedAt.delete(ticker);
       toast('שמירת רשימת המעקב נכשלה');
       _reportClientError('watchlist_write', error.message||String(error), {stack:JSON.stringify({adding, code:error.code}).slice(0,2000)});
       render();
     }
+    if(!error && isLatest){_wlLoaded=true;_wlReadError=false;}
+    _updateWlSyncStatus();
   } else {
     localStorage.setItem('sepa_wl', JSON.stringify([...watchlist]));
+    _wlSaveErrors.delete(ticker);_updateWlSyncStatus();
     if (IN_JOURNAL) { try{ localStorage.setItem('sepa_wl_dirty', '1'); }catch(e){} }
     // Embedded in the journal but with no session applied means the SSO
     // handshake hasn't gone through yet (or was lost) — the star still lights
@@ -2709,6 +2735,7 @@ async function saveWL(ticker, adding){
 
 function toggleWL(e, ticker){
   e.stopPropagation();
+  const previousAddedAt=watchlistAddedAt.get(ticker);
   const adding = !watchlist.has(ticker);
   adding ? watchlist.add(ticker) : watchlist.delete(ticker);
   if(adding) watchlistAddedAt.set(ticker, new Date().toISOString().slice(0,10));
@@ -2741,7 +2768,7 @@ function toggleWL(e, ticker){
       _wlDataGen++;
     }
   }
-  saveWL(ticker, adding); render();
+  saveWL(ticker, adding, previousAddedAt); render();
 }
 function copyTicker(e, ticker){
   e.stopPropagation();
@@ -4383,6 +4410,12 @@ function setMode(m){
     scan();
   }
 }
+async function refreshWatchlist(){
+  const account=_accountContext();
+  if(account) await loadUserData();
+  if(account && !_accountCurrent(account)) return;
+  if(mode==='watch') scan(true);
+}
 function setLayout(l){
   layout=l;
   try{ localStorage.setItem('sepa_layout', l); }catch(e){}
@@ -4399,7 +4432,8 @@ function _syncWlTopbarBtn(){
 }
 function applyView(){
   const isWl = mode==='watch';
-  watchRefreshBtn.style.display = isWl ? '' : 'none';
+  $('watchRefreshBtn').style.display = isWl ? '' : 'none';
+  _updateWlSyncStatus();
   _restoreSortForMode(); sortResults();
   $('tabScreen')?.classList.toggle('active', !isWl);
   $('tabWatch') ?.classList.toggle('active',  isWl);
@@ -5062,11 +5096,19 @@ async function initAuth(){
 async function loadUserData(){
   const account=_accountContext();
   if(!account || !_sb) return;
-  const [{data:wlData},{data:prefData}] = await Promise.all([
+  let responses;
+  try { responses = await Promise.all([
     _sb.from('screener_watchlist').select('ticker,created_at').eq('user_id',account.userId),
     _sb.from('screener_prefs').select('col_vis,prefs').eq('user_id',account.userId).maybeSingle()
-  ]);
+  ]); } catch(error) {
+    if(_accountCurrent(account)){_wlReadError=true;_updateWlSyncStatus();}
+    return;
+  }
+  const [{data:wlData,error:wlError},{data:prefData}]=responses;
   if(!_accountCurrent(account)) return;
+  _wlReadError=!!wlError;
+  if(wlData && !wlError) _wlLoaded=true;
+  _updateWlSyncStatus();
   _reconcilePrefs(prefData?.prefs);
   // loadResultsCache() has already rendered from the local copy by the time this
   // resolves. Re-rendering unconditionally meant every single page load redrew
@@ -5084,9 +5126,13 @@ async function loadUserData(){
     const onServer = new Set(wlData.map(r=>r.ticker));
     const localOnly = _lsJSON('sepa_wl', []).filter(t=>typeof t==='string' && !onServer.has(t));
     if(localOnly.length){
-      const { error } = await _sb.from('screener_watchlist').upsert(localOnly.map(ticker=>({user_id:account.userId, ticker})));
+      _wlLoaded=false;_updateWlSyncStatus();
+      let error;
+      try { ({error}=await _sb.from('screener_watchlist').upsert(localOnly.map(ticker=>({user_id:account.userId, ticker})))); }
+      catch(cause){error=cause;}
       if(!_accountCurrent(account)) return;
-      if(error) return;
+      if(error){_wlReadError=true;_updateWlSyncStatus();return;}
+      _wlLoaded=true;_updateWlSyncStatus();
       localOnly.forEach(t=>wlData.push({ticker:t, created_at:new Date().toISOString()}));
     }
     try{ localStorage.removeItem('sepa_wl_dirty'); }catch(e){}
