@@ -311,12 +311,16 @@
     // KNSA (-0.91), ROST (+1.83), MUFG (a 3.2-ADR day), IESC/NESR (-5%/-4.5%).
     const sideways = withTail([[0.002, 0.004, 800], [-0.002, 0.004, 700], [0.002, 0.004, 900], [-0.002, 0.004, 700], [0.002, 0.004, 800]]);
     const spike = withTail([[0.002, 0.004, 800], [-0.002, 0.004, 700], [-0.025, 0.004, 900], [0.03, 0.004, 700], [0.002, 0.004, 800]]);
+    // Far below an old high, so only the quiet path (with its strict-source rule) applies.
+    const sidewaysFar = sideways.map((x, i) => i === 10 ? { ...x, h: 300 } : x);
     const qp = _quietPause(sideways);
     check('_quietPause: measures the last sessions in ADRs', qp && qp.moveMax < 0.5 && Math.abs(qp.net) < 0.5, 'got ' + JSON.stringify(qp));
     check('cleanbase: quiet sideways candles near the pivot pass without a thrust (TWLO/UFCS/BOKF)',
       _cleanbaseExactFail(row(knsa), sideways, g) === false, 'got ' + JSON.stringify(_quietPause(sideways)));
     check('cleanbase: quiet candles via the momentum/fundamental screens alone are not enough (KO/MRK/JNJ)',
-      _cleanbaseExactFail(row(knsa, -3, ['finviz', 'growth']), sideways, g) === true);
+      _cleanbaseExactFail(row(knsa, -3, ['finviz', 'growth']), sidewaysFar, g) === true);
+    check('cleanbase: the same names do count on a tight base right under the 52-week high (AAPL/XOM, user 2026-10-08)',
+      _cleanbaseExactFail(row(knsa, -3, ['finviz', 'growth']), sideways, g) === false);
     check('cleanbase: quiet candles on a thinly-traded name are not proof of real participation (PLPC)',
       _cleanbaseExactFail(row(knsa, -3, ['vcp'], 28.5e6), sideways, g) === true);
     check('cleanbase: the same quiet candles pass once volume clears the floor (NTAP)',

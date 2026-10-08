@@ -2423,12 +2423,13 @@ function _tightNearHighOK(tn){
 }
 function _cleanbaseExactFail(r, bars, opts={}){
   if(!bars || _ma200Rising(bars)===false) return true;
-  // Same guards as the quiet path below, minus the VCP leg sequence: a strict
-  // source screen, real liquidity, no breakout yet, and quiet sideways candles.
+  // Same guards as the quiet path below, minus the VCP leg sequence and the
+  // strict-source rule: being this close to the 52-week high is the trend proof
+  // (user's call 2026-10-08 — AAPL/XOM/CVX/FROG via the momentum screen count).
   const doneT=_completedBars(bars), tn=_tightNearHigh(doneT);
   const pT=_weakPullback(doneT), qT=_quietPause(doneT);
   if(_tightNearHighOK(tn) && pT && pT.newHigh<=2 && (r.vcp?.distToPivot==null || (r.vcp.distToPivot<=2 && r.vcp.distToPivot>=-4))
-     && r.via?.some(s=>CLEANBASE_STRICT.includes(s)) && (r.dollarVol??0)>=35e6
+     && (r.dollarVol??0)>=35e6
      && qT && qT.moveMax<=1 && qT.net>=-0.5 && qT.net<=1.3){
     r.pullback=pT;
     r.pause={kind:'tight', volAvg:tn.volAvg, rangeMax:tn.r5};
