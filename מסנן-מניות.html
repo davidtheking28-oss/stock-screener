@@ -46,6 +46,7 @@
 @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400 700;font-display:swap;src:url('fonts/jetbrains-mono-latin.woff2') format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;}
 .filter-scan-action { margin:0; padding:14px 20px; }
 @media (pointer:coarse) { .filter-scan-action .btn-scan { min-height:44px; } }
+.filter-panel.wl-mode { display:none; }
 </style>
 <script>const _thq=new URLSearchParams(location.search).get('theme');if(_thq==='tj'||_thq==='tj-light')document.documentElement.dataset.theme=_thq;</script>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
@@ -1153,7 +1154,7 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="src-tab" id="tabWatch" aria-selected="false" onclick="setMode('watch')">&#9733; מעקב <span class="results-count" id="wlCount"></span></button>
       </div>
       <div class="scan-status">
-        <span id="scanTime"></span>
+        <span id="scanTime"></span><button class="btn-rescan" id="watchRefreshBtn" onclick="scan(true)" style="display:none">רענן נתוני מעקב</button>
         <button class="btn-rescan" id="scanBtn" onclick="if(mode==='watch')setMode('screen');scan(true)" style="display:none">&#8635; סרוק שנית</button>
       </div>
       <div id="sectorWrap"></div>
@@ -2896,10 +2897,11 @@ function _reconcilePrefs(serverPrefs){
 }
 document.addEventListener('visibilitychange', async ()=>{
   if(document.hidden || !_currentUser || !_sb) return;
-  const account=_accountContext();
-  const { data } = await _sb.from('screener_prefs').select('prefs').eq('user_id',account.userId).maybeSingle();
-  if(!_accountCurrent(account)) return;
-  if(data) _reconcilePrefs(data.prefs);
+  // Returning to an already-open tablet must also fetch stars changed on
+  // another device. loadUserData preserves in-flight local edits and binds
+  // its response to the original account, just as it does after sign-in.
+  try { await loadUserData(); }
+  catch(error) { console.warn('[watchlist refresh]', error?.message || 'failed'); }
 });
 
 async function setFeature(key, on){
@@ -4248,19 +4250,10 @@ function _restoreSortForMode(){
 // tab the header counted the screener output above the watchlist, and CSV
 // exported the screener list; with a search active every one of them ignored
 // the filter.
-// Only meaningful on the מעקב tab while "בסיס נקי" is the active screener —
-// every other screener leaves the watchlist showing every starred ticker,
-// same as before (that IS the point of a watchlist). _exactFail is set by
-// validateExact, which scan() now also runs against the watchlist's own rows
-// when cleanbase is active (see scan()'s ttUniverse block) — a row with no
-// _exactFail yet (validation still in flight, or never run because the
-// active screener isn't cleanbase) is left visible rather than hidden.
-function _wlCleanbaseVisible(r){
-  return !(activeScreener==='cleanbase' && r._exactFail===true);
-}
-function _wlCleanbaseHidden(){
-  return [...watchlist].filter(t=>ttUniverse[t] && !_wlCleanbaseVisible(ttUniverse[t])).length;
-}
+// Saved membership is independent of every screener, including cleanbase.
+// Keep these legacy helpers neutral for callers that report list counts.
+function _wlCleanbaseVisible(r){ return true; }
+function _wlCleanbaseHidden(){ return 0; }
 function visibleRows(){
   const base = mode==='watch'
     ? sortRows([...watchlist].map(t=>ttUniverse[t]).filter(Boolean).filter(_wlCleanbaseVisible))
@@ -4368,6 +4361,11 @@ function setMode(m){
   // that restored mode='watch' before anything applied it), and the one thing
   // that must never happen is a click on the tab you are supposedly already on
   // doing nothing at all. applyView is idempotent.
+  if(m==='watch' && mode!=='watch'){
+    clearTimeout(_searchTimer);
+    searchQuery='';
+    if($('tickerSearch')) $('tickerSearch').value='';
+  }
   mode=m;
   try{ localStorage.setItem('sepa_mode', m); }catch(e){}
   _queuePrefsPush();
@@ -4401,6 +4399,7 @@ function _syncWlTopbarBtn(){
 }
 function applyView(){
   const isWl = mode==='watch';
+  watchRefreshBtn.style.display = isWl ? '' : 'none';
   _restoreSortForMode(); sortResults();
   $('tabScreen')?.classList.toggle('active', !isWl);
   $('tabWatch') ?.classList.toggle('active',  isWl);
