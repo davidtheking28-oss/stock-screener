@@ -1232,6 +1232,8 @@
     const calm = mkB([...flat, 103, 102.8, 102.6, 102.5]);
     check('cleanbase: a thrust followed by three hard red days is too deep (TER shape)', _pullbackTooDeep(_quietPause(deep), _thrustPullback(deep)) === true);
     check('cleanbase: a thrust followed by small quiet days is kept', _pullbackTooDeep(_quietPause(calm), _thrustPullback(calm)) === false);
+    const fall = mkB([...Array.from({ length: 56 }, (_, i) => 130 - i * 0.5), 102.4, 102.2, 102.5, 102.3, 102.4, 102.2, 102.3, 102.4, 102.2, 102.3, 102.2, 102.3, 102.2, 102.3]);
+    check('cleanbase: quiet days inside a decline (under the 50-day average) are rejected (ABNB shape)', _pullbackTooDeep(_quietPause(fall), null) === true);
   }
 
   // ── journal hand-off origins ──

@@ -2374,15 +2374,21 @@ function _quietPause(bars){
           net: (bars[n-1].c/bars[n-6].c-1)*100/adr,
           rangeMax: Math.max(...last3.map(b=>rng(b)/adr)),
           volAvg: avg(last3.map(b=>b.v))/vol50,
-          offHigh: (bars[n-1].c/Math.max(...bars.slice(-10).map(b=>b.h))-1)*100/adr};
+          offHigh: (bars[n-1].c/Math.max(...bars.slice(-10).map(b=>b.h))-1)*100/adr,
+          vs50: (bars[n-1].c/avg(bars.slice(-50).map(b=>b.c))-1)*100,
+          off60: (bars[n-1].c/Math.max(...bars.slice(-60).map(b=>b.h))-1)*100/adr};
 }
 // A pullback that gives back too much is selling, not resting. Measured
 // 2026-10-08 on the user's 38 own entries and logged misses (close the day
 // before): none sat more than 1.12 ADR under its 10-session high, and none gave
 // back more than 0.58 ADR of a thrust. TER (thrust +1.9 ADR, then three red
 // days to 2.12 ADR under the high, net -1.98) is what this keeps out.
+// ABNB (2026-10-09) was quiet for a few days, but inside a decline: 4.8% under
+// its 50-day average and 5.07 ADR under its 60-day high. All 38 of the user's
+// examples closed above the 50-day average (lowest +0.1%) and within 3.32 ADR of
+// the 60-day high.
 function _pullbackTooDeep(q, t){
-  return (q && q.offHigh < -1.5) || (t && t.net < -1);
+  return (q && (q.offHigh < -1.5 || q.vs50 < 0 || q.off60 < -4)) || (t && t.net < -1);
 }
 // "בסיס נקי": passes another screener (see _cleanbaseUniverse), the CURRENT
 // pullback is shallower than the recent ones and near the pivot, the range
