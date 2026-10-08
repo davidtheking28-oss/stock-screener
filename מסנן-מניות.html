@@ -3786,7 +3786,7 @@ async function scan(force=false){
     if(!isCommodities){
       await _yieldToMain();
       if(myToken!==_scanToken) return;
-      ttUniverse = {};
+      ttUniverse = Object.fromEntries(Object.entries(ttUniverse).filter(([t,r])=>watchlist.has(t)&&r.quoteOnly));
       applyFilters(universe, rsMap, {skipFund:true, forceTickers:watchlist}).forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
       _wlDataGen++;
       saveUniverseCache();
@@ -4300,6 +4300,44 @@ function _restoreSortForMode(){
 // the filter.
 // Saved membership is independent of every screener, including cleanbase.
 // Keep these legacy helpers neutral for callers that report list counts.
+
+// Saved membership does not depend on the scanner's market-cap/price universe.
+const _wlQuoteJobs=new Map(), _wlQuoteAttempt=new Map();
+function _watchRowFromBars(ticker,bars){
+  const valid=(bars||[]).filter(b=>Number.isFinite(b.c)&&b.c>0&&Number.isFinite(b.h)&&Number.isFinite(b.l)).sort((a,b)=>a.t-b.t);
+  if(!valid.length) return null;
+  const last=valid.at(-1),hi=Math.max(...valid.map(b=>b.h)),lo=Math.min(...valid.map(b=>b.l));
+  const perf=n=>valid.length>n?(last.c/valid.at(-1-n).c-1)*100:null;
+  const row={ticker,sym:ticker,name:ticker,close:last.c,rs:null,sector:'—',mc:null,
+    vol:last.v??null,avgVol:valid.slice(-10).reduce((sum,b)=>sum+(b.v||0),0)/Math.min(10,valid.length),
+    earnIn:null,fromHighPct:(last.c/hi-1)*100,fromLowPct:lo>0?(last.c/lo-1)*100:null,
+    rangePos:hi>lo?(last.c-lo)/(hi-lo):0.5,perfY:perf(252),perf3:perf(63),perf6:perf(126),perfW:perf(5),
+    eps:null,epsQoq:null,rev:null,revQoq:null,roe:null,nm:null,nmFy:null,epsFwdGrowth:null,
+    volD:null,volM:null,adrPct:null,emaDist:Infinity,score:null,checks:{},quoteOnly:true};
+  row.dollarVol=row.avgVol*last.c;
+  // No relative-strength rank or fundamental data can be inferred from OHLC.
+  row.ttPass=null;row.quoteAsOf=last.t;
+  return row;
+}
+async function _ensureWatchlistQuotes(force=false){
+  if(mode!=='watch') return;
+  const generation=_accountGeneration;
+  const jobs=[...watchlist].filter(t=>!ttUniverse[t]).map(t=>{
+    if(_wlQuoteJobs.has(t)) return _wlQuoteJobs.get(t);
+    if(!force && Date.now()-(_wlQuoteAttempt.get(t)||0)<60000) return;
+    _wlQuoteAttempt.set(t,Date.now());
+    const job=(async()=>{
+      const bars=await _fetchBars1y(t);
+      if(generation!==_accountGeneration || !watchlist.has(t) || ttUniverse[t]) return;
+      const row=_watchRowFromBars(t,bars);if(!row) return;
+      ttUniverse[t]=row;_wlDataGen++;saveUniverseCache();
+      if(mode==='watch') render();
+    })().catch(()=>{}).finally(()=>{if(_wlQuoteJobs.get(t)===job)_wlQuoteJobs.delete(t);});
+    _wlQuoteJobs.set(t,job);return job;
+  });
+  await Promise.all(jobs);
+}
+
 function _wlCleanbaseVisible(r){ return true; }
 function _wlCleanbaseHidden(){ return 0; }
 function visibleRows(){
@@ -4329,6 +4367,7 @@ function render(){
   if(mode==='watch') layout==='gallery' ? renderWatchlistGallery() : renderWatchlist();
   else               layout==='gallery' ? renderGallery()          : renderTable();
   _renderWlMissing();
+  if(mode==='watch') _ensureWatchlistQuotes();
   _renderWlBreakouts();
 }
 
@@ -4448,7 +4487,7 @@ async function refreshWatchlist(){
   const account=_accountContext();
   if(account) await loadUserData();
   if(account && !_accountCurrent(account)) return;
-  if(mode==='watch') scan(true);
+  if(mode==='watch'){ await _ensureWatchlistQuotes(true); scan(true); }
 }
 function setLayout(l){
   layout=l;
@@ -4644,7 +4683,7 @@ function renderTable(rows){
       const rsS=Math.round(clamp(r.rs,0,99)/99*15*penalty);
       const perfYS=Math.round(Math.min(clamp(r.perfY??0,0,300)/300,1)*15*penalty);
       const epsYoyS=sc-epsS-revS-rsS-perfYS;
-      scTip='ציון צמיחה: '+sc+'/100\nEPS QoQ: '+epsS+'/30\nמכירות QoQ: '+revS+'/25\nRS: '+rsS+'/15\nביצוע שנתי: '+perfYS+'/15\nEPS YoY: '+epsYoyS+'/15';
+      scTip='ציון צמיחה: '+(sc??'—')+'/100\nEPS QoQ: '+epsS+'/30\nמכירות QoQ: '+revS+'/25\nRS: '+rsS+'/15\nביצוע שנתי: '+perfYS+'/15\nEPS YoY: '+epsYoyS+'/15';
     } else if(r.scoreKind==='qulla'){
       const emaMax = num('emaDistMax'); const emaMaxUsed = Number.isNaN(emaMax) ? 3.5 : emaMax;
       const wkMax  = num('weekRangeMax'); const wkMaxUsed  = Number.isNaN(wkMax) ? 7 : wkMax;
@@ -4658,14 +4697,14 @@ function renderTable(rows){
       const perfYS=Math.round(Math.min(clamp(r.perfY??0,0,300)/300,1)*15*penalty);
       const rsS=Math.round(clamp(r.rs,0,99)/99*10*penalty);
       const revS=sc-moveS-adrS-emaS-tightS-epsS-perfYS-rsS;
-      scTip='ציון Qullamaggie: '+sc+'/100\nמהלך 6ח׳: '+moveS+'/20\nEPS: '+epsS+'/15\nביצוע שנתי: '+perfYS+'/15\nקרבה ל-EMA: '+emaS+'/15\nADR: '+adrS+'/10\nהידוק שבועי: '+tightS+'/10\nRS: '+rsS+'/10\nהכנסות: '+revS+'/5';
+      scTip='ציון Qullamaggie: '+(sc??'—')+'/100\nמהלך 6ח׳: '+moveS+'/20\nEPS: '+epsS+'/15\nביצוע שנתי: '+perfYS+'/15\nקרבה ל-EMA: '+emaS+'/15\nADR: '+adrS+'/10\nהידוק שבועי: '+tightS+'/10\nRS: '+rsS+'/10\nהכנסות: '+revS+'/5';
     } else if(r.scoreKind==='commodities'){
       const rsS=Math.round(clamp(r.rs,0,99)/99*40);
       const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*20);
       const pf=Math.max(r.perf3??0,(r.perf6??0)/2);
       const perfS=Math.round(Math.min(clamp(pf,0,150)/150,1)*20);
       const perfYS=sc-rsS-hiS-perfS;
-      scTip='ציון מומנטום: '+sc+'/100\nRS: '+rsS+'/40\nקרבה לשיא: '+hiS+'/20\nביצוע 3-6ח׳: '+perfS+'/20\nביצוע שנתי: '+perfYS+'/20';
+      scTip='ציון מומנטום: '+(sc??'—')+'/100\nRS: '+rsS+'/40\nקרבה לשיא: '+hiS+'/20\nביצוע 3-6ח׳: '+perfS+'/20\nביצוע שנתי: '+perfYS+'/20';
     } else if(r.scoreKind==='power'){
       const rsS=Math.round(clamp(r.rs,0,99)/99*30*penalty);
       const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15*penalty);
@@ -4674,22 +4713,22 @@ function renderTable(rows){
       const epsS=Math.round(epsScore(r.eps,20)*penalty);
       const perfYS=Math.round(Math.min(clamp(r.perfY??0,0,300)/300,1)*15*penalty);
       const revS=sc-rsS-hiS-perfS-epsS-perfYS;
-      scTip='ציון מומנטום: '+sc+'/100\nRS: '+rsS+'/30\nEPS: '+epsS+'/20\nקרבה לשיא: '+hiS+'/15\nביצוע 3-6ח׳: '+perfS+'/15\nביצוע שנתי: '+perfYS+'/15\nהכנסות: '+revS+'/5';
+      scTip='ציון מומנטום: '+(sc??'—')+'/100\nRS: '+rsS+'/30\nEPS: '+epsS+'/20\nקרבה לשיא: '+hiS+'/15\nביצוע 3-6ח׳: '+perfS+'/15\nביצוע שנתי: '+perfYS+'/15\nהכנסות: '+revS+'/5';
     } else {
       const rsS=Math.round(clamp(r.rs,0,99)/99*35*penalty);
       const epsS=Math.round(epsScore(r.eps,25)*penalty);
       const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*15*penalty);
       const perfYS=Math.round(Math.min(clamp(r.perfY??0,0,300)/300,1)*10*penalty);
       const revS=sc-rsS-epsS-hiS-perfYS;
-      scTip='ציון SEPA: '+sc+'/100\nRS: '+rsS+'/35\nEPS: '+epsS+'/25\nהכנסות: '+revS+'/15\nקרבה לשיא: '+hiS+'/15\nביצוע שנתי: '+perfYS+'/10';
+      scTip='ציון SEPA: '+(sc??'—')+'/100\nRS: '+rsS+'/35\nEPS: '+epsS+'/25\nהכנסות: '+revS+'/15\nקרבה לשיא: '+hiS+'/15\nביצוע שנתי: '+perfYS+'/10';
     }
     const scEl='<div class="score-cell" title="'+scTip+'">'
-      +'<span class="score-val" style="color:'+scoreColor(sc)+'">'+sc+'</span>'
+      +'<span class="score-val" style="color:'+scoreColor(sc)+'">'+(sc??'—')+'</span>'
       +'<span class="score-track"><span class="score-fill" style="width:'+clamp(sc,0,100)+'%;background:'+scoreColor(sc)+'"></span></span>'
       +'</div>';
 
     const rsCol=r.rs>=80?'var(--green)':r.rs>=60?'var(--yellow)':'var(--text3)';
-    const rsEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+r.rs+'%;background:'+rsCol+';color:'+rsCol+'"></div></div><span class="mn" style="color:'+rsCol+';font-weight:600">'+r.rs+'</span></div>';
+    const rsEl='<div class="mini-bar-wrap"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+(r.rs??'—')+'%;background:'+rsCol+';color:'+rsCol+'"></div></div><span class="mn" style="color:'+rsCol+';font-weight:600">'+(r.rs??'—')+'</span></div>';
 
     const rPos=clamp(r.rangePos*100,2,98);
     const rCol=r.rangePos>0.7?'var(--green)':r.rangePos>0.4?'var(--yellow)':'var(--red)';
@@ -4828,7 +4867,7 @@ function renderGallery(srcRows){
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
       +((earnB||ttB||viaB)?'<div class="gcard-tags">'+viaB+earnB+ttB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
-      +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+r.rs+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+r.rs+'</b></span>'+sectorBadgeHtml(r.sector,true)+'</div></div>'
+      +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+(r.rs??'—')+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+(r.rs??'—')+'</b></span>'+sectorBadgeHtml(r.sector,true)+'</div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
@@ -5091,6 +5130,7 @@ document.addEventListener('keydown', e=>{
 
 const EMPTY_SVG='<svg class="empty-icon" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="22" cy="22" r="16" stroke="currentColor" stroke-width="1.5"/><circle cx="22" cy="22" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="22" y1="6" x2="22" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="22" y1="32" x2="22" y2="38" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="22" x2="12" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="32" y1="22" x2="38" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 function _validationNote(r){
+  if(r.quoteOnly) return '<div class="validation-note">נתוני מחיר עצמאיים · דוחות ודירוג RS אינם זמינים</div>';
   if(!r.validation) return '';
   const text=r.validation.status==='verified'?'אימות OHLC':'אימות חלקי — מבוסס גם על קירוב';
   const date=r.validation.asOf ? ' · נתוני מחיר עד '+new Date(r.validation.asOf*1000).toLocaleDateString('he-IL') : '';
@@ -5202,7 +5242,7 @@ async function loadUserData(){
   // dropped again and the truncated map was cached for 24h. Rebuild it here
   // whenever the set actually changed and the raw universe is still in memory.
   if(wlChanged && _rawUniverse && _rsMapMem){
-    ttUniverse = {};
+    ttUniverse = Object.fromEntries(Object.entries(ttUniverse).filter(([t,r])=>watchlist.has(t)&&r.quoteOnly));
     applyFilters(_rawUniverse, _rsMapMem, {skipFund:true, forceTickers:watchlist})
       .forEach(r=>{ r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; });
     saveUniverseCache(); _wlDataGen++;
