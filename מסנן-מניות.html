@@ -1648,6 +1648,7 @@ function _setCurrentUser(user){
   if(_currentUser?.id!==user?.id){
     _accountGeneration++;
     _wlPending.clear();
+    _wlWrites.clear();
     _wlSaveErrors.clear();_wlLoaded=false;_wlReadError=false;
     clearTimeout(_prefsTimer);
     firstSeenByTicker.clear();
@@ -2675,7 +2676,9 @@ function _toastNext(){ if(!_toastQ.length){_toastBusy=false;return;} _toastBusy=
 // superseded, since-resolved call reverting the ticker after a later click
 // already changed it would silently undo the user's actual final choice).
 const _wlPending = new Map();
+const _wlWrites = new Map();
 let _wlSeq = 0;
+let _wlRevision = 0, _wlReadSeq = 0;
 const _wlSaveErrors = new Set();
 let _wlLoaded = false, _wlReadError = false;
 function _updateWlSyncStatus(){
@@ -2690,18 +2693,27 @@ function _updateWlSyncStatus(){
   el.dataset.state=state;el.textContent=text;
 }
 async function saveWL(ticker, adding, previousAddedAt){
+  _wlRevision++;
   if(_currentUser && _sb){
     const account=_accountContext();
     const mySeq = ++_wlSeq;
     _wlPending.set(ticker, mySeq);
     _wlSaveErrors.delete(ticker);_updateWlSyncStatus();
+    // Serialize this ticker's writes so a slow add cannot land after remove.
+    const prior=_wlWrites.get(ticker);
+    const write=Promise.resolve(prior).catch(()=>{}).then(()=>{
+      if(!_accountCurrent(account)) return {};
+      return adding
+        ? _sb.from('screener_watchlist').upsert({user_id:account.userId, ticker})
+        : _sb.from('screener_watchlist').delete().eq('user_id',account.userId).eq('ticker',ticker);
+    });
+    _wlWrites.set(ticker,write);
     let error;
-    try {
-      ({error} = adding
-        ? await _sb.from('screener_watchlist').upsert({user_id:account.userId, ticker})
-        : await _sb.from('screener_watchlist').delete().eq('user_id',account.userId).eq('ticker',ticker));
-    } catch(cause) { error=cause; }
+    try { ({error}=await write); }
+    catch(cause) { error=cause; }
+    finally { if(_wlWrites.get(ticker)===write) _wlWrites.delete(ticker); }
     if(!_accountCurrent(account)) return;
+    _wlRevision++;
     const isLatest = _wlPending.get(ticker)===mySeq;
     if(isLatest) _wlPending.delete(ticker);
     // Signed in, saveWL skips the localStorage fallback — so a failed write meant
@@ -5107,16 +5119,18 @@ async function initAuth(){
 async function loadUserData(){
   const account=_accountContext();
   if(!account || !_sb) return;
+  const revision=_wlRevision, readSeq=++_wlReadSeq;
+  const currentRead=()=>_accountCurrent(account) && revision===_wlRevision && readSeq===_wlReadSeq;
   let responses;
   try { responses = await Promise.all([
     _sb.from('screener_watchlist').select('ticker,created_at').eq('user_id',account.userId),
     _sb.from('screener_prefs').select('col_vis,prefs').eq('user_id',account.userId).maybeSingle()
   ]); } catch(error) {
-    if(_accountCurrent(account)){_wlReadError=true;_updateWlSyncStatus();}
+    if(currentRead()){_wlReadError=true;_updateWlSyncStatus();}
     return;
   }
   const [{data:wlData,error:wlError},{data:prefData}]=responses;
-  if(!_accountCurrent(account)) return;
+  if(!currentRead()) return;
   _wlReadError=!!wlError;
   if(wlData && !wlError) _wlLoaded=true;
   _updateWlSyncStatus();
@@ -5141,7 +5155,7 @@ async function loadUserData(){
       let error;
       try { ({error}=await _sb.from('screener_watchlist').upsert(localOnly.map(ticker=>({user_id:account.userId, ticker})))); }
       catch(cause){error=cause;}
-      if(!_accountCurrent(account)) return;
+      if(!currentRead()) return;
       if(error){_wlReadError=true;_updateWlSyncStatus();return;}
       _wlLoaded=true;_updateWlSyncStatus();
       localOnly.forEach(t=>wlData.push({ticker:t, created_at:new Date().toISOString()}));
