@@ -1300,11 +1300,14 @@ function _reportClientError(kind, message, extra = {}){
     const key = kind + ':' + String(message).slice(0, 200);
     if (_reportedErrors.has(key)) return;
     _reportedErrors.add(key);
-    _sb.from('client_errors').insert({
-      user_id: _currentUser?.id ?? null,
-      kind, message: String(message).slice(0, 2000), app: 'screener',
-      ua: navigator.userAgent, ...extra,
-    }).then(() => {}, () => {});
+    // Plain fetch with the anon key, not _sb: when the auth client itself is
+    // stuck (the tablet case) a report sent through it is stuck too, and the
+    // failure leaves no trace at all. The user id rides in the message instead.
+    fetch(SUPABASE_URL + '/rest/v1/client_errors', {
+      method: 'POST', keepalive: true,
+      headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + SUPABASE_ANON, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ kind, message: (String(message) + ' · uid=' + (_currentUser?.id || '-')).slice(0, 2000), app: 'screener', ua: navigator.userAgent, ...extra }),
+    }).catch(() => {});
   } catch(e) {}
 }
 window.addEventListener('error', (e) => {
@@ -2711,6 +2714,7 @@ async function saveWL(ticker, adding, previousAddedAt){
         : _sb.from('screener_watchlist').delete().eq('user_id',account.userId).eq('ticker',ticker);
     });
     _wlWrites.set(ticker,write);
+    setTimeout(()=>{ if(_wlPending.get(ticker)===mySeq) _reportClientError('watchlist_write_stuck', 'star write still pending after 10s', {stack:_ssoDiag()}); }, 10000);
     let error;
     try { ({error}=await write); }
     catch(cause) { error=cause; }
