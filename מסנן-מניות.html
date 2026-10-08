@@ -5097,10 +5097,17 @@ async function initAuth(){
   const {data:{session}} = await _sb.auth.getSession();
   _setCurrentUser(session?.user ?? null);
   updateAuthUI();
-  _sb.auth.onAuthStateChange(async(event, session)=>{
+  _sb.auth.onAuthStateChange((event, session)=>{
     _setCurrentUser(session?.user ?? null);
     updateAuthUI();
-    if(event==='SIGNED_IN') await loadUserData();
+    if(event==='SIGNED_IN'){
+      // Supabase awaits auth callbacks while holding its session lock.
+      // Database requests need that session: defer them until it is released.
+      const account=_accountContext();
+      setTimeout(()=>{
+        if(account && _accountCurrent(account)) loadUserData().catch(error=>_reportClientError('watchlist_load',error.message));
+      },0);
+    }
     if(event==='SIGNED_OUT'){
       const wl = _lsJSON('sepa_wl', []);
       watchlist = new Set(Array.isArray(wl) ? wl : []);
