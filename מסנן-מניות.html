@@ -2732,7 +2732,12 @@ async function saveWL(ticker, adding, previousAddedAt){
   } else {
     localStorage.setItem('sepa_wl', JSON.stringify([...watchlist]));
     _wlSaveErrors.delete(ticker);_updateWlSyncStatus();
-    if (IN_JOURNAL) { try{ localStorage.setItem('sepa_wl_dirty', '1'); }catch(e){} }
+    if (IN_JOURNAL) { try{
+      const pending=new Set(_lsJSON('sepa_wl_pending_adds',[]));
+      adding ? pending.add(ticker) : pending.delete(ticker);
+      localStorage.setItem('sepa_wl_pending_adds',JSON.stringify([...pending]));
+      localStorage.setItem('sepa_wl_dirty', '1');
+    }catch(e){} }
     // Embedded in the journal but with no session applied means the SSO
     // handshake hasn't gone through yet (or was lost) — the star still lights
     // up, but it's only on THIS device until that resolves. A standalone,
@@ -5156,7 +5161,9 @@ async function loadUserData(){
   // overwrite them — otherwise they vanish the moment sync finally works.
   if(wlData && localStorage.getItem('sepa_wl_dirty')==='1'){
     const onServer = new Set(wlData.map(r=>r.ticker));
-    const localOnly = _lsJSON('sepa_wl', []).filter(t=>typeof t==='string' && !onServer.has(t));
+    // A legacy snapshot includes tickers removed on another device.
+    // Only replay explicit new offline additions, never the entire snapshot.
+    const localOnly = _lsJSON('sepa_wl_pending_adds', []).filter(t=>typeof t==='string' && !onServer.has(t));
     if(localOnly.length){
       _wlLoaded=false;_updateWlSyncStatus();
       let error;
@@ -5167,7 +5174,7 @@ async function loadUserData(){
       _wlLoaded=true;_updateWlSyncStatus();
       localOnly.forEach(t=>wlData.push({ticker:t, created_at:new Date().toISOString()}));
     }
-    try{ localStorage.removeItem('sepa_wl_dirty'); }catch(e){}
+    try{ localStorage.removeItem('sepa_wl_dirty'); localStorage.removeItem('sepa_wl_pending_adds'); }catch(e){}
   }
   if(wlData) {
     watchlist = new Set(wlData.map(r=>r.ticker));
