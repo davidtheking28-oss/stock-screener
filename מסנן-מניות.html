@@ -4319,9 +4319,36 @@ function _watchRowFromBars(ticker,bars){
   row.ttPass=null;row.quoteAsOf=last.t;
   return row;
 }
+// A star added on another device, or before this device ran any scan, has no
+// ttUniverse row, and the OHLC fallback below can only fill price fields — RS,
+// EPS, revenue, sector and the company name came out as '—' (REX/IESC/SNDK/STX
+// on the tablet). Pull those names from the same bulk universe request a scan
+// makes, so they get full rows; only a name truly outside it stays quote-only.
+let _wlEnrichJob=null;
+async function _enrichWatchlistRows(){
+  if(_wlEnrichJob) return _wlEnrichJob;
+  const need=new Set([...watchlist].filter(t=>!ttUniverse[t]||ttUniverse[t].quoteOnly));
+  if(!need.size) return;
+  const generation=_accountGeneration;
+  _wlEnrichJob=(async()=>{
+    let universe=_rawUniverse;
+    if(!universe || Date.now()-_rawTime>=UNIVERSE_TTL){ universe=await fetchUniverse(); _rawUniverse=universe; _rawTime=Date.now(); _rsMapMem=null; }
+    if(generation!==_accountGeneration) return;
+    const rsMap=_rsMapMem ?? (_rsMapMem=computeRS(universe));
+    let added=0;
+    applyFilters(universe, rsMap, {skipFund:true, forceTickers:need}).forEach(r=>{
+      if(!need.has(r.ticker) || !watchlist.has(r.ticker)) return;
+      r.score=calcScore(r); r.scoreKind='sepa'; ttUniverse[r.ticker]=r; added++;
+    });
+    if(added){ _wlDataGen++; saveUniverseCache(); if(mode==='watch') render(); }
+  })().catch(()=>{}).finally(()=>{ _wlEnrichJob=null; });
+  return _wlEnrichJob;
+}
+
 async function _ensureWatchlistQuotes(force=false){
   if(mode!=='watch') return;
   const generation=_accountGeneration;
+  await _enrichWatchlistRows();
   const jobs=[...watchlist].filter(t=>!ttUniverse[t]).map(t=>{
     if(_wlQuoteJobs.has(t)) return _wlQuoteJobs.get(t);
     if(!force && Date.now()-(_wlQuoteAttempt.get(t)||0)<60000) return;
