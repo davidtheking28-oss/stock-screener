@@ -2373,7 +2373,16 @@ function _quietPause(bars){
   return {moveMax: Math.max(...[n-3,n-2,n-1].map(i=>Math.abs(mv(i)))),
           net: (bars[n-1].c/bars[n-6].c-1)*100/adr,
           rangeMax: Math.max(...last3.map(b=>rng(b)/adr)),
-          volAvg: avg(last3.map(b=>b.v))/vol50};
+          volAvg: avg(last3.map(b=>b.v))/vol50,
+          offHigh: (bars[n-1].c/Math.max(...bars.slice(-10).map(b=>b.h))-1)*100/adr};
+}
+// A pullback that gives back too much is selling, not resting. Measured
+// 2026-10-08 on the user's 38 own entries and logged misses (close the day
+// before): none sat more than 1.12 ADR under its 10-session high, and none gave
+// back more than 0.58 ADR of a thrust. TER (thrust +1.9 ADR, then three red
+// days to 2.12 ADR under the high, net -1.98) is what this keeps out.
+function _pullbackTooDeep(q, t){
+  return (q && q.offHigh < -1.5) || (t && t.net < -1);
 }
 // "בסיס נקי": passes another screener (see _cleanbaseUniverse), the CURRENT
 // pullback is shallower than the recent ones and near the pivot, the range
@@ -2408,6 +2417,7 @@ function _cleanbaseExactFail(r, bars, opts={}){
   // fall (net <=-0.9), ROST rises (+1.8), MUFG has a 3.2-ADR day, IESC/NESR sit
   // 4.5-5% under the pivot while the missed ones were within 4%.
   const q=_quietPause(done);
+  if(_pullbackTooDeep(q, t)) return true;
   // Live, that alone let in 47 names, 32 of them passing only the broad annual
   // momentum screen (KO, MRK, JNJ...). A quiet base has no thrust to vouch for
   // it, so it must also pass a base/trend screener (user's call, 2026-09-27).

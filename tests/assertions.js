@@ -1224,6 +1224,16 @@
     host.remove();
   }
 
+  // ── cleanbase: a pullback that gives back the thrust is not a pause ──
+  {
+    const mkB = closes => closes.map((c, i) => ({ t: 1.7e9 + i * 86400, o: c, h: c * 1.01, l: c * 0.99, c, v: i >= closes.length - 3 ? 800 : (i === closes.length - 4 ? 2000 : 1000) }));
+    const flat = Array.from({ length: 66 }, (_, i) => 100 + (i % 2 ? 0.2 : -0.2));
+    const deep = mkB([...flat, 108, 106.9, 103.5, 99]);
+    const calm = mkB([...flat, 103, 102.8, 102.6, 102.5]);
+    check('cleanbase: a thrust followed by three hard red days is too deep (TER shape)', _pullbackTooDeep(_quietPause(deep), _thrustPullback(deep)) === true);
+    check('cleanbase: a thrust followed by small quiet days is kept', _pullbackTooDeep(_quietPause(calm), _thrustPullback(calm)) === false);
+  }
+
   // ── journal hand-off origins ──
   check('journal hand-off: both journal origins are trusted, an unrelated one is not',
     TRUSTED_JOURNAL_ORIGINS.includes('https://davidtheking28-oss.github.io') && TRUSTED_JOURNAL_ORIGINS.includes('https://trading-journal-ashy-eta.vercel.app') && !TRUSTED_JOURNAL_ORIGINS.includes('https://evil.example'));
