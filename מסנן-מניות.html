@@ -893,6 +893,9 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 9px 18px; border-top: 1px solid var(--border);
   font: 500 11px var(--sans); color: var(--text3); line-height: 1.7;
 }
+.wl-missing-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px; margin-top:12px; }
+.wl-missing-item { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--bg); }
+.wl-missing-item button { margin-inline-start:auto; }
 .wl-missing b { color: var(--text2); font-family: var(--mono); font-weight: 600; }
 .piv-base { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; }
 .gstat-val:has(.piv-base) { flex-direction: column; gap: 2px; }
@@ -4347,8 +4350,11 @@ function _renderWlMissing(){
     ? ' · ייתכן שירדו מתחת לסף המחיר/שווי השוק של הסריקה או עברו בורסה.'
     : ' · סרוק את השוק כדי למשוך עבורן נתונים.';
   el.innerHTML='במעקב ללא נתונים מהסריקה האחרונה: '
-    +missing.map(t=>'<b>'+escHtml(t)+'</b>').join(', ')
-    +reason;
+    +missing.length+' מניות'+reason
+    +'<div class="wl-missing-list">'+missing.filter(t=>!searchQuery||t.includes(searchQuery)).map(t=>
+      '<div class="wl-missing-item"><b dir="ltr">'+escHtml(t)+'</b><span>נתוני מחיר טרם זמינים</span>'
+      +'<button class="btn-ghost" aria-label="הסר '+escHtml(t)+' מהמעקב" data-ticker="'+escHtml(t)+'" onclick="toggleWL(event,this.dataset.ticker)">הסר מהמעקב</button></div>'
+    ).join('')+'</div>';
 }
 
 // Watchlist names that broke out in the last 5 sessions and were neither
