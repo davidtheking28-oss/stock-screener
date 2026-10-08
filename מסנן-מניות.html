@@ -2376,7 +2376,8 @@ function _quietPause(bars){
           volAvg: avg(last3.map(b=>b.v))/vol50,
           offHigh: (bars[n-1].c/Math.max(...bars.slice(-10).map(b=>b.h))-1)*100/adr,
           vs50: (bars[n-1].c/avg(bars.slice(-50).map(b=>b.c))-1)*100,
-          off60: (bars[n-1].c/Math.max(...bars.slice(-60).map(b=>b.h))-1)*100/adr};
+          off60: (bars[n-1].c/Math.max(...bars.slice(-60).map(b=>b.h))-1)*100/adr,
+          off52w: (bars[n-1].c/Math.max(...bars.slice(-252).map(b=>b.h))-1)*100};
 }
 // A pullback that gives back too much is selling, not resting. Measured
 // 2026-10-08 on the user's 38 own entries and logged misses (close the day
@@ -2388,7 +2389,9 @@ function _quietPause(bars){
 // examples closed above the 50-day average (lowest +0.1%) and within 3.32 ADR of
 // the 60-day high.
 function _pullbackTooDeep(q, t){
-  return (q && (q.offHigh < -1.5 || q.vs50 < 0 || q.off60 < -4)) || (t && t.net < -1);
+// The base must sit in a key area: within 15% of the 52-week high (user's
+// choice 2026-10-08; keeps 32 of their 37 measured examples).
+  return (q && (q.offHigh < -1.5 || q.vs50 < 0 || q.off60 < -4 || q.off52w < -15)) || (t && t.net < -1);
 }
 // "בסיס נקי": passes another screener (see _cleanbaseUniverse), the CURRENT
 // pullback is shallower than the recent ones and near the pivot, the range

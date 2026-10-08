@@ -1234,6 +1234,9 @@
     check('cleanbase: a thrust followed by small quiet days is kept', _pullbackTooDeep(_quietPause(calm), _thrustPullback(calm)) === false);
     const fall = mkB([...Array.from({ length: 56 }, (_, i) => 130 - i * 0.5), 102.4, 102.2, 102.5, 102.3, 102.4, 102.2, 102.3, 102.4, 102.2, 102.3, 102.2, 102.3, 102.2, 102.3]);
     check('cleanbase: quiet days inside a decline (under the 50-day average) are rejected (ABNB shape)', _pullbackTooDeep(_quietPause(fall), null) === true);
+    const farOff = mkB([...Array.from({ length: 30 }, (_, i) => 150 - i * 1.6), ...Array.from({ length: 66 }, (_, i) => 98 + i * 0.06)]);
+    const fq = _quietPause(farOff);
+    check('cleanbase: a quiet base far below its 52-week high is not in a key area', fq.vs50 > 0 && fq.off52w < -15 && _pullbackTooDeep(fq, null) === true, JSON.stringify(fq));
   }
 
   // ── journal hand-off origins ──
