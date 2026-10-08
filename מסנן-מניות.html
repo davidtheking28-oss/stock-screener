@@ -1018,6 +1018,7 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
   <div id="statBar"></div>
   <div class="topbar-end">
+    <span id="wlSyncStatus" role="status" aria-live="polite" aria-atomic="true"></span>
     <button class="btn-ghost" id="wlTopbarBtn" style="font-size:12px" onclick="setMode('watch')" title="רשימת מעקב">&#9733; מעקב</button>
     <div id="authChip"><button class="btn-ghost" style="font-size:12px" onclick="toggleAuthModal()">כניסה</button></div>
   </div>
@@ -1156,7 +1157,7 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="src-tab" id="tabWatch" aria-selected="false" onclick="setMode('watch')">&#9733; מעקב <span class="results-count" id="wlCount"></span></button>
       </div>
       <div class="scan-status">
-        <span id="wlSyncStatus" role="status" aria-live="polite" aria-atomic="true"></span><span id="scanTime"></span><button class="btn-rescan" id="watchRefreshBtn" onclick="refreshWatchlist()" style="display:none">רענן נתוני מעקב</button>
+        <span id="scanTime"></span><button class="btn-rescan" id="watchRefreshBtn" onclick="refreshWatchlist()" style="display:none">רענן נתוני מעקב</button>
         <button class="btn-rescan" id="scanBtn" onclick="if(mode==='watch')setMode('screen');scan(true)" style="display:none">&#8635; סרוק שנית</button>
       </div>
       <div id="sectorWrap"></div>
@@ -4383,6 +4384,15 @@ async function logMissedBreakout(t){
   toast(t+' נרשמה ב"פוספסו" ביומן ✓');
 }
 
+function _refreshWatchlistMembership(){
+  if(!_currentUser || !_sb || document.hidden) return;
+  return loadUserData();
+}
+// CSS tab switches do not emit visibilitychange for an embedded document.
+window.addEventListener('message',e=>{
+  if(e.source!==window.parent || !TRUSTED_JOURNAL_ORIGINS.includes(e.origin)) return;
+  if(e.data?.type==='tj:screener-visible' && e.data.visible) _refreshWatchlistMembership();
+});
 function setMode(m){
   // No `if(m===mode) return` short-circuit: state and DOM can disagree (a boot
   // that restored mode='watch' before anything applied it), and the one thing
@@ -4397,6 +4407,7 @@ function setMode(m){
   try{ localStorage.setItem('sepa_mode', m); }catch(e){}
   _queuePrefsPush();
   applyView();
+  if(m==='watch') _refreshWatchlistMembership();
   // A saved watchlist with no ttUniverse row for any of it (no scan this
   // session, cache expired) used to just sit on the "סרוק את השוק" empty
   // state until clicked. The user asked for it to load automatically instead
