@@ -286,9 +286,9 @@
     check('cleanbase: an up day on the very last session has no pullback yet',
       _cleanbaseExactFail(far, lastDay, g) === true);
     check('cleanbase: the newest pullback being the deepest of the last three is not a contraction',
-      _cleanbaseExactFail(row([5, 6, 9]), quiet, g) === true);
+      _cleanbaseExactFail(row([5, 6, 9], -6), quiet, g) === true);
     check('cleanbase: too deep a current pullback is rejected',
-      _cleanbaseExactFail(row([20, 15, 13]), quiet, g) === true);
+      _cleanbaseExactFail(row([20, 15, 13], -6), quiet, g) === true);
     check('cleanbase: already broken out past the pivot is rejected',
       _cleanbaseExactFail(row(knsa, 3), quiet, g) === true);
     check('cleanbase: no bars drops the row', _cleanbaseExactFail(row(knsa), null, g) === true);
@@ -325,6 +325,9 @@
       _cleanbaseExactFail(row(knsa, -6, ['finviz']), quiet, g) === false);
     check('cleanbase: the same quiet candles more than 4% under the pivot are not ready yet (IESC/NESR)',
       _cleanbaseExactFail(row(knsa, -5), sideways, g) === true);
+    const nsitRow = row([5, 6, 9], -2);
+    check('cleanbase: a tight base near the high passes without a textbook VCP leg sequence (NSIT)',
+      _cleanbaseExactFail(nsitRow, sideways, g) === false && nsitRow.pause?.kind === 'tight', JSON.stringify(nsitRow.pause));
     check('cleanbase: a steady decline is not quiet sideways (TX/KNSA)',
       _cleanbaseExactFail(row(knsa), steady, g) === true, 'got ' + JSON.stringify(_quietPause(steady)));
     check('cleanbase: drifting up is not quiet sideways (ROST)',
@@ -1237,6 +1240,18 @@
     const farOff = mkB([...Array.from({ length: 30 }, (_, i) => 150 - i * 1.6), ...Array.from({ length: 66 }, (_, i) => 98 + i * 0.06)]);
     const fq = _quietPause(farOff);
     check('cleanbase: a quiet base far below its 52-week high is not in a key area', fq.vs50 > 0 && fq.off52w < -15 && _pullbackTooDeep(fq, null) === true, JSON.stringify(fq));
+  }
+
+  // ── cleanbase: tight sideways base near the 52-week high (NSIT) ──
+  {
+    const mk2 = (closes, w) => closes.map((c, i) => ({ t: 1.7e9 + i * 86400, o: c, h: c * (1 + w), l: c * (1 - w), c, v: 1000 }));
+    const run = Array.from({ length: 60 }, (_, i) => 100 + i * 0.8);
+    const tight = mk2([...run, ...Array.from({ length: 20 }, (_, i) => 147 + (i % 3) * 0.4)], 0.012);
+    const loose = mk2([...run, ...Array.from({ length: 20 }, (_, i) => 147 + (i % 2 ? 7 : -7))], 0.012);
+    check('cleanbase: a tight sideways base just under the high passes the NSIT path', _tightNearHighOK(_tightNearHigh(tight)) === true, JSON.stringify(_tightNearHigh(tight)));
+    check('cleanbase: a wide swinging range near the high does not', _tightNearHighOK(_tightNearHigh(loose)) === false);
+    const far = mk2([...Array.from({ length: 30 }, () => 200), ...Array.from({ length: 50 }, (_, i) => 140 + (i % 3) * 0.3)], 0.012);
+    check('cleanbase: a tight range far below the 52-week high does not', _tightNearHighOK(_tightNearHigh(far)) === false);
   }
 
   // ── journal hand-off origins ──
