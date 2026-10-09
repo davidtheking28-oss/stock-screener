@@ -1287,6 +1287,14 @@
     localStorage.removeItem('sepa_sort_x');
   }
 
+  {
+    const hdr = document.querySelector('.filter-header');
+    hdr.classList.add('hover-probe');
+    const rule = [...document.styleSheets].flatMap(sh => [...sh.cssRules]).find(r => r.selectorText === '.filter-header:hover');
+    check('sticky filter header stays opaque on hover (buttons must not show through)', !!rule && /var\(--surface\)/.test(rule.style.background || rule.cssText));
+    hdr.classList.remove('hover-probe');
+  }
+
   setScreener('sepa', true); // restore
   return R;
 })()
