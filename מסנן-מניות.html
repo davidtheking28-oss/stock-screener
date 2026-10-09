@@ -1009,10 +1009,9 @@ tbody tr:last-child td { border-bottom: none; }
   .filter-sections.single .fields { grid-template-columns:repeat(2,minmax(0,360px)); gap:12px 28px; justify-content:start; }
   .filter-sections.single .field { grid-column:auto; grid-template-columns:minmax(0,1fr) 86px; gap:12px; }
 }
-@media(min-width:681px) {
-  .filter-panel { position:sticky; top:54px; z-index:30; max-height:max(200px, calc(100vh - 54px - 250px)); overflow-y:auto; overscroll-behavior:contain; }
-  .filter-panel .filter-header { position:sticky; top:0; }
-  .filter-panel > .screeners { position:sticky; top:var(--filter-header-h, 47px); }
+@media(min-width:681px) and (min-height:720px) {
+  .filter-panel { position:sticky; top:54px; z-index:30; }
+  .filter-panel .filter-header, .filter-panel > .screeners { position:static; }
 }
 </style>
 </head>
@@ -3552,7 +3551,7 @@ function renderMyPresets(){
   ro.observe(el);
   ro.observe(panel);
   if(bar) ro.observe(bar);
-  matchMedia('(min-width:681px)').addEventListener('change', () => { headerH = measure(); apply(); setupObserver(); });
+  matchMedia('(min-width:681px) and (min-height:720px)').addEventListener('change', () => { headerH = measure(); apply(); setupObserver(); });
   setupObserver();
   apply();
 })();
