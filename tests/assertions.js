@@ -1293,6 +1293,8 @@
     const rule = [...document.styleSheets].flatMap(sh => [...sh.cssRules]).find(r => r.selectorText === '.filter-header:hover');
     check('sticky filter header stays opaque on hover (buttons must not show through)', !!rule && /var\(--surface\)/.test(rule.style.background || rule.cssText));
     hdr.classList.remove('hover-probe');
+    const bar = document.querySelector('.filter-panel > .screeners');
+    check('the screener buttons row stays fixed under the sticky filter header', getComputedStyle(bar).position === 'sticky' && parseFloat(getComputedStyle(bar).top) >= 54 + hdr.offsetHeight - 1);
   }
 
   setScreener('sepa', true); // restore
