@@ -1295,7 +1295,7 @@
     hdr.classList.remove('hover-probe');
     const bar = document.querySelector('.filter-panel > .screeners');
     const panelEl = document.getElementById('filterPanel');
-    check('the whole filter panel stays pinned while the page scrolls (header, buttons row and fields)', getComputedStyle(panelEl).position === 'sticky' && getComputedStyle(hdr).position === 'static' && getComputedStyle(bar).position === 'static');
+    check('the whole filter panel stays pinned while the page scrolls and scrolls its own fields when short', getComputedStyle(panelEl).position === 'sticky' && getComputedStyle(panelEl).overflowY === 'auto' && getComputedStyle(hdr).position === 'sticky' && getComputedStyle(bar).position === 'sticky');
   }
 
   setScreener('sepa', true); // restore
