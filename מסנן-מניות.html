@@ -1004,8 +1004,14 @@ tbody tr:last-child td { border-bottom: none; }
 .validation-note { margin:4px 0 0; font:500 11px var(--sans); color:var(--text2); }
 @media(min-width:681px) {
   .filter-panel > .screeners { position:sticky; top:calc(54px + var(--filter-header-h, 47px)); z-index:29; background:var(--surface); }
+}
+@media(min-width:681px) {
   .filter-sections.single .fields { grid-template-columns:repeat(2,minmax(0,360px)); gap:12px 28px; justify-content:start; }
   .filter-sections.single .field { grid-column:auto; grid-template-columns:minmax(0,1fr) 86px; gap:12px; }
+}
+@media(min-width:681px) and (min-height:720px) {
+  .filter-panel { position:sticky; top:54px; z-index:30; }
+  .filter-panel .filter-header, .filter-panel > .screeners { position:static; }
 }
 </style>
 </head>
@@ -3528,12 +3534,14 @@ function renderMyPresets(){
   const bar = document.querySelector('.filter-panel > .screeners');
   const measure = () => {
     document.documentElement.style.setProperty('--filter-header-h', el.offsetHeight + 'px');
+    if(getComputedStyle(panel).position === 'sticky') return panel.offsetHeight;
     return el.offsetHeight + (bar && getComputedStyle(bar).position === 'sticky' ? bar.offsetHeight : 0);
   };
+  const panelPinned = () => getComputedStyle(panel).position === 'sticky';
   let headerH = measure();
   let stuck = true;
   let io;
-  const apply = () => document.documentElement.style.setProperty('--thead-top', (54 + (stuck ? headerH : 0)) + 'px');
+  const apply = () => document.documentElement.style.setProperty('--thead-top', (54 + (stuck || panelPinned() ? headerH : 0)) + 'px');
   const setupObserver = () => {
     if(io) io.disconnect();
     io = new IntersectionObserver((entries) => { stuck = entries[0].isIntersecting; apply(); }, { rootMargin: `-${54 + headerH}px 0px 0px 0px`, threshold: 0 });
@@ -3541,7 +3549,9 @@ function renderMyPresets(){
   };
   const ro = new ResizeObserver(() => { headerH = measure(); apply(); setupObserver(); });
   ro.observe(el);
+  ro.observe(panel);
   if(bar) ro.observe(bar);
+  matchMedia('(min-width:681px) and (min-height:720px)').addEventListener('change', () => { headerH = measure(); apply(); setupObserver(); });
   setupObserver();
   apply();
 })();

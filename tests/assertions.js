@@ -1294,7 +1294,8 @@
     check('sticky filter header stays opaque on hover (buttons must not show through)', !!rule && /var\(--surface\)/.test(rule.style.background || rule.cssText));
     hdr.classList.remove('hover-probe');
     const bar = document.querySelector('.filter-panel > .screeners');
-    check('the screener buttons row stays fixed under the sticky filter header', getComputedStyle(bar).position === 'sticky' && parseFloat(getComputedStyle(bar).top) >= 54 + hdr.offsetHeight - 1);
+    const panelEl = document.getElementById('filterPanel');
+    check('the whole filter panel stays pinned while the page scrolls (header, buttons row and fields)', getComputedStyle(panelEl).position === 'sticky' && getComputedStyle(hdr).position === 'static' && getComputedStyle(bar).position === 'static');
   }
 
   setScreener('sepa', true); // restore
