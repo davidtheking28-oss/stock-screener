@@ -1295,6 +1295,16 @@
     hdr.classList.remove('hover-probe');
   }
 
+  {
+    const prevMap = sectorStrengthMap, prevScr = activeScreener;
+    activeScreener = 'sepa';
+    sectorStrengthMap = { Healthcare: 60, Technology: 50, Financials: 40, Energy: 30 };
+    const html = sectorBadgeHtml('Healthcare', true);
+    check('sector badge shows the sector ETF ticker, not a cut-off word', /gb-lbl">XLV</.test(html) && !/>Health</.test(html));
+    check('every grouped sector maps to a fixed ETF ticker', Object.values(SECTOR_GROUPS).filter(g => !['Government','Other'].includes(g)).every(g => SECTOR_ETF[g]));
+    sectorStrengthMap = prevMap; activeScreener = prevScr;
+  }
+
   setScreener('sepa', true); // restore
   return R;
 })()

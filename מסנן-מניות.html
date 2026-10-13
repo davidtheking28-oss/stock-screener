@@ -1516,6 +1516,14 @@ const SECTOR_GROUPS = {
   'Miscellaneous':'Other',
 };
 function groupSector(raw){ return raw ? (SECTOR_GROUPS[raw]||raw) : raw; }
+// The card badge shows the sector's SPDR ETF ticker: always short enough to fit, the same
+// symbol the journal's Market Pulse uses, and unambiguous where a first word was not
+// ("Health" was cut to "H…" on narrow cards).
+const SECTOR_ETF = {
+  'Technology':'XLK', 'Communication Services':'XLC', 'Healthcare':'XLV', 'Financials':'XLF',
+  'Energy':'XLE', 'Materials':'XLB', 'Industrials':'XLI', 'Consumer Discretionary':'XLY',
+  'Consumer Staples':'XLP', 'Utilities':'XLU', 'Real Estate':'XLRE',
+};
 // A stored key that no longer exists (the removed 'momentum' screener) would
 // make setScreener early-return, leaving the panel with no panel-* class and
 // every screener-specific field visible at once.
@@ -3293,7 +3301,8 @@ function sectorBadgeHtml(sector, withLabel){
   // for Health Technology/Services; this one's a label collision, not a data
   // merge, but the same "which sector is this actually" confusion for the user.
   const shortSector = String(sector).startsWith('Consumer ') ? String(sector).replace('Consumer ', 'Cons. ') : String(sector).split(' ')[0];
-  const lbl = withLabel ? '<span class="gb-lbl">'+escHtml(shortSector)+'</span> ' : '';
+  const sectorEtf = SECTOR_ETF[sector] || SECTOR_ETF[groupSector(sector)];
+  const lbl = withLabel ? '<span class="gb-lbl">'+escHtml(sectorEtf || shortSector)+'</span> ' : '';
   return '<span class="gbadge" style="color:'+t.c+';background:'+t.bg+'" title="מקום '+t.rank+' מתוך '+t.total+' סקטורים — '+t.pct+'% מהמניות ב'+escHtml(sector)+' עומדות ב-Trend Template">'+lbl+'<b>#'+t.rank+'</b></span>';
 }
 
