@@ -208,6 +208,9 @@
     check('range setup: fewer than three touches of the ceiling is not enough', _rangeBreakout(bars(twoTouches)) === null);
     const fell = path([...range.slice(0, -1), [89, 78.5], [90, 70]]);
     check('range setup: a range that has broken DOWN is not a setup', _rangeBreakout(bars(fell)) === null);
+    const stairs = path([[0, 50], [60, 76], [63, 80], [66, 77.4], [67, 80.9], [74, 78.3], [75, 81.8], [89, 80.5]]);
+    check('range setup: rising steps that keep closing above the earlier highs are a staircase, not a flat ceiling',
+      _rangeBreakout(bars(stairs)) === null, JSON.stringify(_rangeBreakout(bars(stairs))));
     const dipped = path([...range, [91, 70], [94, 77], [95, 81.6]]);
     check('range setup: a range that broke down and then bounced above the ceiling is not a clean breakout',
       _rangeBreakout(bars(dipped))?.kind !== 'breakout');

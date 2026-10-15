@@ -1593,7 +1593,7 @@ const COL_DEFS = [
 // Renaming the key makes every old cache miss once and force a real
 // recompute, instead of asking users to clear localStorage by hand again.
 const UNIVERSE_CACHE_KEY = 'sepa_universe_v2';
-const RESULTS_CACHE_KEY  = 'sepa_scan_results_v1';
+const RESULTS_CACHE_KEY  = 'sepa_scan_results_v2';
 const SCROLL_KEY = 'sepa_scroll_v1';
 
 // Restoring the right results is not enough on its own — landing back at the top
@@ -2496,10 +2496,15 @@ function _rangeBreakout(bars, P=RB){
     if(height>P.maxHeight || height<P.minHeight) continue;
     if(Math.abs(c[e]/c[s]-1)*100>P.maxDrift) continue;
     let inside=true, above=0;
-    for(let i=s;i<=e;i++){ if(c[i]>top*1.005){ inside=false; break; } if(c[i]>=ma(i)) above++; }
-    if(!inside || above/P.L<P.above21 || !(ma(e)>=ma(s)) || c[s]/c[s-40]<1+P.priorAdv/100) continue;
+    for(let i=s;i<=e;i++){ if(c[i]>=ma(i)) above++; }
+    if(above/P.L<P.above21 || !(ma(e)>=ma(s)) || c[s]/c[s-40]<1+P.priorAdv/100) continue;
     const ti=touchIdx(s,e,top);
     if(ti.length<P.minTouches || ti[0]>s+Math.round(P.L*0.6)) continue;
+    // `top` is the window's own maximum, so c[i]>top can never happen. A flat ceiling
+    // means that once it is first reached no close clears the highest high already set.
+    let runTop=-Infinity;
+    for(let i=s;i<=e;i++){ if(i>ti[0] && c[i]>runTop*1.005){ inside=false; break; } if(h[i]>runTop) runTop=h[i]; }
+    if(!inside) continue;
     let swings=0;
     for(let q=1;q<ti.length;q++){ let m=Infinity; for(let i=ti[q-1];i<=ti[q];i++) if(l[i]<m) m=l[i]; if(m<=top*(1-P.minSwing/100)) swings++; }
     if(swings<P.minTouches-1) continue;
@@ -2655,6 +2660,7 @@ async function _cleanbaseUniverse(universe, rsMap, signal){
   for(const r of applyFilters(universe, rsMap, {forceTickers:new Set(rawBy.keys())}).filter(keep)){
     if(byT.has(r.ticker)) continue;
     const d=rawBy.get(r.ticker);
+    if(d[C.SMA50]==null || d[C.SMA200]==null) continue;
     if(!(r.close>d[C.SMA50] && r.close>d[C.SMA200] && d[C.SMA50]>d[C.SMA200])) continue;
     r.via=['range']; byT.set(r.ticker, r);
   }
@@ -3417,7 +3423,7 @@ async function backfillSectorStrength(){
   // cache-only boot still shows a clickable chip.
   if(activeScreener!=='commodities'){
     _marketBreadthPct = rated ? Math.round(up/rated*100) : 0;
-    _paintBreadth(rated ? Math.round(a200/rated*100) : 0, _marketBreadthPct);
+    if(rated) _paintBreadth(Math.round(a200/rated*100), _marketBreadthPct);
   }
   _tableKey=''; _galleryKey='';
   render();
@@ -4034,7 +4040,7 @@ async function scan(force=false){
     // breadth got zeroed by an unrelated screener.
     if(!isCommodities){
       _marketBreadthPct = bPct;
-      _paintBreadth(rated ? Math.round(a200/rated*100) : 0, bPct);
+      if(rated) _paintBreadth(Math.round(a200/rated*100), bPct);
     }
 
     if(activeScreener==='cleanbase') $('statBar').innerHTML='<span class="spinner"></span> מריץ את כל המסננים…';
