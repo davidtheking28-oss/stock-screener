@@ -143,6 +143,30 @@
     check('applyFilters finviz: a stock far from its 52w high now fails', eqSet(out, ['NEARHI']), 'got ' + JSON.stringify(out));
   }
 
+  // ── applyFilters: winners ("מנצחי השנה") — the five Finviz-style gates ──
+  {
+    setScreener('winners', true);
+    const base = { close: 100, SMA50: 90, SMA200: 70, price_52_week_high: 105, price_52_week_low: 40,
+      'High.3M': 104, beta_1_year: 1.5, relative_volume_10d_calc: 0.6,
+      market_cap_basic: 5e9, average_volume_10d_calc: 1e6, average_volume_90d_calc: 1e6, volume: 6e5,
+      'Perf.Y': 150, description: 'x', exchange: 'NASDAQ' };
+    const uni = [
+      mkStock('W:PASS', { ...base, name: 'PASS' }),
+      mkStock('W:SLOW', { ...base, name: 'SLOW', 'Perf.Y': 60 }),
+      mkStock('W:FARHI', { ...base, name: 'FARHI', 'High.3M': 130 }),
+      mkStock('W:LOWBETA', { ...base, name: 'LOWBETA', beta_1_year: 0.8 }),
+      mkStock('W:HOTVOL', { ...base, name: 'HOTVOL', relative_volume_10d_calc: 1.8 }),
+      mkStock('W:THIN', { ...base, name: 'THIN', average_volume_10d_calc: 5e4, average_volume_90d_calc: 5e4 }),
+      mkStock('W:NOBETA', { ...base, name: 'NOBETA', beta_1_year: null }),
+    ];
+    const rs = {}; uni.forEach(u => { rs[u.s] = 80; });
+    const out = tickers(applyFilters(uni, rs));
+    check('applyFilters winners: only the stock passing all five gates survives', eqSet(out, ['PASS']), 'got ' + JSON.stringify(out));
+    const row = applyFilters([mkStock('W:PASS', { ...base, name: 'PASS' })], { 'W:PASS': 80 })[0];
+    check('winners score: a stock on its high with a year +150% scores above one 20% off', calcScore(row, 'winners') > calcScore({ ...row, fromHighPct: -20, perfY: 110 }, 'winners'));
+    setScreener('sepa', true);
+  }
+
   // ── applyFilters: Commodities fixed-ticker membership ──
   {
     setScreener('commodities', true);

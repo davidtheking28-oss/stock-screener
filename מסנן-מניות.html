@@ -327,6 +327,8 @@ body {
 #filterPanel.panel-sepa .f-commodities, #filterPanel.panel-power .f-commodities, #filterPanel.panel-growth .f-commodities, #filterPanel.panel-qulla .f-commodities, #filterPanel.panel-finviz .f-commodities, #filterPanel.panel-cleanbase .f-commodities { display: none; }
 #filterPanel.panel-sepa .f-qulla, #filterPanel.panel-power .f-qulla, #filterPanel.panel-growth .f-qulla, #filterPanel.panel-commodities .f-qulla, #filterPanel.panel-finviz .f-qulla, #filterPanel.panel-cleanbase .f-qulla { display: none; }
 #filterPanel.panel-sepa .f-finviz, #filterPanel.panel-power .f-finviz, #filterPanel.panel-growth .f-finviz, #filterPanel.panel-commodities .f-finviz, #filterPanel.panel-qulla .f-finviz, #filterPanel.panel-cleanbase .f-finviz { display: none; }
+#filterPanel:not(.panel-winners) .f-winners { display: none; }
+#filterPanel.panel-winners .f-sepa, #filterPanel.panel-winners .f-power, #filterPanel.panel-winners .f-tech, #filterPanel.panel-winners .f-growth, #filterPanel.panel-winners .f-commodities, #filterPanel.panel-winners .f-qulla, #filterPanel.panel-winners .f-finviz, #filterPanel.panel-winners .f-liq { display: none; }
 /* The rules above enumerate every panel by name, so a new screener would be
    invisible in all of them until it is appended to each line. These two are
    written the other way round — negated — so the VCP fields hide everywhere
@@ -1046,6 +1048,7 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="screener-btn" aria-pressed="false" data-screener="cleanbase" onclick="setScreener('cleanbase')">בסיס נקי</button>
         <button class="screener-btn" aria-pressed="false" data-screener="qulla" onclick="setScreener('qulla')">Qullamaggie</button>
         <button class="screener-btn" aria-pressed="false" data-screener="finviz" onclick="setScreener('finviz')">מומנטום שנתי</button>
+        <button class="screener-btn" aria-pressed="false" data-screener="winners" onclick="setScreener('winners')">מנצחי השנה</button>
         <button class="screener-btn" aria-pressed="false" data-screener="growth" onclick="setScreener('growth')">מסנן פונדמנטלי</button>
         <button class="screener-btn" aria-pressed="false" data-screener="commodities" onclick="setScreener('commodities')">סחורות</button>
       </div>
@@ -1099,6 +1102,11 @@ tbody tr:last-child td { border-bottom: none; }
             <div class="field f-finviz"><label for="smaTrend50">מחיר מול SMA50</label><div class="field-combo"><input type="text" inputmode="none" id="smaTrend50" value="1" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-finviz"><label for="smaTrend200">מחיר מול SMA200</label><div class="field-combo"><input type="text" inputmode="none" id="smaTrend200" value="1" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-finviz"><label for="finvizFromHigh">מהשיא (%) מקס&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="finvizFromHigh" value="25" min="0" max="100" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-winners"><label for="winPerfY">ביצוע שנתי מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="winPerfY" value="100" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-winners"><label for="winFromHigh">מתחת לשיא 50 יום מקס&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="winFromHigh" value="10" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-winners"><label for="winBetaMin">בטא מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="winBetaMin" value="1" min="0" step="0.1" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-winners"><label for="winVolMin">נפח מניות מינ&#8217; (M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="winVolMin" value="0.1" min="0" step="0.05" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-winners"><label for="winRelVolMax">נפח יחסי מקס&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="winRelVolMax" value="1" min="0" step="0.05" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-base"><label for="priceMin">מחיר מינ&#8217; ($)</label><div class="field-combo"><input type="text" inputmode="none" id="priceMin" value="10" min="0" oninput="updUnitHints()" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-base"><label for="mcMin">שווי שוק מינ&#8217; ($B)</label><div class="field-combo"><input type="text" inputmode="none" id="mcMin" value="2" min="0" step="0.05" oninput="updUnitHints()" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-base f-liq"><label for="liqMin">נזילות מינ&#8217; ($M/יום)</label><div class="field-combo"><input type="text" inputmode="none" id="liqMin" value="20" min="0" oninput="updUnitHints()" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
@@ -1453,7 +1461,10 @@ const COLUMNS = [
   // whole universe in the first minutes of a session, which starved the
   // Qullamaggie gate intraday. This is TradingView's real average daily range,
   // in price units; adrPct converts it to the percentage the UI shows.
-  "ADR"
+  "ADR",
+  // "Winners" screen: beta, the 3-month high (closest TradingView offers to Finviz's
+  // 50-day high) and TradingView's own relative volume.
+  "beta_1_year","High.3M","relative_volume_10d_calc"
 ];
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
@@ -1470,6 +1481,7 @@ const SCREENERS = {
   cleanbase: {name:'בסיס נקי',           sub:'עוברת מסנן קיים + התכווצות, נרות קטנים וווליום יורד', fund:false, presets:false},
   qulla:    {name:'Qullamaggie',          sub:'Breakout — מהלך גדול + דשדוש צמוד ל-EMA', fund:false, presets:false},
   finviz:   {name:'מומנטום שנתי',         sub:'שנה +30% · מעל SMA50/200 · קרוב לשיא', fund:false, presets:false},
+  winners:  {name:'מנצחי השנה',            sub:'שנה +100% · ליד שיא 50 יום · בטא>1 · נפח שקט', fund:false, presets:false},
   growth:   {name:'מסנן פונדמנטלי',      sub:'סקטורים נבחרים + צמיחה רבעונית', fund:false, presets:false},
   commodities: {name:'סחורות',           sub:'רשימת סחורות קבועה',       fund:false, presets:false},
 };
@@ -1480,6 +1492,7 @@ const SCREENER_DEFAULTS = {
   cleanbase: {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:4,move6Min:30,move3Min:30,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1,finvizFromHigh:25},
+  winners:  {priceMin:1,mcMin:0.1,liqMin:0,earnDays:0,winPerfY:100,winFromHigh:10,winBetaMin:1,winVolMin:0.1,winRelVolMax:1},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
   commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
 };
@@ -3146,6 +3159,14 @@ function _calcScoreRaw(r, scr='sepa'){
     const revS   = Math.min(clamp(r.rev??0,0,200)/200,1)*5;
     return Math.round(clamp(tightS+pivotS+contS+dryS+rsS+epsS+revS,0,100));
   }
+  if(scr==='winners'){
+    const nearS = clamp(1-Math.max(0,-r.fromHighPct)/25,0,1)*30;
+    const perfS = Math.min(clamp(r.perfY??0,0,300)/300,1)*25;
+    const rsS   = clamp(r.rs,0,99)/99*25;
+    const dryS  = r.rvol!=null ? clamp(1-r.rvol,0,1)*10 : 0;
+    const betaS = Math.min(clamp(r.beta??0,0,3)/3,1)*10;
+    return Math.round(clamp(nearS+perfS+rsS+dryS+betaS,0,100));
+  }
   if(scr==='finviz'){
     const hiS   = clamp(1-Math.max(0,-r.fromHighPct)/25,0,1)*25;
     const perfS = Math.min(clamp(r.perfY??0,0,300)/300,1)*20;
@@ -3363,6 +3384,11 @@ const FIELD_PRESETS = {
   perfYMin:     [[10,'10%'],[20,'20%'],[30,'30% — קלאסי'],[50,'50%'],[75,'75%'],[100,'100%'],[200,'200%']],
   finvizVolMin: [[0.1,'100K+ — קלאסי'],[0.25,'250K+'],[0.5,'500K+'],[1,'1M+'],[2,'2M+']],
   finvizFromHigh: [[5,'5% — צמוד לשיא'],[8,'8%'],[10,'10%'],[12,'12%'],[15,'15%'],[20,'20%'],[25,'25% — קלאסי'],[35,'35%'],[50,'50%'],[75,'75%']],
+  winPerfY:     [[30,'30%'],[50,'50%'],[75,'75%'],[100,'100% — ברירת מחדל'],[150,'150%'],[200,'200%'],[300,'300%']],
+  winFromHigh:  [[3,'3% — צמוד מאוד'],[5,'5%'],[8,'8%'],[10,'10% — ברירת מחדל'],[15,'15%'],[20,'20%']],
+  winBetaMin:   [[0,'כבוי'],[0.5,'0.5'],[1,'1 — ברירת מחדל'],[1.5,'1.5'],[2,'2']],
+  winVolMin:    [[0.1,'100K+ — ברירת מחדל'],[0.25,'250K+'],[0.5,'500K+'],[1,'1M+'],[2,'2M+']],
+  winRelVolMax: [[0.5,'0.5 — שקט מאוד'],[0.75,'0.75'],[1,'1 — ברירת מחדל'],[1.5,'1.5'],[2,'2']],
   smaTrend50:  [[1,'מעל — קלאסי'],[0,'מתחת']],
   smaTrend200: [[1,'מעל — קלאסי'],[0,'מתחת']],
 };
@@ -3474,6 +3500,7 @@ const PRESET_FIELDS=['rsMin','fromHigh','fromLow','priceMin','mcMin','liqMin','e
   'vcpContractions','vcpDepthMax','pivotBelow',
   'epsMin','revMin','roeMin','epsQoqMin','revQoqMin','adrMin','move6Min','move3Min',
   'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin','smaTrend50','smaTrend200',
+  'winPerfY','winFromHigh','winBetaMin','winVolMin','winRelVolMax',
   'nmMin','revQoqSepaMin','epsQoqSepaMin','epsFwdMin'];
 function _myPresets(){ try{ return JSON.parse(localStorage.getItem(MY_PRESETS_KEY)||'{}')||{}; }catch(e){ return {}; } }
 function _writeMyPresets(o){ try{ localStorage.setItem(MY_PRESETS_KEY, JSON.stringify(o)); }catch(e){} }
@@ -3557,7 +3584,7 @@ function _toggleFilterPanel(headerEl){
   if(open && mode==='watch') setMode('screen');
 }
 
-const SCREENER_HEADS = {sepa:'טכני — Trend Template', power:'טכני — Power Play', vcp:'טכני — בסיס VCP', cleanbase:'טכני — בסיס נקי', qulla:'טכני — Qullamaggie Breakout', finviz:'טכני — מומנטום שנתי', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
+const SCREENER_HEADS = {sepa:'טכני — Trend Template', power:'טכני — Power Play', vcp:'טכני — בסיס VCP', cleanbase:'טכני — בסיס נקי', qulla:'טכני — Qullamaggie Breakout', finviz:'טכני — מומנטום שנתי', winners:'טכני — מנצחי השנה', growth:'פונדמנטלי — צמיחה רבעונית', commodities:'סחורות — רשימה קבועה'};
 function setScreener(key, applyDef=true){
   if(!SCREENERS[key]) return;
   // Picking a screener means "show me this screen", so it leaves the watchlist.
@@ -4099,7 +4126,7 @@ function applyFilters(universe, rsMap, opts={}){
     // SEPA (the default) and VCP both read S150, so they take the full set.
     if(forced){ if([close,hi,lo].some(v=>v==null)) continue; }
     else if(scr==='qulla'||scr==='power'){ if([close,s50,hi,lo].some(v=>v==null)) continue; }
-    else if(scr==='commodities'||scr==='growth'){ if([close,hi,lo].some(v=>v==null)) continue; }
+    else if(scr==='commodities'||scr==='growth'||scr==='winners'){ if([close,hi,lo].some(v=>v==null)) continue; }
     else if(scr==='finviz'){ if([close,s50,s200,hi,lo].some(v=>v==null)) continue; }
     else if([close,s50,s150,s200,hi,lo].some(v=>v==null)) continue;
     if(!forced && (close<priceMin||mc<mcMin)) continue;
@@ -4117,6 +4144,7 @@ function applyFilters(universe, rsMap, opts={}){
     const adrRaw=d[C.ADR];
     const adrPct=(adrRaw!=null && close>0) ? adrRaw/close*100 : volD;
     const vr=(vol!=null&&avgVol)?vol/avgVol:null;
+    const beta=d[C.beta_1_year], hi3m=d[C['High.3M']], rvol=d[C.relative_volume_10d_calc]??vr;
     const perfY=d[C['Perf.Y']], perf3=d[C['Perf.3M']], perf6=d[C['Perf.6M']];
     const eps=d[C.earnings_per_share_diluted_yoy_growth_fq],
           epsQoq=d[C['earnings_per_share_diluted_qoq_growth_fq']],
@@ -4192,6 +4220,15 @@ function applyFilters(universe, rsMap, opts={}){
       const tightOk=perfW!=null && perfW>=-wMax && perfW<=wMax;
       checks={volOk,adrOk,trendOk,move6Ok,move3Ok,surfOk,tightOk};
       pass=volOk&&adrOk&&trendOk&&move6Ok&&move3Ok&&surfOk&&tightOk;
+    } else if(scr==='winners'){
+      const avgW=d[C.average_volume_90d_calc]??d[C.average_volume_30d_calc]??avgVol;
+      const perfOk=perfY!=null && perfY>=num('winPerfY');
+      const nearOk=hi3m!=null && close>=hi3m*(1-num('winFromHigh')/100);
+      const betaOk=num('winBetaMin')<=0 || (beta!=null && beta>=num('winBetaMin'));
+      const volOk=avgW!=null && avgW>=num('winVolMin')*1e6;
+      const rvolOk=rvol!=null && rvol<=num('winRelVolMax');
+      checks={perfOk,nearOk,betaOk,volOk,rvolOk};
+      pass=perfOk&&nearOk&&betaOk&&volOk&&rvolOk;
     } else if(scr==='finviz'){
       const avg90=d[C.average_volume_90d_calc], avg30=d[C.average_volume_30d_calc];
       const avgRef=avg90??avg30??avgVol;
@@ -4239,7 +4276,7 @@ function applyFilters(universe, rsMap, opts={}){
       ttPass:pass,
       sym:r.s, ticker:d[C.name], name:d[C.description]||'', exch:d[C.exchange],
       close, rs, sector:groupSector(d[C.sector])||'—', mc,
-      vol, avgVol, dollarVol, earnIn,
+      vol, avgVol, dollarVol, earnIn, beta, rvol,
       fromHighPct, fromLowPct:(close/lo-1)*100,
       rangePos:hi>lo?(close-lo)/(hi-lo):0.5, perfY, perf3, perf6, volD, volM, adrPct,
       perfW:d[C['Perf.W']],
@@ -4730,6 +4767,8 @@ function renderTable(rows){
     ? 'ציון מורכב 0–100: RS (35%) + EPS (25%) + הכנסות (15%) + קרבה לשיא (15%) + ביצוע שנתי (10%)'
     : scKind==='growth'
     ? 'ציון צמיחה 0–100: EPS QoQ (30%) + מכירות QoQ (25%) + RS (15%) + ביצוע שנתי (15%) + EPS YoY (15%)'
+    : scKind==='winners'
+    ? 'ציון מנצחי השנה 0–100: קרבה לשיא 52 שבועות (30%) + ביצוע שנתי (25%) + RS (25%) + נפח שקט (10%) + בטא (10%)'
     : scKind==='qulla'
     ? 'ציון Qullamaggie 0–100: מהלך 6ח׳ (20%) + EPS (15%) + ביצוע שנתי (15%) + צמידות ל-EMA (15%) + ADR (10%) + הידוק שבועי (10%) + RS (10%) + הכנסות (5%)'
     : 'ציון מומנטום 0–100: RS (30%) + EPS (20%) + קרבה לשיא (15%) + ביצוע 3-6ח׳ (15%) + ביצוע שנתי (15%) + הכנסות (5%)';
@@ -4791,6 +4830,13 @@ function renderTable(rows){
       const rsS=Math.round(clamp(r.rs,0,99)/99*10*penalty);
       const revS=sc-moveS-adrS-emaS-tightS-epsS-perfYS-rsS;
       scTip='ציון Qullamaggie: '+(sc??'—')+'/100\nמהלך 6ח׳: '+moveS+'/20\nEPS: '+epsS+'/15\nביצוע שנתי: '+perfYS+'/15\nקרבה ל-EMA: '+emaS+'/15\nADR: '+adrS+'/10\nהידוק שבועי: '+tightS+'/10\nRS: '+rsS+'/10\nהכנסות: '+revS+'/5';
+    } else if(r.scoreKind==='winners'){
+      const nearS=Math.round(clamp(1-Math.max(0,-r.fromHighPct)/25,0,1)*30*penalty);
+      const perfS=Math.round(Math.min(clamp(r.perfY??0,0,300)/300,1)*25*penalty);
+      const rsS=Math.round(clamp(r.rs,0,99)/99*25*penalty);
+      const dryS=Math.round((r.rvol!=null?clamp(1-r.rvol,0,1)*10:0)*penalty);
+      const betaS=sc-nearS-perfS-rsS-dryS;
+      scTip='ציון מנצחי השנה: '+(sc??'—')+'/100\nקרבה לשיא: '+nearS+'/30\nביצוע שנתי: '+perfS+'/25\nRS: '+rsS+'/25\nנפח שקט: '+dryS+'/10\nבטא: '+betaS+'/10';
     } else if(r.scoreKind==='commodities'){
       const rsS=Math.round(clamp(r.rs,0,99)/99*40);
       const hiS=Math.round(clamp((1-Math.max(0,-r.fromHighPct)/25),0,1)*20);
@@ -5457,6 +5503,7 @@ function saveFilterPrefs(){
       adrMin:num('adrMin'),move6Min:num('move6Min'),move3Min:num('move3Min'),
       emaDistMax:num('emaDistMax'),weekRangeMax:num('weekRangeMax'),volSharesMin:num('volSharesMin'),
       perfYMin:num('perfYMin'),finvizVolMin:num('finvizVolMin'),
+      winPerfY:num('winPerfY'),winFromHigh:num('winFromHigh'),winBetaMin:num('winBetaMin'),winVolMin:num('winVolMin'),winRelVolMax:num('winRelVolMax'),
       smaTrend50:num('smaTrend50'),smaTrend200:num('smaTrend200'),
       nmMin:num('nmMin'),revQoqSepaMin:num('revQoqSepaMin'),epsQoqSepaMin:num('epsQoqSepaMin'),epsFwdMin:num('epsFwdMin'),
       useFund:$('useFund')?.checked,requireProfit:$('requireProfit')?.checked,requireEpsAccel:$('requireEpsAccel')?.checked,
@@ -5500,6 +5547,7 @@ function loadFilterPrefs(){
     set('adrMin',p.adrMin); set('move6Min',p.move6Min); set('move3Min',p.move3Min);
     set('emaDistMax',p.emaDistMax); set('weekRangeMax',p.weekRangeMax); set('volSharesMin',p.volSharesMin);
     set('perfYMin',p.perfYMin); set('finvizVolMin',p.finvizVolMin);
+    set('winPerfY',p.winPerfY); set('winFromHigh',p.winFromHigh); set('winBetaMin',p.winBetaMin); set('winVolMin',p.winVolMin); set('winRelVolMax',p.winRelVolMax);
     set('smaTrend50',p.smaTrend50); set('smaTrend200',p.smaTrend200);
     set('nmMin',p.nmMin); set('revQoqSepaMin',p.revQoqSepaMin); set('epsQoqSepaMin',p.epsQoqSepaMin); set('epsFwdMin',p.epsFwdMin);
     if($('useFund')&&p.useFund!=null) $('useFund').checked=p.useFund;
