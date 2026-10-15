@@ -2256,12 +2256,13 @@ function _powerPlayOK(bars, runPct, minConsolBars=10, now=Date.now()){
 // that crosses back and forth is positive evidence of bad data, and every
 // OHLC-derived measure (VCP legs, ADR, EMA distance, the SMA200 slope, a Power
 // Play run) is meaningless on it.
-// isJump takes the close-to-close ratio. The default (a 35% move) suits screeners
-// of ordinary stocks; the winners screener holds names up 100%+ in a year, whose
-// real earnings gaps of 35-40% happen twice a season, so it only treats a
-// split-sized ratio (2x or 1/2) as evidence of a broken series.
+// Only a split-sized close-to-close ratio (2x or 1/2) counts as evidence of a broken
+// series. A 35% threshold used to drop real momentum names (ANF, KOD, ACVA, CRSR,
+// PACS, IBRX, measured 2026-10-15): two earnings gaps of 35-175% in a year, each
+// on 3-17x the volume. A scale flip does the opposite - the volume moves against the
+// price - and the MNST series that motivated this guard flipped by exactly 2x.
 const _splitLike=r=>r>=1.8||r<=0.55;
-function _barsSane(bars, isJump=r=>Math.abs(r-1)>=0.35){
+function _barsSane(bars, isJump=_splitLike){
   if(!bars || bars.length<3) return true;   // nothing to judge
   let jumps=0;
   for(let i=1;i<bars.length;i++){
@@ -2573,7 +2574,7 @@ async function validateExact(list, scr, onProgress, signal){
         // "no bars" is a fetch that failed and the screeners fall back, while
         // this is positive evidence the numbers are wrong. Nothing can be
         // verified against it, so the row is dropped outright.
-        const bars=(raw && !_barsSane(raw, scr==='winners' ? _splitLike : undefined)) ? null : raw;
+        const bars=(raw && !_barsSane(raw)) ? null : raw;
         if(raw && !bars) r._exactFail=true;
         // Bars are already in hand for every screener that gets here, so the
         // base shape and the RS line come for free — they annotate the row
