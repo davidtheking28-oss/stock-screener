@@ -201,6 +201,13 @@
       _rangeBreakout(bars(path([...range, [90, 86]])))?.kind !== 'breakout');
     const gsrc = _cleanbaseExactFail.toString();
     check('cleanbase exact gate tries the range setup', /_rangeBreakout\(doneT\)/.test(gsrc));
+    const rowR = { via: ['range'], vcp: null };
+    const flatBars = bars(path([...range, [90, 86]]));
+    check('a range-only candidate is rejected unless it has a range setup',
+      _cleanbaseExactFail({ ...rowR }, bars(path([[100, 100]])), {}) === true);
+    check('the range-only path never accepts the tight/quiet/thrust paths',
+      /rangeOnly/.test(gsrc) && /r\.via\[0\]==='range'/.test(gsrc));
+    check('cleanbase pool adds trending names for the range setup', /r\.via=\['range'\]/.test(_cleanbaseUniverse.toString()));
   }
 
   // ── applyFilters: Commodities fixed-ticker membership ──

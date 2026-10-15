@@ -2519,6 +2519,12 @@ function _cleanbaseExactFail(r, bars, opts={}){
   // strict-source rule: being this close to the 52-week high is the trend proof
   // (user's call 2026-10-08 — AAPL/XOM/CVX/FROG via the momentum screen count).
   const doneT=_completedBars(bars), tn=_tightNearHigh(doneT);
+  const rangeOnly=r.via?.length===1 && r.via[0]==='range';
+  if(rangeOnly){
+    const rbo=_rangeBreakout(doneT);
+    if(!rbo) return true;
+    r.rangeSetup=rbo; return false;
+  }
   const pT=_weakPullback(doneT), qT=_quietPause(doneT);
   if(_tightNearHighOK(tn) && pT && pT.newHigh<=2 && (r.vcp?.distToPivot==null || (r.vcp.distToPivot<=2 && r.vcp.distToPivot>=-4))
      && (r.dollarVol??0)>=35e6
@@ -2575,7 +2581,8 @@ function _cleanbaseExactFail(r, bars, opts={}){
 // its first await, so _asScreener only has to be set around the call itself.
 const CLEANBASE_SOURCES=['sepa','power','vcp','qulla','finviz','growth'];
 const CLEANBASE_STRICT=['sepa','power','vcp','qulla'];
-const CLEANBASE_VIA={sepa:'SEPA',power:'Power',vcp:'VCP',qulla:'Qulla',finviz:'מומנטום',growth:'פונדמנטלי'};
+const CLEANBASE_VIA={sepa:'SEPA',power:'Power',vcp:'VCP',qulla:'Qulla',finviz:'מומנטום',growth:'פונדמנטלי',range:'טווח'};
+const _viaName=k=>SCREENERS[k]?.name ?? 'מגמה עולה + טווח שטוח';
 async function _cleanbaseUniverse(universe, rsMap, signal){
   // cleanbase's own panel still narrows the pool (e.g. no entry right before a
   // report), read now, before any source screener's defaults are swapped in.
@@ -2604,6 +2611,19 @@ async function _cleanbaseUniverse(universe, rsMap, signal){
       if(seen) seen.via.push(s); else { r.via=[s]; byT.set(r.ticker, r); }
     }
   }
+  // A flat-topped range is a base in its own right, so it must not depend on
+  // the name also passing a momentum screen. Coarse cut only (uptrend above the
+  // 50/200-day); _cleanbaseExactFail measures the range itself from the bars
+  // and, for these rows, accepts nothing else.
+  _asScreener='finviz';
+  try{
+    for(const r of applyFilters(universe, rsMap).filter(keep)){
+      if(byT.has(r.ticker)) continue;
+      const d=r.d;
+      if(!(r.close>d[C.SMA50] && r.close>d[C.SMA200] && d[C.SMA50]>d[C.SMA200])) continue;
+      r.via=['range']; byT.set(r.ticker, r);
+    }
+  } finally { _asScreener=null; }
   return [...byT.values()];
 }
 const _high50=bars=>Math.max(...bars.slice(-50).map(b=>b.h));
@@ -5098,7 +5118,7 @@ function renderGallery(srcRows){
     // the Trend Template looked identical to one that passes, as soon as you
     // switched the watchlist to גרפים.
     const viaB = (!fromWatchlist && r.via?.length)
-      ? '<span class="earn-badge" title="עוברת את הקריטריונים של: '+r.via.map(k=>SCREENERS[k].name).join(', ')+'">'+r.via.map(k=>CLEANBASE_VIA[k]).join(' · ')+'</span>' : '';
+      ? '<span class="earn-badge" title="עוברת את הקריטריונים של: '+r.via.map(_viaName).join(', ')+'">'+r.via.map(k=>CLEANBASE_VIA[k]).join(' · ')+'</span>' : '';
     const ttB = (fromWatchlist && r.ttPass===false)
       ? '<span class="tt-badge" title="במעקב, אך אינה עוברת כרגע את ה-Trend Template">מחוץ למגמה</span>' : '';
     const priceStr = r.close>=100 ? Math.round(r.close).toLocaleString('en-US') : r.close.toFixed(2);
