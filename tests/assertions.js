@@ -410,6 +410,16 @@
     check('_closedSessionKey: Saturday belongs to Friday\'s close', _closedSessionKey(utc('2026-09-26T16:00:00')) === '2026-09-25');
     check('_closedSessionKey: market hours have no closed-session key', _closedSessionKey(utc('2026-09-22T14:00:00')) === null);
     check('_closedSessionKey: after the close it is that day', _closedSessionKey(utc('2026-09-22T21:00:00')) === '2026-09-22');
+    check('_resultsBehindSession: a scan from mid-session is behind once that session closes',
+      _resultsBehindSession(utc('2026-09-22T16:00:00'), utc('2026-09-22T21:00:00')) === true);
+    check('_resultsBehindSession: last night\'s scan is current pre-market',
+      _resultsBehindSession(utc('2026-09-22T23:00:00'), utc('2026-09-23T12:00:00')) === false);
+    check('_resultsBehindSession: Friday evening\'s scan is current all weekend',
+      _resultsBehindSession(utc('2026-09-25T22:00:00'), utc('2026-09-27T15:00:00')) === false);
+    check('_resultsBehindSession: two-day-old scan is behind',
+      _resultsBehindSession(utc('2026-09-21T23:00:00'), utc('2026-09-23T12:00:00')) === true);
+    check('_resultsBehindSession: intraday is left to the 30-minute stale link',
+      _resultsBehindSession(utc('2026-09-22T14:00:00'), utc('2026-09-22T18:00:00')) === false);
     check('_closedSessionKey: pre-market it is the previous weekday', _closedSessionKey(utc('2026-09-22T12:00:00')) === '2026-09-21'
       && _closedSessionKey(utc('2026-09-21T12:00:00')) === '2026-09-18', 'got ' + _closedSessionKey(utc('2026-09-21T12:00:00')));
     const fri = { t: utc('2026-09-25T21:00:00'), key: _closedSessionKey(utc('2026-09-25T21:00:00')) };

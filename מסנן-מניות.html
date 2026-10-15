@@ -2913,6 +2913,10 @@ function saveResultsCache(){
 // Returns whether a cached scan for the CURRENT activeScreener was actually
 // applied — setScreener uses this to tell "nothing to restore" from "restored
 // instantly" when switching screeners.
+function _resultsBehindSession(time, now=Date.now()){
+  const k=_closedSessionKey(now);
+  return k!==null && _closedSessionKey(time)!==k;
+}
 function loadResultsCache(){
   try {
     const raw = localStorage.getItem(RESULTS_CACHE_KEY);
@@ -2920,6 +2924,7 @@ function loadResultsCache(){
     const {allResults:ar, scr, time, nt} = JSON.parse(raw);
     if(Date.now() - time > 24*60*60*1000){ localStorage.removeItem(RESULTS_CACHE_KEY); return false; }
     if(scr && scr !== activeScreener) return false;
+    if(_resultsBehindSession(time)){ setTimeout(()=>scan(true)); return false; }
     allResults = ar; _dataGen++;
     if(Array.isArray(nt) && new Date(time).toDateString()===new Date().toDateString()) newToday = new Set(nt);
     applySectorFilter(); sortResults();
