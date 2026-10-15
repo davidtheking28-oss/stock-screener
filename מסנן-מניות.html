@@ -49,6 +49,7 @@
 .filter-panel.wl-mode { display:none; }
 #wlSyncStatus{font-size:12px;color:var(--text2);line-height:1.5;padding:4px 8px;border:1px solid var(--border2);border-radius:var(--r2)}
 #wlSyncStatus[data-state="error"]{color:var(--red)}
+@media (max-width: 600px){ .topbar-end{flex-shrink:1;min-width:0} #wlSyncStatus{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0} }
 </style>
 <script>const _thq=new URLSearchParams(location.search).get('theme');if(_thq==='tj'||_thq==='tj-light')document.documentElement.dataset.theme=_thq;</script>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
@@ -712,12 +713,16 @@ tbody tr:last-child td { border-bottom: none; }
 .gcard-symline { display: flex; align-items: baseline; gap: 7px; }
 .gcard-sym { font: 700 15.5px var(--mono); letter-spacing: 0.3px; color: var(--text); }
 .gcard-price { font: 600 12px var(--mono-data); color: var(--text2); font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
-.gcard-name { font: 500 12px var(--sans); color: var(--text3); margin-top: 2px; letter-spacing: 0.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; direction: ltr; text-align: right; }
+.gcard-name { font: 500 12px var(--sans); color: var(--text3); margin-top: 2px; letter-spacing: 0.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; direction: ltr; text-align: right; }
 /* Badges used to be flex-shrink:0 while the ticker side could not shrink either,
    so on a ~380px tablet card a long sector name ("Cons. Discretionary") pushed
    the RS badge over the price. The sector badge now gives way (ellipsis); RS and
    the ticker/price never do. */
 .gcard-left { flex: 0 0 auto; }
+/* On a phone the 44px star plus a 140px name left 98px for RS + sector (120 needed),
+   so the sector label collapsed to a bare "#6". The name truncates first instead. */
+.gcard { container-type: inline-size; }
+@container (max-width: 360px) { .gcard-name { max-width: 110px; } }
 .gcard-badges { display: flex; align-items: center; gap: 5px; flex-shrink: 1; min-width: 0; }
 .gcard-badges .gbadge { flex-shrink: 0; }
 .gcard-badges .gbadge ~ .gbadge { flex-shrink: 1; min-width: 0; }
@@ -2907,7 +2912,7 @@ function _updateWlSyncStatus(){
   else if(_wlReadError){state='error';text='לא ניתן לאמת סנכרון — רענן כשיש חיבור';}
   else if(!_wlLoaded){state='loading';text='בודק סנכרון עם החשבון…';}
   else {state='saved';text='מסונכרן עם החשבון';}
-  el.dataset.state=state;el.textContent=text;
+  el.dataset.state=state;el.textContent=text;el.title=text;
 }
 async function saveWL(ticker, adding, previousAddedAt){
   _wlRevision++;
