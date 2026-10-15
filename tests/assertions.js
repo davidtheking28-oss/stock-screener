@@ -163,6 +163,10 @@
     const out = tickers(applyFilters(uni, rs));
     check('applyFilters winners: only the stock passing all five gates survives', eqSet(out, ['PASS']), 'got ' + JSON.stringify(out));
     const bars = (hi, n=60) => Array.from({ length: n }, (_, i) => ({ t: i, o: 100, h: i === 5 ? hi : 101, l: 99, c: 100, v: 1 }));
+    const gappy = Array.from({ length: 60 }, (_, i) => ({ t: i, o: 1, h: 1, l: 1, c: i < 20 ? 100 : i < 40 ? 140 : 192, v: 1 }));
+    const flip = Array.from({ length: 60 }, (_, i) => ({ t: i, o: 1, h: 1, l: 1, c: i % 2 ? 50 : 100, v: 1 }));
+    check('winners keep a series with two real +40% earnings gaps; the default screeners still drop it', _barsSane(gappy, _splitLike) === true && _barsSane(gappy) === false);
+    check('winners still drop a series that flips between split-sized scales', _barsSane(flip, _splitLike) === false);
     check('_high50: highest high of the LAST 50 sessions, ignoring older spikes', _high50(bars(500)) === 101 && _high50(bars(500, 55)) === 500);
     check('_winnersNearHigh: 0-10% below the 50-day high passes, further fails',
       _winnersNearHigh(95, 100, 10) === true && _winnersNearHigh(89, 100, 10) === false && _winnersNearHigh(100, 100, 10) === true);
