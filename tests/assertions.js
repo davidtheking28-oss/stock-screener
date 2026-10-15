@@ -147,21 +147,28 @@
   {
     setScreener('winners', true);
     const base = { close: 100, SMA50: 90, SMA200: 70, price_52_week_high: 105, price_52_week_low: 40,
-      'High.3M': 104, beta_1_year: 1.5, relative_volume_10d_calc: 0.6,
+      'High.1M': 104, beta_5_year: 1.5,
       market_cap_basic: 5e9, average_volume_10d_calc: 1e6, average_volume_90d_calc: 1e6, volume: 6e5,
       'Perf.Y': 150, description: 'x', exchange: 'NASDAQ' };
     const uni = [
       mkStock('W:PASS', { ...base, name: 'PASS' }),
       mkStock('W:SLOW', { ...base, name: 'SLOW', 'Perf.Y': 60 }),
-      mkStock('W:FARHI', { ...base, name: 'FARHI', 'High.3M': 130 }),
-      mkStock('W:LOWBETA', { ...base, name: 'LOWBETA', beta_1_year: 0.8 }),
-      mkStock('W:HOTVOL', { ...base, name: 'HOTVOL', relative_volume_10d_calc: 1.8 }),
+      mkStock('W:FARHI', { ...base, name: 'FARHI', 'High.1M': 130 }),
+      mkStock('W:LOWBETA', { ...base, name: 'LOWBETA', beta_5_year: 0.8 }),
+      mkStock('W:HOTVOL', { ...base, name: 'HOTVOL', volume: 2e6 }),
       mkStock('W:THIN', { ...base, name: 'THIN', average_volume_10d_calc: 5e4, average_volume_90d_calc: 5e4 }),
-      mkStock('W:NOBETA', { ...base, name: 'NOBETA', beta_1_year: null }),
+      mkStock('W:NOBETA', { ...base, name: 'NOBETA', beta_5_year: null }),
     ];
     const rs = {}; uni.forEach(u => { rs[u.s] = 80; });
     const out = tickers(applyFilters(uni, rs));
     check('applyFilters winners: only the stock passing all five gates survives', eqSet(out, ['PASS']), 'got ' + JSON.stringify(out));
+    const bars = (hi, n=60) => Array.from({ length: n }, (_, i) => ({ t: i, o: 100, h: i === 5 ? hi : 101, l: 99, c: 100, v: 1 }));
+    check('_high50: highest high of the LAST 50 sessions, ignoring older spikes', _high50(bars(500)) === 101 && _high50(bars(500, 55)) === 500);
+    check('_winnersNearHigh: 0-10% below the 50-day high passes, further fails',
+      _winnersNearHigh(95, 100, 10) === true && _winnersNearHigh(89, 100, 10) === false && _winnersNearHigh(100, 100, 10) === true);
+    check('winners: relative volume is today over the 3-month average (Finviz), not the 10-day average',
+      applyFilters([mkStock('W:R', { ...base, name: 'R', volume: 5e5, average_volume_10d_calc: 1e5 })], { 'W:R': 80 })[0]?.rvol === 0.5);
+    check('winners defaults: price and market cap are Any, as on Finviz', SCREENER_DEFAULTS.winners.priceMin === 0 && SCREENER_DEFAULTS.winners.mcMin === 0);
     const row = applyFilters([mkStock('W:PASS', { ...base, name: 'PASS' })], { 'W:PASS': 80 })[0];
     check('winners score: a stock on its high with a year +150% scores above one 20% off', calcScore(row, 'winners') > calcScore({ ...row, fromHighPct: -20, perfY: 110 }, 'winners'));
     setScreener('sepa', true);

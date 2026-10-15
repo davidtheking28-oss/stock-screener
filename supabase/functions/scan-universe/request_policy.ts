@@ -1,6 +1,6 @@
 // Three fixed public queries keep cache cardinality bounded and prevent callers
 // from turning this endpoint into a generic TradingView proxy.
-export const COLUMNS = ["name","description","close","SMA50","SMA150","SMA200","price_52_week_high","price_52_week_low","Perf.Y","earnings_per_share_diluted_yoy_growth_fq","earnings_per_share_diluted_qoq_growth_fq","total_revenue_qoq_growth_fq","total_revenue_yoy_growth_fq","return_on_equity_fq","net_margin","sector","market_cap_basic","volume","exchange","average_volume_10d_calc","earnings_release_next_date","Volatility.D","Volatility.M","Perf.3M","Perf.6M","EMA10","EMA20","Perf.W","average_volume_30d_calc","average_volume_90d_calc","earnings_per_share_diluted_ttm","earnings_per_share_forecast_next_fy","net_margin_fy","ADR","beta_1_year","High.3M","relative_volume_10d_calc"];
+export const COLUMNS = ["name","description","close","SMA50","SMA150","SMA200","price_52_week_high","price_52_week_low","Perf.Y","earnings_per_share_diluted_yoy_growth_fq","earnings_per_share_diluted_qoq_growth_fq","total_revenue_qoq_growth_fq","total_revenue_yoy_growth_fq","return_on_equity_fq","net_margin","sector","market_cap_basic","volume","exchange","average_volume_10d_calc","earnings_release_next_date","Volatility.D","Volatility.M","Perf.3M","Perf.6M","EMA10","EMA20","Perf.W","average_volume_30d_calc","average_volume_90d_calc","earnings_per_share_diluted_ttm","earnings_per_share_forecast_next_fy","net_margin_fy","ADR","beta_5_year","High.1M"];
 const COMMODITIES = ["GLD","SLV","COPX","WEAT","CORN","UNG","PALL","PPLT","UGA","USO","CANE","URA"];
 function stable(value:unknown):string {
   if(Array.isArray(value)) return '['+value.map(stable).join(',')+']';
@@ -19,7 +19,7 @@ function signature(body:unknown):string {
 }
 export function normalizeScanRequest(body:unknown){
   const sig=signature(body);
-  for(const [kind,query] of Object.entries(QUERIES)) if(sig===signature(query)) return {key:'scan:v3:'+kind,body:query};
+  for(const [kind,query] of Object.entries(QUERIES)) if(sig===signature(query)) return {key:'scan:v4:'+kind,body:query};
   throw Error('unsupported scan query');
 }
 export async function readScanRequest(req:Request,maxBytes=16384){

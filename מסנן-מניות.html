@@ -1462,9 +1462,10 @@ const COLUMNS = [
   // Qullamaggie gate intraday. This is TradingView's real average daily range,
   // in price units; adrPct converts it to the percentage the UI shows.
   "ADR",
-  // "Winners" screen: beta, the 3-month high (closest TradingView offers to Finviz's
-  // 50-day high) and TradingView's own relative volume.
-  "beta_1_year","High.3M","relative_volume_10d_calc"
+  // "Winners" screen: 5-year beta (Finviz's definition) and the 1-month high, which
+  // bounds the 50-day high from below so the candidate cut never drops a name the
+  // exact 50-day check (validateExact) would keep.
+  "beta_5_year","High.1M"
 ];
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
@@ -1492,7 +1493,7 @@ const SCREENER_DEFAULTS = {
   cleanbase: {rsMin:70,fromHigh:25,fromLow:30,priceMin:10,mcMin:0.3,liqMin:10,earnDays:5,vcpContractions:3,vcpDepthMax:12,pivotBelow:10},
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:4,move6Min:30,move3Min:30,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1,finvizFromHigh:25},
-  winners:  {priceMin:1,mcMin:0.1,liqMin:0,earnDays:0,winPerfY:100,winFromHigh:10,winBetaMin:1,winVolMin:0.1,winRelVolMax:1},
+  winners:  {priceMin:0,mcMin:0,liqMin:0,earnDays:0,winPerfY:100,winFromHigh:10,winBetaMin:1,winVolMin:0.1,winRelVolMax:1},
   growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
   commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
 };
@@ -2533,9 +2534,12 @@ async function _cleanbaseUniverse(universe, rsMap, signal){
   }
   return [...byT.values()];
 }
+const _high50=bars=>Math.max(...bars.slice(-50).map(b=>b.h));
+const _winnersNearHigh=(close, high50, pct)=>close>=high50*(1-pct/100);
 async function validateExact(list, scr, onProgress, signal){
   signal?.throwIfAborted();
-  if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp'&&scr!=='cleanbase')||!HAS_SUPABASE||!list.length) return list;
+  if((scr!=='sepa'&&scr!=='power'&&scr!=='qulla'&&scr!=='vcp'&&scr!=='cleanbase'&&scr!=='winners')||!HAS_SUPABASE||!list.length) return list;
+  const winFromHigh=num('winFromHigh');
   const runMin=num('runMin')||100, total=list.length; let done=0, idx=0;
   const adrMin=num('adrMin')||4, emaDistMax=num('emaDistMax')||3.5, weekMax=num('weekRangeMax')||7;
   const move3Min=num('move3Min')||0, move6Min=num('move6Min')||0;
@@ -2577,6 +2581,12 @@ async function validateExact(list, scr, onProgress, signal){
           if(_vcpExactFail(r, bars, vcpOpts)) r._exactFail=true;
         } else if(scr==='cleanbase'){
           if(_cleanbaseExactFail(r, bars, vcpOpts)) r._exactFail=true;
+        } else if(scr==='winners'){
+          // Finviz's "50-Day High/Low": the highest high of the last 50 sessions.
+          if(bars && bars.length>=50){
+            r.high50=_high50(bars);
+            if(!_winnersNearHigh(r.close, r.high50, winFromHigh)) r._exactFail=true;
+          }
         } else if(scr==='qulla'){
           if(_qullaExactOK(bars, adrMin, emaDistMax, weekMax, move3Min, move6Min)===false) r._exactFail=true;
         } else {
@@ -2594,7 +2604,7 @@ async function validateExact(list, scr, onProgress, signal){
           }
         }
         if(!r._exactFail){
-          const enough=bars?.length && (scr==='sepa' ? _ma200Rising(bars)!==null : scr==='power' ? bars.length>=45 : scr==='qulla' ? bars.length>=Math.max(25,move6Min>0?127:0,move3Min>0?64:0) : true);
+          const enough=bars?.length && (scr==='sepa' ? _ma200Rising(bars)!==null : scr==='power' ? bars.length>=45 : scr==='qulla' ? bars.length>=Math.max(25,move6Min>0?127:0,move3Min>0?64:0) : scr==='winners' ? bars.length>=50 : true);
           r.validation={status:enough?'verified':'approximate', asOf:bars?.at(-1)?.t||null};
         }
       }catch(e){ if(signal?.aborted) throw e; r.validation={status:'approximate',asOf:null}; }
@@ -3611,6 +3621,9 @@ function setScreener(key, applyDef=true){
   if(switching) _maybeReportScreenerReviewed(true);
   activeScreener=key;
   _screenerActiveSince=Date.now();
+  // Finviz orders this screen by 52-week high (relative), nearest first.
+  if(key==='winners' && (switching || !localStorage.getItem('sepa_sort_screen'))){ _sortByMode.screen={key:'fromHigh',dir:-1}; sortKey='fromHigh'; sortDir=-1; }
+  else if(prevScreener==='winners' && switching && _sortByMode.screen.key==='fromHigh'){ _sortByMode.screen={key:'score',dir:-1}; sortKey='score'; sortDir=-1; }
   if(switching){
     // RESULTS_CACHE_KEY only ever holds ONE screener's scan at a time, so
     // switching screeners almost never has anything to restore instantly —
@@ -3878,7 +3891,7 @@ async function scan(force=false){
     _dataGen++;
     if(myToken!==_scanToken) return;
     allResults.forEach(r=>{ r.score=calcScore(r, activeScreener); r.scoreKind=activeScreener; });
-    const needsExact = activeScreener==='sepa' || activeScreener==='power' || activeScreener==='qulla' || activeScreener==='vcp' || activeScreener==='cleanbase';
+    const needsExact = activeScreener==='sepa' || activeScreener==='power' || activeScreener==='qulla' || activeScreener==='vcp' || activeScreener==='cleanbase' || activeScreener==='winners';
     if(myToken!==_scanToken) return;
 
     if(!isCommodities){
@@ -4149,7 +4162,10 @@ function applyFilters(universe, rsMap, opts={}){
     const adrRaw=d[C.ADR];
     const adrPct=(adrRaw!=null && close>0) ? adrRaw/close*100 : volD;
     const vr=(vol!=null&&avgVol)?vol/avgVol:null;
-    const beta=d[C.beta_1_year], hi3m=d[C['High.3M']], rvol=d[C.relative_volume_10d_calc]??vr;
+    const beta=d[C.beta_5_year], hi1m=d[C['High.1M']];
+    // Finviz relative volume is today's volume over the 3-month average.
+    const avg3m=d[C.average_volume_90d_calc]??d[C.average_volume_30d_calc]??avgVol;
+    const rvol=(vol!=null&&avg3m)?vol/avg3m:null;
     const perfY=d[C['Perf.Y']], perf3=d[C['Perf.3M']], perf6=d[C['Perf.6M']];
     const eps=d[C.earnings_per_share_diluted_yoy_growth_fq],
           epsQoq=d[C['earnings_per_share_diluted_qoq_growth_fq']],
@@ -4228,7 +4244,9 @@ function applyFilters(universe, rsMap, opts={}){
     } else if(scr==='winners'){
       const avgW=d[C.average_volume_90d_calc]??d[C.average_volume_30d_calc]??avgVol;
       const perfOk=perfY!=null && perfY>=num('winPerfY');
-      const nearOk=hi3m!=null && close>=hi3m*(1-num('winFromHigh')/100);
+      // Candidate cut only: High.1M <= the 50-day high, so this keeps every name the
+      // exact check can keep. validateExact applies the real 50-day high.
+      const nearOk=hi1m!=null && close>=hi1m*(1-num('winFromHigh')/100);
       const betaOk=num('winBetaMin')<=0 || (beta!=null && beta>=num('winBetaMin'));
       const volOk=avgW!=null && avgW>=num('winVolMin')*1e6;
       const rvolOk=rvol!=null && rvol<=num('winRelVolMax');
