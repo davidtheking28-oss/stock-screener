@@ -717,8 +717,9 @@ tbody tr:last-child td { border-bottom: none; }
    so on a ~380px tablet card a long sector name ("Cons. Discretionary") pushed
    the RS badge over the price. The sector badge now gives way (ellipsis); RS and
    the ticker/price never do. */
-.gcard-left { flex: 0 0 auto; }
-.gcard-badges { display: flex; align-items: center; gap: 5px; flex-shrink: 1; min-width: 0; }
+.gcard-left { flex: 0 1 auto; }
+.gcard-badges { flex-shrink: 0; }
+.gcard-badges { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .gcard-badges .gbadge { flex-shrink: 0; }
 .gcard-badges .gbadge ~ .gbadge { flex-shrink: 1; min-width: 0; }
 .gcard-badges .gbadge ~ .gbadge .gb-lbl { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -5148,7 +5149,7 @@ function renderGallery(srcRows){
     // The same badge renderTable draws. Without it a watchlist name that fails
     // the Trend Template looked identical to one that passes, as soon as you
     // switched the watchlist to גרפים.
-    const viaB = (!fromWatchlist && r.via?.length)
+    const viaB = (!fromWatchlist && r.via?.length && !(r.via.length===1 && r.via[0]==='range'))
       ? '<span class="earn-badge" title="עוברת את הקריטריונים של: '+r.via.map(_viaName).join(', ')+'">'+r.via.map(k=>CLEANBASE_VIA[k]).join(' · ')+'</span>' : '';
     const ttB = (fromWatchlist && r.ttPass===false)
       ? '<span class="tt-badge" title="במעקב, אך אינה עוברת כרגע את ה-Trend Template">מחוץ למגמה</span>' : '';
