@@ -1479,7 +1479,7 @@ const SCREENERS = {
   sepa:     {name:'Minervini SEPA',      sub:'Trend Template + SEPA',  fund:true,  presets:true},
   power:    {name:'Power Play',           sub:'ריצה נפיצה + דשדוש הדוק', fund:false, presets:false},
   vcp:      {name:'VCP / פריצה',        sub:'בסיס VCP מתהדק + מחיר צמוד לנקודת הפריצה', fund:false, presets:false},
-  cleanbase: {name:'בסיס נקי',           sub:'עוברת מסנן קיים + התכווצות, נרות קטנים וווליום יורד · או טווח עם תקרה שטוחה מעל ממוצע 21', fund:false, presets:false},
+  cleanbase: {name:'בסיס נקי',           sub:'עוברת מסנן קיים + התכווצות, נרות קטנים וווליום יורד · או טווח עם תקרה שטוחה מעל ממוצע 21 · או חזרה לשיא קודם', fund:false, presets:false},
   qulla:    {name:'Qullamaggie',          sub:'Breakout — מהלך גדול + דשדוש צמוד ל-EMA', fund:false, presets:false},
   finviz:   {name:'מומנטום שנתי',         sub:'שנה +30% · מעל SMA50/200 · קרוב לשיא', fund:false, presets:false},
   winners:  {name:'מנצחי השנה',            sub:'שנה +100% · ליד שיא 50 יום · בטא>1 · נפח שקט', fund:false, presets:false},
@@ -2514,7 +2514,28 @@ function _rangeBreakout(bars, P=RB){
   }
   return null;
 }
-const RB_LABEL={forming:'טווח · תחת התקרה', breakout:'פריצת טווח', retest:'חזרה ל-21'};
+// A stock that ran 20%+, gave back 8-35%, and is now back at that high without having
+// closed over it: base-on-base, the shape of APPN. Looser than a range on purpose in
+// height and shape, so the rest is tight: above a rising 21DMA and the 50DMA, from
+// 1.5% under the high to 4% over it. Measured live 2026-10-16: 33 of 432 candidates.
+function _priorHighRetest(bars){
+  if(!bars || bars.length<110) return null;
+  const n=bars.length, c=bars.map(b=>b.c), h=bars.map(b=>b.h), l=bars.map(b=>b.l), s=n-60;
+  let top=-Infinity, ti=-1;
+  for(let i=s;i<n-5;i++) if(h[i]>top){ top=h[i]; ti=i; }
+  if(n-1-ti<10) return null;
+  const dd=(1-Math.min(...l.slice(ti))/top)*100;
+  if(dd<8 || dd>35) return null;
+  const last=c[n-1], dist=(last/top-1)*100;
+  if(dist<-1.5 || dist>4) return null;
+  const leg=(top/Math.min(...l.slice(Math.max(0,ti-40),ti+1))-1)*100;
+  if(leg<20) return null;
+  if(!(last>_sma(c,n-1,21) && _sma(c,n-1,21)>_sma(c,n-6,21) && last>_sma(c,n-1,50))) return null;
+  for(let i=ti+1;i<n-1;i++) if(c[i]>top*1.005) return null;
+  return {kind:'highretest', top, touches:2, height:dd, since:null, distPct:dist, leg};
+}
+const _rangeSetup=bars=>_rangeBreakout(bars)||_priorHighRetest(bars);
+const RB_LABEL={forming:'טווח · תחת התקרה', breakout:'פריצת טווח', retest:'חזרה ל-21', highretest:'חזרה לשיא קודם'};
 function _cleanbaseExactFail(r, bars, opts={}){
   if(!bars || _ma200Rising(bars)===false) return true;
   // Same guards as the quiet path below, minus the VCP leg sequence and the
@@ -2523,7 +2544,7 @@ function _cleanbaseExactFail(r, bars, opts={}){
   const doneT=_completedBars(bars), tn=_tightNearHigh(doneT);
   const rangeOnly=r.via?.length===1 && r.via[0]==='range';
   if(rangeOnly){
-    const rbo=_rangeBreakout(doneT);
+    const rbo=_rangeSetup(doneT);
     if(!rbo) return true;
     r.rangeSetup=rbo; return false;
   }
@@ -2535,7 +2556,7 @@ function _cleanbaseExactFail(r, bars, opts={}){
     r.pause={kind:'tight', volAvg:tn.volAvg, rangeMax:tn.r5};
     return false;
   }
-  const rb=_rangeBreakout(doneT);
+  const rb=_rangeSetup(doneT);
   if(rb){ r.rangeSetup=rb; return false; }
   const v=r.vcp;
   if(!v || !Array.isArray(v.depths) || v.depths.length<2 || v.contractions < (opts.minC ?? 3)) return true;
@@ -2795,7 +2816,10 @@ function _rgbColor(c){
 }
 function rangeBadgeHtml(r){
   const g=r.rangeSetup; if(!g) return '';
-  return '<span class="earn-badge" title="טווח צדדי עם תקרה שטוחה ('+g.touches+' נגיעות, גובה '+g.height.toFixed(1)+'%) מעל ממוצע 21 · תקרה $'+g.top.toFixed(2)+'">'+RB_LABEL[g.kind]+'</span>';
+  const tip=g.kind==='highretest'
+    ? 'עלייה של '+g.leg.toFixed(0)+'%, תיקון של '+g.height.toFixed(0)+'% וחזרה לשיא הקודם $'+g.top.toFixed(2)
+    : 'טווח צדדי עם תקרה שטוחה ('+g.touches+' נגיעות, גובה '+g.height.toFixed(1)+'%) מעל ממוצע 21 · תקרה $'+g.top.toFixed(2);
+  return '<span class="earn-badge" title="'+tip+'">'+RB_LABEL[g.kind]+'</span>';
 }
 function earnBadgeHtml(earnIn){
   if(earnIn==null || earnIn<0 || earnIn>14) return '';

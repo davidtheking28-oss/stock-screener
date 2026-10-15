@@ -203,7 +203,18 @@
     check('range setup: a high-flying breakout more than 4% over the ceiling is chasing, not entry 1',
       _rangeBreakout(bars(path([...range, [90, 86]])))?.kind !== 'breakout');
     const gsrc = _cleanbaseExactFail.toString();
-    check('cleanbase exact gate tries the range setup', /_rangeBreakout\(doneT\)/.test(gsrc));
+    check('cleanbase exact gate tries the range setup', /_rangeSetup\(doneT\)/.test(gsrc));
+    const hr = path([[0, 40], [60, 60], [70, 90], [75, 80], [82, 62], [95, 76], [110, 88], [119, 89.8]]);
+    check('prior-high retest: ran 20%+, fell 8-35%, back under the old high -> highretest',
+      _priorHighRetest(bars(hr))?.kind === 'highretest', JSON.stringify(_priorHighRetest(bars(hr))));
+    check('prior-high retest: a stock still 8% under its high is not there yet',
+      _priorHighRetest(bars(path([[0, 40], [60, 60], [70, 90], [82, 62], [119, 82]]))) === null);
+    check('prior-high retest: a stock already 8% over its old high is chasing',
+      _priorHighRetest(bars(path([[0, 40], [60, 60], [70, 90], [82, 62], [110, 88], [119, 98]]))) === null);
+    check('prior-high retest: a drop of only 5% is a flag, not a base',
+      _priorHighRetest(bars(path([[0, 40], [60, 60], [70, 90], [78, 85.5], [119, 89]]))) === null);
+    check('prior-high retest: a plain uptrend making new highs is not a retest',
+      _priorHighRetest(bars(path([[0, 50], [119, 130]]))) === null);
     const rowR = { via: ['range'], vcp: null };
     const flatBars = bars(path([...range, [90, 86]]));
     check('a range-only candidate is rejected unless it has a range setup',
