@@ -1479,7 +1479,7 @@ const SCREENERS = {
   sepa:     {name:'Minervini SEPA',      sub:'Trend Template + SEPA',  fund:true,  presets:true},
   power:    {name:'Power Play',           sub:'ריצה נפיצה + דשדוש הדוק', fund:false, presets:false},
   vcp:      {name:'VCP / פריצה',        sub:'בסיס VCP מתהדק + מחיר צמוד לנקודת הפריצה', fund:false, presets:false},
-  cleanbase: {name:'בסיס נקי',           sub:'עוברת מסנן קיים + התכווצות, נרות קטנים וווליום יורד', fund:false, presets:false},
+  cleanbase: {name:'בסיס נקי',           sub:'עוברת מסנן קיים + התכווצות, נרות קטנים וווליום יורד · או טווח עם תקרה שטוחה מעל ממוצע 21', fund:false, presets:false},
   qulla:    {name:'Qullamaggie',          sub:'Breakout — מהלך גדול + דשדוש צמוד ל-EMA', fund:false, presets:false},
   finviz:   {name:'מומנטום שנתי',         sub:'שנה +30% · מעל SMA50/200 · קרוב לשיא', fund:false, presets:false},
   winners:  {name:'מנצחי השנה',            sub:'שנה +100% · ליד שיא 50 יום · בטא>1 · נפח שקט', fund:false, presets:false},
@@ -2456,6 +2456,63 @@ function _tightNearHigh(bars){
 function _tightNearHighOK(tn){
   return !!tn && tn.adr>=1 && tn.off52w>=-8 && tn.vs50>=0 && tn.span15<=3.5 && tn.r5<=1.6 && tn.off10>=-1.5;
 }
+// "Master swing setup - range breakout": a stock that has already run, then chops
+// sideways under a FLAT ceiling it keeps testing (3+ touches, real pullbacks of 3%+
+// between them) while it holds the rising 21-day average. Entry 1 is the close above
+// that ceiling; entry 2 is the first pullback back to the 21-day average after it.
+// Calibrated on the live pool 2026-10-15 (514 names -> 11): a looser range height or
+// no flatness test lets in plain uptrends riding the 21DMA (TMO, JOYY), and without a
+// minimum height it lets in deal-pegged stocks that trade at one price (UTZ, DV).
+const RB = { L:30, minHeight:5, maxHeight:14, maxDrift:6, minTouches:3, minSwing:3, zonePct:2.5, minGapBars:4,
+  above21:0.8, priorAdv:10, breakMaxExt:4, retestMaxBack:20, retestBand:2.5 };
+function _rangeBreakout(bars, P=RB){
+  if(!bars || bars.length<90) return null;
+  const n=bars.length, c=bars.map(b=>b.c), h=bars.map(b=>b.h), l=bars.map(b=>b.l);
+  const ma=i=>_sma(c,i,21);
+  const touchIdx=(s,e,top)=>{
+    const t=[]; let last=-99;
+    for(let i=s+1;i<e;i++){
+      const peak=h[i]>=h[i-1] && h[i]>=h[i+1];
+      if(peak && h[i]>=top*(1-P.zonePct/100) && i-last>=P.minGapBars){ t.push(i); last=i; }
+    }
+    if(h[e]>=top*(1-P.zonePct/100) && e-last>=P.minGapBars) t.push(e);
+    return t;
+  };
+  const last=c[n-1];
+  for(let k=0;k<=P.retestMaxBack;k++){
+    const e=n-1-k, s=e-P.L+1; if(s<45) break;
+    let top=-Infinity, low=Infinity, priorTop=-Infinity;
+    for(let i=s;i<=e;i++){ if(h[i]>top) top=h[i]; if(l[i]<low) low=l[i]; if(i<e && h[i]>priorTop) priorTop=h[i]; }
+    // The range ends on the last bar still under the ceiling the earlier bars built.
+    // Without this the breakout bar raises its own ceiling and reads as 'inside'.
+    if(c[e]>priorTop*1.005) continue;
+    const height=(top/low-1)*100;
+    if(height>P.maxHeight || height<P.minHeight) continue;
+    if(Math.abs(c[e]/c[s]-1)*100>P.maxDrift) continue;
+    let inside=true, above=0;
+    for(let i=s;i<=e;i++){ if(c[i]>top*1.005){ inside=false; break; } if(c[i]>=ma(i)) above++; }
+    if(!inside || above/P.L<P.above21 || !(ma(e)>=ma(s)) || c[s]/c[s-40]<1+P.priorAdv/100) continue;
+    const ti=touchIdx(s,e,top);
+    if(ti.length<P.minTouches || ti[0]>s+Math.round(P.L*0.6)) continue;
+    let swings=0;
+    for(let q=1;q<ti.length;q++){ let m=Infinity; for(let i=ti[q-1];i<=ti[q];i++) if(l[i]<m) m=l[i]; if(m<=top*(1-P.minSwing/100)) swings++; }
+    if(swings<P.minTouches-1) continue;
+    const out=kind=>({kind, top, touches:ti.length, height, since:null, distPct:(last/top-1)*100});
+    if(k===0){ if(last>=top*0.96 && last<=top*1.005) return out('forming'); continue; }
+    let broke=-1;
+    for(let i=e+1;i<n;i++){ if(c[i]>top){ broke=i; break; } }
+    if(broke<0){ if(last>=top*0.96) return out('forming'); continue; }
+    let held=true; for(let i=broke;i<n;i++) if(c[i]<top*0.985){ held=false; break; }
+    if(!held) continue;
+    const since=n-1-broke;
+    if(since<=3 && last<=top*(1+P.breakMaxExt/100)) return {...out('breakout'), since};
+    let peak=-Infinity; for(let i=broke;i<n;i++) if(h[i]>peak) peak=h[i];
+    const m=ma(n-1);
+    if(since>=2 && peak>=top*1.03 && last>=m*0.99 && last<=m*(1+P.retestBand/100) && ma(n-1)>ma(n-6)) return {...out('retest'), since};
+  }
+  return null;
+}
+const RB_LABEL={forming:'טווח · תחת התקרה', breakout:'פריצת טווח', retest:'חזרה ל-21'};
 function _cleanbaseExactFail(r, bars, opts={}){
   if(!bars || _ma200Rising(bars)===false) return true;
   // Same guards as the quiet path below, minus the VCP leg sequence and the
@@ -2470,6 +2527,8 @@ function _cleanbaseExactFail(r, bars, opts={}){
     r.pause={kind:'tight', volAvg:tn.volAvg, rangeMax:tn.r5};
     return false;
   }
+  const rb=_rangeBreakout(doneT);
+  if(rb){ r.rangeSetup=rb; return false; }
   const v=r.vcp;
   if(!v || !Array.isArray(v.depths) || v.depths.length<2 || v.contractions < (opts.minC ?? 3)) return true;
   const d=v.depths, last=d[d.length-1];
@@ -2713,6 +2772,10 @@ function _rgbColor(c){
   x.fillStyle=c; x.fillRect(0,0,1,1);
   const d=x.getImageData(0,0,1,1).data;
   return 'rgb('+d[0]+','+d[1]+','+d[2]+')';
+}
+function rangeBadgeHtml(r){
+  const g=r.rangeSetup; if(!g) return '';
+  return '<span class="earn-badge" title="טווח צדדי עם תקרה שטוחה ('+g.touches+' נגיעות, גובה '+g.height.toFixed(1)+'%) מעל ממוצע 21 · תקרה $'+g.top.toFixed(2)+'">'+RB_LABEL[g.kind]+'</span>';
 }
 function earnBadgeHtml(earnIn){
   if(earnIn==null || earnIn<0 || earnIn>14) return '';
@@ -3158,6 +3221,17 @@ function _calcScoreRaw(r, scr='sepa'){
     // ranked the same. 5%, carved out of moveS.
     const revS  = Math.min(clamp(r.rev??0,0,200)/200,1)*5;
     return Math.round(clamp(moveS+adrS+emaS+tightS+epsS+perfYS+rsS+revS,0,100));
+  }
+  if(scr==='cleanbase' && r.rangeSetup && !r.pause){
+    const g=r.rangeSetup;
+    const touchS = clamp((g.touches-2)/4,0,1)*20;
+    const stateS = g.kind==='breakout' ? 25-Math.min(g.since??0,3)*3
+                 : g.kind==='retest' ? 18
+                 : clamp(1-Math.abs(g.distPct)/4,0,1)*20;
+    const tightS = clamp(1-g.height/14,0,1)*20;
+    const rsS    = clamp(r.rs,0,99)/99*20;
+    const revS   = Math.min(clamp(r.rev??0,0,200)/200,1)*5;
+    return Math.round(clamp(touchS+stateS+tightS+rsS+epsScore(r.eps,10)+revS,0,100));
   }
   if(scr==='cleanbase' && r.pullback && r.pause){
     const p=r.pullback, t=r.pause, v=r.vcp;
@@ -4935,7 +5009,7 @@ function renderTable(rows){
     return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
       +'</td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה"><span class="new-badge" style="'+(isNew?'':'display:none')+'">חדש</span>'+r.ticker+earnB+ttB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+'</td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה"><span class="new-badge" style="'+(isNew?'':'display:none')+'">חדש</span>'+r.ticker+earnB+rangeBadgeHtml(r)+ttB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+'</td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
@@ -5040,7 +5114,7 @@ function renderGallery(srcRows){
     return '<div class="gcard" role="button" tabindex="0" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&event.target===this){event.preventDefault();openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')}">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
       +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
-      +((earnB||ttB||viaB)?'<div class="gcard-tags">'+viaB+earnB+ttB+'</div>':'')+'</div></div>'
+      +((earnB||ttB||viaB||r.rangeSetup)?'<div class="gcard-tags">'+viaB+rangeBadgeHtml(r)+earnB+ttB+'</div>':'')+'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+(r.rs??'—')+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+(r.rs??'—')+'</b></span>'+sectorBadgeHtml(r.sector,true)+'</div></div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'

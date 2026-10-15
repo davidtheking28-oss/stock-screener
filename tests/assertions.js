@@ -178,6 +178,31 @@
     setScreener('sepa', true);
   }
 
+  // ── cleanbase: "master swing setup - range breakout" ──
+  {
+    const path = pts => { const out = []; for (let q = 1; q < pts.length; q++) { const [i0, v0] = pts[q - 1], [i1, v1] = pts[q]; for (let i = i0; i < i1; i++) out.push(v0 + (v1 - v0) * (i - i0) / (i1 - i0)); } out.push(pts[pts.length - 1][1]); return out; };
+    const bars = cl => cl.map((c, i) => ({ t: i * 86400, o: c, h: c * 1.004, l: c * 0.996, c, v: 1000 }));
+    // 60 bars of run, then a 30-bar range under a flat 80 ceiling touched three times, higher lows
+    const range = [[0, 50], [60, 76], [63, 80], [68, 76.8], [73, 80], [79, 77.5], [84, 80], [89, 78.5]];
+    const forming = _rangeBreakout(bars(path(range)));
+    check('range setup: three touches of a flat ceiling above the 21DMA, price under it -> forming', forming?.kind === 'forming' && forming.touches >= 3, JSON.stringify(forming));
+    const broke = _rangeBreakout(bars(path([...range, [90, 81.6]])));
+    check('range setup: the first close above the ceiling -> breakout (entry 1)', broke?.kind === 'breakout' && broke.since === 0, JSON.stringify(broke));
+    const trend = path([[0, 50], [120, 130]]);
+    check('range setup: a plain uptrend riding the 21DMA is not a range', _rangeBreakout(bars(trend)) === null);
+    const pegged = path([[0, 50], [60, 76], [61, 80], [100, 80]]);
+    check('range setup: a stock pegged at one price (deal price) is not a range', _rangeBreakout(bars(pegged)) === null);
+    const twoTouches = path([[0, 50], [60, 76], [63, 80], [70, 77], [78, 80], [89, 78.5]]);
+    check('range setup: fewer than three touches of the ceiling is not enough', _rangeBreakout(bars(twoTouches)) === null);
+    const fell = path([...range.slice(0, -1), [89, 78.5], [90, 70]]);
+    check('range setup: a range that has broken DOWN is not a setup', _rangeBreakout(bars(fell)) === null);
+    check('range setup: too little history is not judged', _rangeBreakout(bars(path([[0, 50], [40, 60]]))) === null);
+    check('range setup: a high-flying breakout more than 4% over the ceiling is chasing, not entry 1',
+      _rangeBreakout(bars(path([...range, [90, 86]])))?.kind !== 'breakout');
+    const gsrc = _cleanbaseExactFail.toString();
+    check('cleanbase exact gate tries the range setup', /_rangeBreakout\(doneT\)/.test(gsrc));
+  }
+
   // ── applyFilters: Commodities fixed-ticker membership ──
   {
     setScreener('commodities', true);
