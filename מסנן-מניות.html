@@ -2615,15 +2615,13 @@ async function _cleanbaseUniverse(universe, rsMap, signal){
   // the name also passing a momentum screen. Coarse cut only (uptrend above the
   // 50/200-day); _cleanbaseExactFail measures the range itself from the bars
   // and, for these rows, accepts nothing else.
-  _asScreener='finviz';
-  try{
-    for(const r of applyFilters(universe, rsMap).filter(keep)){
-      if(byT.has(r.ticker)) continue;
-      const d=r.d;
-      if(!(r.close>d[C.SMA50] && r.close>d[C.SMA200] && d[C.SMA50]>d[C.SMA200])) continue;
-      r.via=['range']; byT.set(r.ticker, r);
-    }
-  } finally { _asScreener=null; }
+  const rawBy=new Map(universe.map(u=>[u.d[C.name], u.d]));
+  for(const r of applyFilters(universe, rsMap, {forceTickers:new Set(rawBy.keys())}).filter(keep)){
+    if(byT.has(r.ticker)) continue;
+    const d=rawBy.get(r.ticker);
+    if(!(r.close>d[C.SMA50] && r.close>d[C.SMA200] && d[C.SMA50]>d[C.SMA200])) continue;
+    r.via=['range']; byT.set(r.ticker, r);
+  }
   return [...byT.values()];
 }
 const _high50=bars=>Math.max(...bars.slice(-50).map(b=>b.h));
