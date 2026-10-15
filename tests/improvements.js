@@ -45,7 +45,7 @@
   if (typeof _galleryBarsFromValidated === 'function') {
     const now = Date.now();
     const bars = Array.from({length:250}, (_,i) => ({t:Math.floor(now/1000)-(249-i)*86400,o:100,h:101,l:99,c:100,v:1000}));
-    _valBars.set('SYNTHETIC-CACHE',{bars,t:now,key:null});
+    _valBars.set('SYNTHETIC-CACHE',{bars,t:now,key:_closedSessionKey(now)});
     const reused = await _galleryBarsFromValidated('SYNTHETIC-CACHE',now);
     check('gallery reuses validated bars in a 90-day window', reused?.length===91 && reused[0].t===bars[159].t);
     check('gallery reuse does not trim source validation history', _valBars.get('SYNTHETIC-CACHE').bars.length===250);
@@ -57,7 +57,7 @@
     const inFlight = new Promise(resolve=>{release=resolve;});
     _warmInflight.set('SYNTHETIC-CACHE',inFlight);
     const reusedPending = _galleryBarsFromValidated('SYNTHETIC-CACHE',now);
-    _valBars.set('SYNTHETIC-CACHE',{bars,t:now,key:null});
+    _valBars.set('SYNTHETIC-CACHE',{bars,t:now,key:_closedSessionKey(now)});
     release();
     check('gallery shares in-flight validation instead of a second fetch', (await reusedPending)?.length===91);
     _warmInflight.delete('SYNTHETIC-CACHE'); _valBars.delete('SYNTHETIC-CACHE');

@@ -90,3 +90,23 @@ Deno.test('too-stale but a failed live fetch falls back to the cached row', asyn
   const r = await serveCached('k', TTL, MAX, async (): Promise<{ v: string }> => { throw new Error('upstream down'); }, io);
   assertEquals(r, { data: { v: 'CACHED' }, src: 'STALE' });
 });
+
+Deno.test('a young row from before the session edge is not served ahead of a refresh', async () => {
+  const { io } = fakeIo({ data: { v: 'CACHED' }, age: 60_000 });
+  const r = await serveCached('k', TTL, MAX, fresh, io, Date.now() - 30_000);
+  assertEquals(r, { data: { v: 'FRESH' }, src: 'LIVE' });
+});
+
+Deno.test('a row refreshed after the session edge is served as usual', async () => {
+  let calls = 0;
+  const { io } = fakeIo({ data: { v: 'CACHED' }, age: 60_000 });
+  const r = await serveCached('k', TTL, MAX, async () => { calls++; return { v: 'FRESH' }; }, io, Date.now() - 120_000);
+  assertEquals(r, { data: { v: 'CACHED' }, src: 'DB' });
+  assertEquals(calls, 0);
+});
+
+Deno.test('a wrong-session row is still the fallback when the live fetch fails', async () => {
+  const { io } = fakeIo({ data: { v: 'CACHED' }, age: 60_000 });
+  const r = await serveCached('k', TTL, MAX, async () => { throw new Error('down'); }, io, Date.now() - 30_000);
+  assertEquals(r, { data: { v: 'CACHED' }, src: 'STALE' });
+});

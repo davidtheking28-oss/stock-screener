@@ -54,11 +54,16 @@ export async function serveCached<T>(
   maxStaleMs: number,
   refresh: () => Promise<T>,
   io: { get: (key: string) => Promise<{ data: T; age: number } | null>; put: (key: string, data: T) => Promise<void> } = { get: dbGet, put: dbPut },
+  // A row refreshed before this instant belongs to the wrong session (see
+  // market_hours.ts lastSessionEdgeMs). It is never served ahead of a refresh, only
+  // used as the fallback when the refresh fails.
+  notBeforeMs = 0,
 ): Promise<{ data: T; src: 'DB' | 'STALE' | 'LIVE' }> {
   const cached = await io.get(key);
-  if (cached && cached.age < ttlMs) return { data: cached.data, src: 'DB' };
+  const wrongSession = !!cached && Date.now() - cached.age < notBeforeMs;
+  if (cached && !wrongSession && cached.age < ttlMs) return { data: cached.data, src: 'DB' };
 
-  if (cached && cached.age < maxStaleMs) {
+  if (cached && !wrongSession && cached.age < maxStaleMs) {
     // Detached on purpose: waitUntil keeps the isolate alive for the refresh
     // without the caller waiting on it. A failure here is not the caller's
     // problem — they already have a usable payload.

@@ -2000,8 +2000,15 @@ function _completedBars(bars, now=Date.now()){
   return _etDay.format(new Date(bars[bars.length-1].t*1000))===_etDay.format(new Date(now)) ? bars.slice(0,-1) : bars;
 }
 const BARS_TTL=30*60*1000;
+// Bars fetched during the session (key null) hold a half-finished candle, so they
+// are only good while the session is still running. Once it closes they must be
+// refetched at once: giving them the full 30 minutes left a scan at 16:10 ET
+// without that day's final bar until 16:40 (measured 2026-10-15, MPC 484.92 vs
+// the close 475.99).
 function _barsFresh(c, now=Date.now()){
-  return !!c && (now-c.t<BARS_TTL || (c.key!=null && c.key===_closedSessionKey(now)));
+  if(!c) return false;
+  if(c.key!=null) return c.key===_closedSessionKey(now);
+  return now-c.t<BARS_TTL && _closedSessionKey(now)===null;
 }
 // IndexedDB, not sessionStorage: ~500 symbols of 1y bars is ~25MB, and
 // sessionStorage's quota kept only 186 of 516 (measured), so a reload

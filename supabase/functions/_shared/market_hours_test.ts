@@ -31,3 +31,13 @@ Deno.test("oneYearBarsPolicy: nothing from before the last close is fresh or ser
   assertEquals(q.ttl, 6 * 60 * 60 * 1000); // intraday: refresh the live bar every 6h at most
   assertEquals(q.maxStale, sinceMon);
 });
+
+Deno.test("lastSessionEdgeMs: the later of the open (+2 min grace) and the close", async () => {
+  const { lastSessionEdgeMs, lastUsOpenMs } = await import("./market_hours.ts");
+  assertEquals(lastUsOpenMs(z("2026-09-22T14:00:00")), z("2026-09-22T13:32:00"));
+  assertEquals(lastSessionEdgeMs(z("2026-09-22T12:00:00")), z("2026-09-21T20:15:00")); // pre-open → Mon close
+  assertEquals(lastSessionEdgeMs(z("2026-09-22T13:31:00")), z("2026-09-21T20:15:00")); // inside the grace
+  assertEquals(lastSessionEdgeMs(z("2026-09-22T14:00:00")), z("2026-09-22T13:32:00")); // mid-session → open
+  assertEquals(lastSessionEdgeMs(z("2026-09-22T21:00:00")), z("2026-09-22T20:15:00")); // evening → close
+  assertEquals(lastSessionEdgeMs(z("2026-09-26T16:00:00")), z("2026-09-25T20:15:00")); // Saturday → Fri close
+});

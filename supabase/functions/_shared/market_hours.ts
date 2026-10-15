@@ -22,6 +22,19 @@ export function lastUsCloseMs(now: number): number {
   return t;
 }
 
+// The most recent session edge: the open (with two minutes of grace for the feed to
+// start the day's bar) or the close above. A row refreshed before it was taken in
+// the wrong session — before the open it still ends on yesterday, mid-session it
+// holds a half-finished candle — so it must not be served ahead of a refresh.
+export function lastUsOpenMs(now: number): number {
+  let t = now - (now % 60000) - etParts(now).min * 60000 + (OPEN_MIN + 2) * 60000;
+  while (t > now || etParts(t).weekend) t -= 86400000;
+  return t;
+}
+export function lastSessionEdgeMs(now: number): number {
+  return Math.max(lastUsCloseMs(now), lastUsOpenMs(now));
+}
+
 // A 1y snapshot taken before the last close holds a half-finished candle (and
 // its low partial volume) for that session, so it is neither fresh nor
 // servable-while-stale once the session has closed. Intraday, the live bar is

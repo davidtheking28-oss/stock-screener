@@ -437,6 +437,10 @@
     check('_barsFresh: fetched after Friday\'s close is still fresh on Saturday', _barsFresh(fri, utc('2026-09-26T16:00:00')) === true);
     check('_barsFresh: stale once Monday\'s session is open', _barsFresh(fri, utc('2026-09-28T14:00:00')) === false);
     const intraday = { t: utc('2026-09-22T14:00:00'), key: null };
+    const midSession = { t: utc('2026-09-22T19:50:00'), key: null, bars: [] };
+    check('_barsFresh: a mid-session fetch is stale the moment the session closes, not 30 minutes later',
+      _barsFresh(midSession, utc('2026-09-22T19:58:00')) === true && _barsFresh(midSession, utc('2026-09-22T20:20:00')) === false);
+    check('_barsFresh: no entry is never fresh', _barsFresh(null) === false);
     check('_barsFresh: intraday fetches still expire after 30 minutes',
       _barsFresh(intraday, utc('2026-09-22T14:10:00')) === true && _barsFresh(intraday, utc('2026-09-22T15:00:00')) === false);
     // During the session today's bar is half a day: its volume always reads as
@@ -472,7 +476,7 @@
         await new Promise(r => setTimeout(r, 20));
         return new Response(JSON.stringify({ results: b.symbols.map(s => ({ symbol: s.replace('.', '-'), bars: [{ t: 1, o: 1, h: 1, l: 1, c: 1, v: 1 }] })) }));
       };
-      _valBars.set('ZWFRESH', { bars: [{ t: 1, c: 1 }], t: Date.now(), key: null });
+      _valBars.set('ZWFRESH', { bars: [{ t: 1, c: 1 }], t: Date.now(), key: _closedSessionKey(Date.now()) });
       try { await Promise.all([_fetchBars1yWarm(['ZWA', 'ZWB', 'ZW.C', 'ZWFRESH']), _fetchBars1yWarm(['ZWB', 'ZWD'])]); }
       finally { window.fetch = realFetch; }
       check('batch warm: a symbol two screeners both need is fetched once', sent.filter(s => s === 'ZWB').length === 1, 'sent ' + sent);

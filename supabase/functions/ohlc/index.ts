@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { serveCached } from "../_shared/market_cache.ts";
-import { oneYearBarsPolicy } from "../_shared/market_hours.ts";
+import { lastSessionEdgeMs, oneYearBarsPolicy } from "../_shared/market_hours.ts";
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -126,13 +126,18 @@ function ok(sym: string, bars: unknown, src: string) {
 async function getBarsFor(sym: string, range: string): Promise<{ bars: unknown; src: string }> {
   const ckey = range === '1y' ? '1y:' + sym : sym;
   const policy = oneYearBarsPolicy(Date.now());
+  // The 3-month series feeds the cards' charts. Taken before the last session edge
+  // it ends on yesterday (pre-open) or on a half-finished candle (mid-session).
+  const edge = range === '1y' ? 0 : lastSessionEdgeMs(Date.now());
   const m = mem.get(ckey);
-  if (m && Date.now() - m.time < MEM_TTL && m.time >= policy.lastClose) return { bars: m.bars, src: 'MEM' };
+  if (m && Date.now() - m.time < MEM_TTL && m.time >= policy.lastClose && m.time >= edge) return { bars: m.bars, src: 'MEM' };
   const { data: bars, src } = await serveCached(
     'ohlc:' + ckey,
     range === '1y' ? policy.ttl : DB_TTL,
     range === '1y' ? policy.maxStale : MAX_STALE,
     () => fetchYahoo(sym, range),
+    undefined,
+    edge,
   );
   mem.set(ckey, { bars, time: Date.now() });
   return { bars, src };

@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { serveCached } from "../_shared/market_cache.ts";
+import { lastSessionEdgeMs } from "../_shared/market_hours.ts";
 
 import { readScanRequest, trimMap } from "./request_policy.ts";
 
@@ -63,12 +64,13 @@ Deno.serve(async (req: Request) => {
 
   // 1. warm in-instance cache
   const m = mem.get(key);
-  if (m && Date.now() - m.time < MEM_TTL) return ok(m.data, 'MEM');
+  const edge = lastSessionEdgeMs(Date.now());
+  if (m && Date.now() - m.time < MEM_TTL && m.time >= edge) return ok(m.data, 'MEM');
 
   // 2. persistent DB cache — fresh, stale-but-usable (background refresh), or
   // a blocking live fetch past MAX_STALE
   try {
-    const { data, src } = await serveCached(key, DB_TTL, MAX_STALE, () => fetchLive(body));
+    const { data, src } = await serveCached(key, DB_TTL, MAX_STALE, () => fetchLive(body), undefined, edge);
     mem.set(key, { data, time: Date.now() });
     trimMap(mem,3);
     return ok(data, src);
