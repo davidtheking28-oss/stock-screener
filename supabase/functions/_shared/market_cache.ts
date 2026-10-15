@@ -76,7 +76,9 @@ export async function serveCached<T>(
 
   try {
     const fresh = await refresh();
-    io.put(key, fresh);
+    // Awaited: the runtime may end the isolate once the response goes out, and an
+    // unawaited write is cut short, leaving the next visitor to pay the cold path.
+    try { await io.put(key, fresh); } catch (e) { console.error(`[${key}] cache write failed:`, e); }
     return { data: fresh, src: 'LIVE' };
   } catch (e) {
     if (cached) return { data: cached.data, src: 'STALE' };

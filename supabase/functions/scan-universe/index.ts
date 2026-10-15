@@ -71,8 +71,9 @@ Deno.serve(async (req: Request) => {
   // a blocking live fetch past MAX_STALE
   try {
     const { data, src } = await serveCached(key, DB_TTL, MAX_STALE, () => fetchLive(body), undefined, edge);
-    mem.set(key, { data, time: Date.now() });
-    trimMap(mem,3);
+    // A STALE row is a fallback (or a row being refreshed behind the response); stamping
+    // it with the current time would have this instance serve it as fresh for MEM_TTL.
+    if (src !== 'STALE') { mem.set(key, { data, time: Date.now() }); trimMap(mem,3); }
     return ok(data, src);
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), { status: 502, headers: { ...CORS, 'Content-Type': 'application/json' } });

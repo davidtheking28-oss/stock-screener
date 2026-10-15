@@ -139,7 +139,10 @@ async function getBarsFor(sym: string, range: string): Promise<{ bars: unknown; 
     undefined,
     edge,
   );
-  mem.set(ckey, { bars, time: Date.now() });
+  if (src !== 'STALE') {
+    mem.set(ckey, { bars, time: Date.now() });
+    while (mem.size > 1500) mem.delete(mem.keys().next().value as string);
+  }
   return { bars, src };
 }
 
@@ -202,6 +205,7 @@ Deno.serve(async (req: Request) => {
     return handleBatch(req);
   }
 
+  while (_rate.size > 4096) _rate.delete(_rate.keys().next().value as string);
   rl.count++;
   _rate.set(ip, rl);
   if (rl.count > RATE_LIMIT) {

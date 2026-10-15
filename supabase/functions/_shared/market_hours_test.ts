@@ -18,6 +18,16 @@ Deno.test("lastUsCloseMs: the most recent weekday 16:15 ET at or before now", ()
   assertEquals(lastUsCloseMs(z("2026-09-21T12:00:00")), z("2026-09-18T20:15:00")); // Mon pre-market → Fri
 });
 
+Deno.test("lastUsCloseMs: stays at 16:15 ET across the clock changes", () => {
+  // Monday 2027-03-15 pre-market, the weekend after the spring change: Friday was EST (21:15Z).
+  assertEquals(lastUsCloseMs(z("2027-03-15T11:00:00")), z("2027-03-12T21:15:00"));
+  // Monday 2026-11-02 pre-market, the weekend after the fall change: Friday was EDT (20:15Z).
+  assertEquals(lastUsCloseMs(z("2026-11-02T12:00:00")), z("2026-10-30T20:15:00"));
+  // Sunday of the change itself.
+  assertEquals(lastUsCloseMs(z("2027-03-14T15:00:00")), z("2027-03-12T21:15:00"));
+  assertEquals(lastUsCloseMs(z("2026-11-01T15:00:00")), z("2026-10-30T20:15:00"));
+});
+
 // The bug this guards: a 1y snapshot taken mid-session (partial last candle,
 // low volume) used to stay "fresh" for 6h and servable for 24h, so an evening
 // scan judged "volume falling day after day" on a half-finished day.

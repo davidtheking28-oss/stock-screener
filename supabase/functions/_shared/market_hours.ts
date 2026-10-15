@@ -16,10 +16,34 @@ export function usMarketOpen(ms: number): boolean {
   return !weekend && min >= OPEN_MIN && min < CLOSE_MIN;
 }
 
+const ET_FULL = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York", year: "numeric", month: "numeric", day: "numeric",
+  hour: "numeric", minute: "numeric", hour12: false,
+});
+function etWall(ms: number) {
+  const p = Object.fromEntries(ET_FULL.formatToParts(new Date(ms)).map((x) => [x.type, +x.value]));
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute);
+}
+// The instant at which New York's wall clock reads `minOfDay` on the calendar day
+// `daysBack` before today's ET date. Subtracting 86400000 instead lands an hour off
+// in the week the clocks change, which put "the last close" at 15:15 ET.
+function etInstant(now: number, daysBack: number, minOfDay: number): number {
+  const nowWall = etWall(now);
+  const target = nowWall - (nowWall % 86400000) - daysBack * 86400000 + minOfDay * 60000;
+  let t = now + (target - nowWall);
+  t += target - etWall(t);
+  return t + (target - etWall(t));
+}
+function lastEdgeBefore(now: number, minOfDay: number): number {
+  for (let d = 0; d < 10; d++) {
+    const t = etInstant(now, d, minOfDay);
+    if (t <= now && !etParts(t).weekend) return t;
+  }
+  return now;
+}
+
 export function lastUsCloseMs(now: number): number {
-  let t = now - (now % 60000) - etParts(now).min * 60000 + CLOSE_MIN * 60000;
-  while (t > now || etParts(t).weekend) t -= 86400000;
-  return t;
+  return lastEdgeBefore(now, CLOSE_MIN);
 }
 
 // The most recent session edge: the open (with two minutes of grace for the feed to
@@ -27,9 +51,7 @@ export function lastUsCloseMs(now: number): number {
 // the wrong session — before the open it still ends on yesterday, mid-session it
 // holds a half-finished candle — so it must not be served ahead of a refresh.
 export function lastUsOpenMs(now: number): number {
-  let t = now - (now % 60000) - etParts(now).min * 60000 + (OPEN_MIN + 2) * 60000;
-  while (t > now || etParts(t).weekend) t -= 86400000;
-  return t;
+  return lastEdgeBefore(now, OPEN_MIN + 2);
 }
 export function lastSessionEdgeMs(now: number): number {
   return Math.max(lastUsCloseMs(now), lastUsOpenMs(now));

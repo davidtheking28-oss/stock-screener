@@ -1547,7 +1547,8 @@ const SECTOR_ETF = {
 // make setScreener early-return, leaving the panel with no panel-* class and
 // every screener-specific field visible at once.
 function _validScreener(key){ return SCREENERS[key] ? key : 'sepa'; }
-let activeScreener = _validScreener(localStorage.getItem('sepa_screener') || 'sepa');
+const _ls = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
+let activeScreener = _validScreener(_ls('sepa_screener') || 'sepa');
 // When there's nothing to scroll (short table, or gallery that fits in one
 // screen), "at bottom" is trivially true the instant it renders — fine for a
 // real 'scroll' event (nothing left to prove), but _maybeReportScreenerReviewed's
@@ -2827,10 +2828,10 @@ function _rgbColor(c){
   return 'rgb('+d[0]+','+d[1]+','+d[2]+')';
 }
 function rangeBadgeHtml(r){
-  const g=r.rangeSetup; if(!g) return '';
+  const g=r.rangeSetup; if(!g || !RB_LABEL[g.kind] || !Number.isFinite(g.top) || !Number.isFinite(g.height)) return '';
   const tip=g.kind==='highretest'
-    ? 'עלייה של '+g.leg.toFixed(0)+'%, תיקון של '+g.height.toFixed(0)+'% וחזרה לשיא הקודם $'+g.top.toFixed(2)
-    : 'טווח צדדי עם תקרה שטוחה ('+g.touches+' נגיעות, גובה '+g.height.toFixed(1)+'%) מעל ממוצע 21 · תקרה $'+g.top.toFixed(2);
+    ? 'עלייה של '+Number(g.leg).toFixed(0)+'%, תיקון של '+g.height.toFixed(0)+'% וחזרה לשיא הקודם $'+g.top.toFixed(2)
+    : 'טווח צדדי עם תקרה שטוחה ('+Number(g.touches)+' נגיעות, גובה '+g.height.toFixed(1)+'%) מעל ממוצע 21 · תקרה $'+g.top.toFixed(2);
   return '<span class="earn-badge" title="'+tip+'">'+RB_LABEL[g.kind]+'</span>';
 }
 function earnBadgeHtml(earnIn){
@@ -2875,7 +2876,7 @@ function fmtFirstSeen(iso){
 // esc() targets values interpolated into an inline onclick="…'VALUE'…", so it
 // escapes the JS string quote as well as the HTML ones. Don't use it for plain
 // markup — escHtml is the one for that.
-function esc(s){ return (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function esc(s){ return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 // Full HTML-text/attribute escaping. & must go first or it double-escapes the
 // entities the later replacements introduce.
 function escHtml(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -2953,7 +2954,7 @@ async function saveWL(ticker, adding, previousAddedAt){
     if(!error && isLatest){_wlLoaded=true;_wlReadError=false;}
     _updateWlSyncStatus();
   } else {
-    localStorage.setItem('sepa_wl', JSON.stringify([...watchlist]));
+    try{ localStorage.setItem('sepa_wl', JSON.stringify([...watchlist])); }catch(e){ toast('השמירה במכשיר נכשלה'); }
     _wlSaveErrors.delete(ticker);_updateWlSyncStatus();
     if (IN_JOURNAL) { try{
       const pending=new Set(_lsJSON('sepa_wl_pending_adds',[]));
@@ -3190,7 +3191,7 @@ async function setColVis(key, on){
     if(!_accountCurrent(account)) return;
     if(error){ colVis[key]=!on; toast('שמירת העדפות העמודות נכשלה'); }
   } else {
-    localStorage.setItem('sepa_colvis', JSON.stringify(colVis));
+    try{ localStorage.setItem('sepa_colvis', JSON.stringify(colVis)); }catch(e){}
   }
   render();
 }
@@ -5069,10 +5070,10 @@ function renderTable(rows){
     const ttB = (mode==='watch' && r.ttPass===false)
       ? '<span class="tt-badge" title="במעקב, אך אינה עוברת כרגע את ה-Trend Template">מחוץ למגמה</span>' : '';
     const earnB = earnBadgeHtml(r.earnIn);
-    return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+esc(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
+    return '<tr data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" data-name="'+escHtml(r.name)+'" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" tabindex="-1">'
       +'<td><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
       +'</td>'
-      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה"><span class="new-badge" style="'+(isNew?'':'display:none')+'">חדש</span>'+r.ticker+earnB+rangeBadgeHtml(r)+ttB+'</div><div class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+'</td>'
+      +'<td><div class="sym" onclick="copyTicker(event,\''+r.ticker+'\')" title="לחץ להעתקה"><span class="new-badge" style="'+(isNew?'':'display:none')+'">חדש</span>'+r.ticker+earnB+rangeBadgeHtml(r)+ttB+'</div><div class="cname" title="'+escHtml(r.name)+'">'+escHtml(r.name)+'</div>'+'</td>'
       +col('price',  '<td><span class="mn hi">$'+priceStr+'</span></td>')
       +col('score',  '<td>'+scEl+'</td>')
       +col('rs',     '<td>'+rsEl+'</td>')
@@ -5176,7 +5177,7 @@ function renderGallery(srcRows){
     const rsBg = rsHi?'rgba(46,204,113,0.13)':rsMid?'rgba(245,185,74,0.13)':'rgba(117,137,168,0.10)';
     return '<div class="gcard" role="button" tabindex="0" onclick="openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&event.target===this){event.preventDefault();openChart(\''+r.sym+'\',\''+r.ticker+'\',\''+esc(r.name)+'\')}">'
       +'<div class="gcard-head"><div class="gcard-left"><button class="star-btn '+(wl?'on':'off')+'" onclick="toggleWL(event,\''+r.ticker+'\')" aria-label="'+(wl?'הסר מרשימת מעקב':'הוסף לרשימת מעקב')+'" aria-pressed="'+wl+'">'+(wl?'★':'☆')+'</button>'
-      +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'
+      +'<div class="gcard-id"><div class="gcard-symline"><span class="gcard-sym">'+r.ticker+'</span><span class="gcard-price">$'+priceStr+'</span></div><div class="gcard-name" title="'+escHtml(r.name)+'">'+escHtml(r.name)+'</div>'
       +'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+(r.rs??'—')+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+(r.rs??'—')+'</b></span>'+sectorBadgeHtml(r.sector,true)+'</div></div>'
@@ -5580,7 +5581,7 @@ async function loadUserData(){
   // found nothing to show. Only fires if the panel is still hidden — a user
   // already looking at a real scan's results must not get yanked onto מעקב.
   // Same explicit-'screen'-choice exception as the boot-time check.
-  else if($('resultsPanel').style.display==='none' && watchlist.size>0 && localStorage.getItem('sepa_mode')!=='screen') setMode('watch');
+  else if($('resultsPanel').style.display==='none' && watchlist.size>0 && _ls('sepa_mode')!=='screen') setMode('watch');
 }
 
 function updateAuthUI(){
@@ -5777,7 +5778,7 @@ applyView();
 // תוצאות סריקה must land back there, not get switched to מעקב just because
 // there happens to be no scan cache. First-ever visit (no sepa_mode key at
 // all) and an explicit last mode of 'watch' still auto-reveal as before.
-if($('resultsPanel').style.display==='none' && watchlist.size>0 && localStorage.getItem('sepa_mode')!=='screen') setMode('watch');
+if($('resultsPanel').style.display==='none' && watchlist.size>0 && _ls('sepa_mode')!=='screen') setMode('watch');
 // The mirror case: sepa_mode was persisted as 'watch' from an earlier
 // session (or another device's now-empty watchlist synced down), but the
 // watchlist is empty NOW. The fixup above never fires (its own guard is
