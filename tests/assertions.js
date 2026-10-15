@@ -178,6 +178,18 @@
     setScreener('sepa', true);
   }
 
+  // ── market breadth chip: share above the 200-day average, not the full template ──
+  {
+    _paintBreadth(46, 16);
+    const lbl = document.getElementById('breadthLabel');
+    check('breadth chip: 46% above the 200DMA reads as a middling tape, not weak',
+      lbl.textContent === '46% מעל ממוצע 200' && lbl.style.color === 'var(--yellow)', lbl.textContent + ' ' + lbl.style.color);
+    _paintBreadth(30, 10);
+    check('breadth chip: under 40% above the 200DMA is weak', lbl.style.color === 'var(--red)');
+    _paintBreadth(60, 30);
+    check('breadth chip: 55%+ above the 200DMA is broad', lbl.style.color === 'var(--green)');
+  }
+
   // ── cleanbase: "master swing setup - range breakout" ──
   {
     const path = pts => { const out = []; for (let q = 1; q < pts.length; q++) { const [i0, v0] = pts[q - 1], [i1, v1] = pts[q]; for (let i = i0; i < i1; i++) out.push(v0 + (v1 - v0) * (i - i0) / (i1 - i0)); } out.push(pts[pts.length - 1][1]); return out; };
