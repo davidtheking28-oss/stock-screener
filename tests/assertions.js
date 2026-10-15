@@ -196,6 +196,9 @@
     check('range setup: fewer than three touches of the ceiling is not enough', _rangeBreakout(bars(twoTouches)) === null);
     const fell = path([...range.slice(0, -1), [89, 78.5], [90, 70]]);
     check('range setup: a range that has broken DOWN is not a setup', _rangeBreakout(bars(fell)) === null);
+    const dipped = path([...range, [91, 70], [94, 77], [95, 81.6]]);
+    check('range setup: a range that broke down and then bounced above the ceiling is not a clean breakout',
+      _rangeBreakout(bars(dipped))?.kind !== 'breakout');
     check('range setup: too little history is not judged', _rangeBreakout(bars(path([[0, 50], [40, 60]]))) === null);
     check('range setup: a high-flying breakout more than 4% over the ceiling is chasing, not entry 1',
       _rangeBreakout(bars(path([...range, [90, 86]])))?.kind !== 'breakout');

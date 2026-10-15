@@ -2497,6 +2497,8 @@ function _rangeBreakout(bars, P=RB){
     let swings=0;
     for(let q=1;q<ti.length;q++){ let m=Infinity; for(let i=ti[q-1];i<=ti[q];i++) if(l[i]<m) m=l[i]; if(m<=top*(1-P.minSwing/100)) swings++; }
     if(swings<P.minTouches-1) continue;
+    let failed=false; for(let i=e+1;i<n;i++) if(c[i]<low*0.99){ failed=true; break; }
+    if(failed) continue;
     const out=kind=>({kind, top, touches:ti.length, height, since:null, distPct:(last/top-1)*100});
     if(k===0){ if(last>=top*0.96 && last<=top*1.005) return out('forming'); continue; }
     let broke=-1;
