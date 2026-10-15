@@ -108,10 +108,14 @@ async function sendTelegramAlert(scanDate: string, entries: string[], exits: str
   // The shared ohlc function is limited to 400 requests a minute per IP, so
   // batches are paced; the watchlist goes first and the deadline cuts the tail.
   const deadline = Date.now() + 100_000;
+  let checked = 0, failed = 0;
   for (let i = 0; i < tickers.length && Date.now() < deadline; i += 8) {
     const t0 = Date.now();
     await Promise.all(tickers.slice(i, i + 8).map(async t => {
-      const r = approachingPivot(await fetchBars(t), -TG_MAX_PCT);
+      const bars = await fetchBars(t);
+      checked++;
+      if (!bars) { failed++; return; }
+      const r = approachingPivot(bars, -TG_MAX_PCT);
       if (r) near.set(t, r);
     }));
     const wait = 1500 - (Date.now() - t0);
@@ -124,7 +128,13 @@ async function sendTelegramAlert(scanDate: string, entries: string[], exits: str
     })),
   ];
   const text = buildPivotAlert(scanDate, groups, entries.filter(t => wl.has(t)), exits.filter(t => wl.has(t)), TG_MAX_PCT);
-  const msg = text ?? `SEPA ${scanDate} — אין היום מניות עד ${TG_MAX_PCT}% מתחת ל-Pivot`;
+  // An empty list only means "none near the pivot" when every price series was read;
+  // otherwise say how many were not, instead of reporting a failure as a quiet day.
+  const incomplete = failed > 0 || checked < tickers.length;
+  const note = incomplete ? `\n(נבדקו ${checked - failed} מתוך ${tickers.length} מניות — ${tickers.length - checked + failed} לא נבדקו)` : '';
+  const msg = (text ?? (incomplete
+    ? `SEPA ${scanDate} — לא ניתן לאשר שאין מניות קרובות ל-Pivot`
+    : `SEPA ${scanDate} — אין היום מניות עד ${TG_MAX_PCT}% מתחת ל-Pivot`)) + note;
   const tr = await fetch(`https://api.telegram.org/bot${sec.telegram_bot_token}/sendMessage`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: sec.telegram_chat_id, text: msg.slice(0, 4000) }),
