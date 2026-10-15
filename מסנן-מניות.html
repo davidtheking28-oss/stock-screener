@@ -2537,7 +2537,14 @@ function _priorHighRetest(bars){
 const _rangeSetup=bars=>_rangeBreakout(bars)||_priorHighRetest(bars);
 const RB_LABEL={forming:'טווח · תחת התקרה', breakout:'פריצת טווח', retest:'חזרה ל-21', highretest:'חזרה לשיא קודם'};
 function _cleanbaseExactFail(r, bars, opts={}){
-  if(!bars || _ma200Rising(bars)===false) return true;
+  if(!bars) return true;
+  // A falling 200-day average fails every path but one: a stock turning up from a
+  // long decline (APPN, user's call 2026-10-16) that is back at its prior high.
+  if(_ma200Rising(bars)===false){
+    const hr=_priorHighRetest(_completedBars(bars));
+    if(!hr) return true;
+    r.rangeSetup=hr; return false;
+  }
   // Same guards as the quiet path below, minus the VCP leg sequence and the
   // strict-source rule: being this close to the 52-week high is the trend proof
   // (user's call 2026-10-08 — AAPL/XOM/CVX/FROG via the momentum screen count).

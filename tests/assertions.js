@@ -213,6 +213,9 @@
       _priorHighRetest(bars(path([[0, 40], [60, 60], [70, 90], [82, 62], [110, 88], [119, 98]]))) === null);
     check('prior-high retest: a drop of only 5% is a flag, not a base',
       _priorHighRetest(bars(path([[0, 40], [60, 60], [70, 90], [78, 85.5], [119, 89]]))) === null);
+    const fall = Array.from({ length: 260 }, (_, i) => i < 200 ? 200 - i * 0.5 : 100 + (i - 200) * 0.9);
+    check('cleanbase: a falling 200-day average is rejected unless the stock is back at a prior high',
+      _cleanbaseExactFail({ via: ['finviz'] }, bars(fall), {}) === true && /_priorHighRetest\(_completedBars\(bars\)\)/.test(gsrc));
     check('prior-high retest: a plain uptrend making new highs is not a retest',
       _priorHighRetest(bars(path([[0, 50], [119, 130]]))) === null);
     const rowR = { via: ['range'], vcp: null };
