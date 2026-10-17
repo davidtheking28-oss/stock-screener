@@ -1073,18 +1073,11 @@ tbody tr:last-child td { border-bottom: none; }
           <div class="fields">
             <div class="field f-tech"><label for="rsMin">RS Rating מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="rsMin" value="70" min="1" max="99" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-tech"><label for="fromHigh">מהשיא (%) מקס&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="fromHigh" value="25" min="0" max="100" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
-            <div class="field f-growth"><label for="epsQoqMin">EPS QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsQoqMin" value="15" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
-            <div class="field f-growth"><label for="revQoqMin">מכירות QoQ מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="revQoqMin" value="25" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
-            <div class="field f-growth" style="grid-column:1 / -1">
-              <label>סקטורים (קבוע)</label>
-              <div class="sector-lock-tags">
-                <span class="sector-tag locked">טכנולוגיה</span>
-                <span class="sector-tag locked">צריכה</span>
-                <span class="sector-tag locked">תקשורת</span>
-                <span class="sector-tag locked">אנרגיה</span>
-              </div>
-              <span class="hint">רק מניות מהסקטורים האלה יעברו את הסינון, ללא יוצא מהכלל</span>
-            </div>
+            <div class="field f-growth"><label for="epsQoqMin">צמיחת רווח למניה, רבעון מול אשתקד מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsQoqMin" value="25" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-growth"><label for="revQoqMin">צמיחת מכירות, רבעון מול אשתקד מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="revQoqMin" value="25" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-growth"><label for="epsYrMin">צמיחת רווח למניה השנה מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsYrMin" value="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-growth"><label for="epsNextMin">צמיחת רווח למניה שנה הבאה מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="epsNextMin" value="20" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
+            <div class="field f-growth"><label for="gmMin">רווח גולמי מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="gmMin" value="50" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-sepa"><label for="fromLow">מעל השפל (%) מינ&#8217;</label><div class="field-combo"><input type="text" inputmode="none" id="fromLow" value="30" min="0" max="500" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-power"><label for="runMin">ריצה מינ&#8217; (%)</label><div class="field-combo"><input type="text" inputmode="none" id="runMin" value="100" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
             <div class="field f-power"><label for="consolWeeks">דשדוש מינ&#8217; (שבועות)</label><div class="field-combo"><input type="text" inputmode="none" id="consolWeeks" value="2" min="0" readonly role="combobox" aria-haspopup="listbox" aria-expanded="false" onfocus="openFieldPicker(this)" onmousedown="fieldComboMouseDown(event,this)"></div></div>
@@ -1470,7 +1463,8 @@ const COLUMNS = [
   // "Winners" screen: 5-year beta (Finviz's definition) and the 1-month high, which
   // bounds the 50-day high from below so the candidate cut never drops a name the
   // exact 50-day check (validateExact) would keep.
-  "beta_5_year","High.1M"
+  "beta_5_year","High.1M",
+  "gross_margin","earnings_per_share_diluted_yoy_growth_ttm"
 ];
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
@@ -1488,7 +1482,7 @@ const SCREENERS = {
   qulla:    {name:'Qullamaggie',          sub:'Breakout — מהלך גדול + דשדוש צמוד ל-EMA', fund:false, presets:false},
   finviz:   {name:'מומנטום שנתי',         sub:'שנה +30% · מעל SMA50/200 · קרוב לשיא', fund:false, presets:false},
   winners:  {name:'מנצחי השנה',            sub:'שנה +100% · ליד שיא 50 יום · בטא>1 · נפח שקט', fund:false, presets:false},
-  growth:   {name:'מסנן פונדמנטלי',      sub:'סקטורים נבחרים + צמיחה רבעונית', fund:false, presets:false},
+  growth:   {name:'מסנן פונדמנטלי',      sub:'צמיחת רווח ומכירות + רווח גולמי', fund:false, presets:false},
   commodities: {name:'סחורות',           sub:'רשימת סחורות קבועה',       fund:false, presets:false},
 };
 const SCREENER_DEFAULTS = {
@@ -1499,26 +1493,16 @@ const SCREENER_DEFAULTS = {
   qulla:    {priceMin:5,mcMin:0,liqMin:0,earnDays:0,adrMin:4,move6Min:30,move3Min:30,emaDistMax:3.5,weekRangeMax:7,volSharesMin:0.5},
   finviz:   {priceMin:3,mcMin:0.3,liqMin:0.1,earnDays:0,perfYMin:30,finvizVolMin:0.1,smaTrend50:1,smaTrend200:1,finvizFromHigh:25},
   winners:  {priceMin:0,mcMin:0,liqMin:0,earnDays:0,winPerfY:100,winFromHigh:10,winBetaMin:1,winVolMin:0.1,winRelVolMax:1},
-  growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:15,revQoqMin:25},
+  growth:   {priceMin:0,mcMin:2,liqMin:0,earnDays:0,epsQoqMin:25,revQoqMin:25,epsYrMin:0,epsNextMin:20,gmMin:50},
   commodities: {priceMin:0,mcMin:0,liqMin:0,earnDays:0},
 };
 const COMMODITY_TICKERS = ['GLD','SLV','COPX','WEAT','CORN','UNG','PALL','PPLT','UGA','USO','CANE','URA'];
-// Health Technology (biotech/pharma) is where a large share of the market's
-// fastest quarterly growers actually sit; leaving it out excluded them from the
-// one screener whose entire thesis is growth.
-// 'Energy Minerals' (oil/gas/coal extraction — Exxon, Chevron, Equinor) removed:
-// a cyclical, commodity-price-driven sector, the near-opposite of "growth" —
-// live-confirmed by Icahn Enterprises (IEP) passing this screen at −18.5% EPS
-// YoY purely because its sector was on this allow-list.
-const GROWTH_SECTORS = ['Technology Services','Electronic Technology','Consumer Durables','Consumer Non-Durables','Consumer Services','Retail Trade','Communications','Health Technology'];
 // TradingView's own 21-way sector field (Electronic Technology vs Technology
 // Services, Health Technology vs Health Services…) is a real classification,
 // just a much finer one than most people expect — "מה זה electronic, ויש
 // technology" was the actual report. Collapsed here into the familiar ~11
 // GICS-style sectors for every DISPLAY use (badges, sector tag, the strength
-// row, and the breadth aggregation that feeds them). GROWTH_SECTORS above
-// stays on the raw 21-way values on purpose — it's a curated allow-list
-// tuned to the fine-grained field, not a display concern.
+// row, and the breadth aggregation that feeds them).
 const SECTOR_GROUPS = {
   'Electronic Technology':'Technology', 'Technology Services':'Technology',
   'Communications':'Communication Services',
@@ -3541,8 +3525,11 @@ const FIELD_PRESETS = {
   epsMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25%'],[40,'40%'],[50,'50% — מינרוויני'],[60,'60%'],[100,'100%'],[150,'150%']],
   revMin:   [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[20,'20% — קלאסי'],[30,'30%'],[50,'50%'],[75,'75%']],
   roeMin:   [[0,'0%'],[5,'5%'],[8,'8%'],[10,'10%'],[15,'15%'],[17,'17% — מינרוויני'],[20,'20%'],[25,'25%'],[30,'30%'],[40,'40%']],
-  epsQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15% — קלאסי'],[25,'25%'],[40,'40%'],[60,'60%'],[100,'100%']],
+  epsQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25% — קלאסי'],[40,'40%'],[60,'60%'],[100,'100%']],
   revQoqMin: [[0,'0%'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25% — קלאסי'],[40,'40%'],[60,'60%'],[100,'100%']],
+  epsYrMin: [[-100,'ללא סינון'],[0,'מעל 0% — קלאסי'],[10,'10%'],[20,'20%'],[30,'30%'],[50,'50%']],
+  epsNextMin: [[-100,'ללא סינון'],[0,'0%'],[10,'10%'],[15,'15%'],[20,'20% — קלאסי'],[25,'25%'],[40,'40%'],[60,'60%']],
+  gmMin: [[-100,'ללא סינון'],[20,'20%'],[30,'30%'],[40,'40%'],[50,'50% — קלאסי'],[60,'60%'],[70,'70%']],
   nmMin: [[0,'כבוי'],[3,'3%'],[5,'5%'],[8,'8%'],[10,'10%'],[15,'15%'],[20,'20%']],
   revQoqSepaMin: [[0,'כבוי'],[5,'5%'],[10,'10%'],[15,'15%'],[25,'25%'],[40,'40%'],[60,'60%'],[100,'100%']],
   epsQoqSepaMin: [[0,'כבוי'],[10,'10%'],[25,'25%'],[50,'50%'],[75,'75%'],[100,'100% — תלת-ספרתי'],[150,'150%'],[200,'200%']],
@@ -3674,7 +3661,7 @@ function applyPreset(key, btn){
 const MY_PRESETS_KEY='sepa_my_presets_v1';
 const PRESET_FIELDS=['rsMin','fromHigh','fromLow','priceMin','mcMin','liqMin','earnDays','runMin','consolWeeks',
   'vcpContractions','vcpDepthMax','pivotBelow',
-  'epsMin','revMin','roeMin','epsQoqMin','revQoqMin','adrMin','move6Min','move3Min',
+  'epsMin','revMin','roeMin','epsQoqMin','revQoqMin','epsYrMin','epsNextMin','gmMin','adrMin','move6Min','move3Min',
   'emaDistMax','weekRangeMax','volSharesMin','perfYMin','finvizVolMin','smaTrend50','smaTrend200',
   'winPerfY','winFromHigh','winBetaMin','winVolMin','winRelVolMax',
   'nmMin','revQoqSepaMin','epsQoqSepaMin','epsFwdMin'];
@@ -4339,12 +4326,21 @@ function applyFilters(universe, rsMap, opts={}){
       pass=COMMODITY_TICKERS.includes(d[C.name]);
       checks={pass};
     } else if(scr==='growth'){
-      const epsQoqMin=num('epsQoqMin'), revQoqMin=num('revQoqMin');
-      const sectorOk=GROWTH_SECTORS.includes(d[C.sector]);
-      const epsOk=epsQoq!=null && epsQoq>=epsQoqMin;
-      const revOk=revQoq!=null && revQoq>=revQoqMin;
-      checks={sectorOk,epsOk,revOk};
-      pass=sectorOk&&epsOk&&revOk;
+      // Mirrors the Finviz screen this was modelled on. Finviz's "Qtr over Qtr"
+      // compares with the same quarter a year earlier, so the YoY columns are
+      // the match — TradingView's *_qoq_* columns are sequential and differ.
+      // "EPS this year" and "next year" have no estimate column here: this year
+      // uses trailing EPS growth, next year the forecast over trailing EPS.
+      // EPS growth next 5 years is not available from TradingView at all.
+      const epsQMin=num('epsQoqMin'), revQMin=num('revQoqMin'), epsYrMin=num('epsYrMin'), epsNextMin=num('epsNextMin'), gmMin=num('gmMin');
+      const epsTtmGrowth=d[C.earnings_per_share_diluted_yoy_growth_ttm], gm=d[C.gross_margin];
+      const epsOk=eps!=null && eps>=epsQMin;
+      const revOk=rev!=null && rev>=revQMin;
+      const yrOk=epsYrMin<=-100 || (epsTtmGrowth!=null && epsTtmGrowth>epsYrMin);
+      const nextOk=epsNextMin<=-100 || (epsFwdGrowth!=null && epsFwdGrowth>=epsNextMin);
+      const gmOk=gmMin<=-100 || (gm!=null && gm>=gmMin);
+      checks={epsOk,revOk,yrOk,nextOk,gmOk};
+      pass=epsOk&&revOk&&yrOk&&nextOk&&gmOk;
     } else if(scr==='power'){
       const run=(perf3!=null && perf3>=runMin*0.4) || (perf6!=null && perf6>=runMin*0.4);
       const near=fromHighPct>=-num('fromHigh');
@@ -5669,7 +5665,7 @@ function drawBreadthSpark(rows){
 // the "only migrate the old default" guards forever, silently clobbering a
 // deliberate value that happened to match a past default (e.g. epsMin=25 on
 // purpose, not left over).
-const FILTERS_VERSION = 6;
+const FILTERS_VERSION = 7;
 function saveFilterPrefs(){
   try {
     localStorage.setItem('sepa_filters', JSON.stringify({
@@ -5678,7 +5674,7 @@ function saveFilterPrefs(){
       priceMin:num('priceMin'),mcMin:num('mcMin'),
       liqMin:num('liqMin'),earnDays:num('earnDays'),runMin:num('runMin'),consolWeeks:num('consolWeeks'),
       epsMin:num('epsMin'),revMin:num('revMin'),roeMin:num('roeMin'),
-      epsQoqMin:num('epsQoqMin'),revQoqMin:num('revQoqMin'),
+      epsQoqMin:num('epsQoqMin'),revQoqMin:num('revQoqMin'),epsYrMin:num('epsYrMin'),epsNextMin:num('epsNextMin'),gmMin:num('gmMin'),
       vcpContractions:num('vcpContractions'),vcpDepthMax:num('vcpDepthMax'),pivotBelow:num('pivotBelow'),
       vcpDryUp:$('vcpDryUp')?.checked,
       adrMin:num('adrMin'),move6Min:num('move6Min'),move3Min:num('move3Min'),
@@ -5716,6 +5712,10 @@ function loadFilterPrefs(){
     // move within 1-3 months. Measured on the live scan 2026-09-25: 49 names at
     // ADR 3 / 3M 20 (slow large caps like PSX, VEEV), 21 at ADR 4 / 3M 30.
     if((p.v||0)<6){ if(p.adrMin===3) p.adrMin=4; if(p.move3Min===20) p.move3Min=30; p.v=6; }
+    // v7: the fundamental screener now follows the Finviz thresholds (EPS and
+    // sales growth 25% year over year). An untouched old default moves; a
+    // deliberately chosen value stays.
+    if((p.v||0)<7){ if(p.epsQoqMin===15) p.epsQoqMin=25; p.v=7; }
     try{ localStorage.setItem('sepa_filters', JSON.stringify(p)); }catch(e){}
     const set=(id,v)=>{ if(v!=null) setFieldValue($(id),v); };
     set('rsMin',p.rsMin); set('fromHigh',p.fromHigh); set('fromLow',p.fromLow);
@@ -5723,7 +5723,7 @@ function loadFilterPrefs(){
     set('mcMin',p.mcMin);
     set('liqMin',p.liqMin); set('earnDays',p.earnDays); set('runMin',p.runMin); set('consolWeeks',p.consolWeeks);
     set('epsMin',p.epsMin); set('revMin',p.revMin); set('roeMin',p.roeMin);
-    set('epsQoqMin',p.epsQoqMin); set('revQoqMin',p.revQoqMin);
+    set('epsQoqMin',p.epsQoqMin); set('revQoqMin',p.revQoqMin); set('epsYrMin',p.epsYrMin); set('epsNextMin',p.epsNextMin); set('gmMin',p.gmMin);
     set('vcpContractions',p.vcpContractions); set('vcpDepthMax',p.vcpDepthMax); set('pivotBelow',p.pivotBelow);
     set('adrMin',p.adrMin); set('move6Min',p.move6Min); set('move3Min',p.move3Min);
     set('emaDistMax',p.emaDistMax); set('weekRangeMax',p.weekRangeMax); set('volSharesMin',p.volSharesMin);

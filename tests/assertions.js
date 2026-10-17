@@ -107,23 +107,27 @@
     check('applyFilters SEPA: keeps only the fully-compliant stock', eqSet(out, ['STRONGA']), 'got ' + JSON.stringify(out));
   }
 
-  // ── applyFilters: Fundamental (growth) sector allow-list + QoQ thresholds ──
+  // ── applyFilters: Fundamental (growth) mirrors the Finviz screen ──
   {
     setScreener('growth', true);
     const base = { close: 50, SMA50: 40, SMA150: 40, SMA200: 40, price_52_week_high: 60, price_52_week_low: 30,
-      market_cap_basic: 5e9, average_volume_10d_calc: 1e6, volume: 1e6, description: 'x', exchange: 'NASDAQ',
-      earnings_per_share_diluted_qoq_growth_fq: 20, total_revenue_qoq_growth_fq: 30 };
+      market_cap_basic: 5e9, average_volume_10d_calc: 1e6, volume: 1e6, description: 'x', exchange: 'NASDAQ', sector: 'Technology Services',
+      earnings_per_share_diluted_yoy_growth_fq: 30, total_revenue_yoy_growth_fq: 30,
+      earnings_per_share_diluted_yoy_growth_ttm: 10, earnings_per_share_diluted_ttm: 2, earnings_per_share_forecast_next_fy: 3, gross_margin: 60 };
+    const mk = (n, o) => mkStock('G:' + n, { ...base, name: n, ...o });
     const uni = [
-      mkStock('G:GROWA', { ...base, name: 'GROWA', sector: 'Technology Services' }),
-      mkStock('G:BADSEC', { ...base, name: 'BADSEC', sector: 'Utilities' }),
-      mkStock('G:LOWEPS', { ...base, name: 'LOWEPS', sector: 'Technology Services', earnings_per_share_diluted_qoq_growth_fq: 10 }),
-      mkStock('G:LOWMC', { ...base, name: 'LOWMC', sector: 'Technology Services', market_cap_basic: 1e9 }),
+      mk('GROWA', {}),
+      mk('UTIL', { sector: 'Utilities' }),
+      mk('LOWEPS', { earnings_per_share_diluted_yoy_growth_fq: 20 }),
+      mk('LOWREV', { total_revenue_yoy_growth_fq: 20 }),
+      mk('LOWGM', { gross_margin: 40 }),
+      mk('NOGM', { gross_margin: null }),
+      mk('NEGYR', { earnings_per_share_diluted_yoy_growth_ttm: -5 }),
+      mk('LOWNEXT', { earnings_per_share_forecast_next_fy: 2.2 }),
+      mk('LOWMC', { market_cap_basic: 1e9 }),
     ];
     const out = tickers(applyFilters(uni, {}));
-    check('applyFilters growth: sector + EPS/Sales QoQ + cap gate', eqSet(out, ['GROWA']), 'got ' + JSON.stringify(out));
-    check('applyFilters growth: Energy Minerals is off the growth sector allow-list',
-      !GROWTH_SECTORS.includes('Energy Minerals'),
-      'a cyclical, commodity-driven sector let Icahn Enterprises (−18.5% EPS YoY) pass the growth screen');
+    check('applyFilters growth: all seven Finviz conditions, any sector', eqSet(out, ['GROWA', 'UTIL']), 'got ' + JSON.stringify(out));
   }
 
   // ── applyFilters: finviz ("מומנטום שנתי") enforces "near the high" ──
@@ -458,10 +462,11 @@
 
     const base = { close: 50, SMA50: 40, SMA150: 40, SMA200: 40, price_52_week_high: 60, price_52_week_low: 30,
       market_cap_basic: 5e9, average_volume_10d_calc: 1e6, volume: 1e6, description: 'x', exchange: 'NASDAQ',
-      earnings_per_share_diluted_qoq_growth_fq: 20, total_revenue_qoq_growth_fq: 30 };
+      earnings_per_share_diluted_yoy_growth_fq: 30, total_revenue_yoy_growth_fq: 30,
+      earnings_per_share_diluted_yoy_growth_ttm: 10, earnings_per_share_diluted_ttm: 2, earnings_per_share_forecast_next_fy: 3, gross_margin: 60 };
     const uni = [
       mkStock('U:GROWA', { ...base, name: 'GROWA', sector: 'Technology Services' }),
-      mkStock('U:NOPE', { ...base, name: 'NOPE', sector: 'Utilities' }),
+      mkStock('U:NOPE', { ...base, name: 'NOPE', sector: 'Utilities', gross_margin: 10 }),
       mkStock('U:EARN', { ...base, name: 'EARN', sector: 'Technology Services', earnings_release_next_date: Date.now() / 1000 + 2 * 86400 }),
     ];
     const pool = await _cleanbaseUniverse(uni, { 'U:GROWA': 85, 'U:NOPE': 85, 'U:EARN': 85 });
