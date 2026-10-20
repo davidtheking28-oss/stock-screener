@@ -727,7 +727,7 @@ tbody tr:last-child td { border-bottom: none; }
 .gcard-badges .gbadge { flex-shrink: 0; }
 .gcard-badges .gbadge ~ .gbadge { flex-shrink: 1; min-width: 0; }
 .gcard-badges .gbadge ~ .gbadge .gb-lbl { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.gcard-tags { display: flex; gap: 4px; flex-wrap: wrap; padding: 0 14px 10px; margin-top: -4px; }
+.gcard-tags { display: flex; gap: 4px; flex-wrap: wrap; padding: 0 14px 10px; margin-top: -4px; min-height: 31px; }
 .gcard-tags .earn-badge { margin: 0; }
 .gbadge { direction: ltr; display: inline-flex; align-items: baseline; gap: 5px; height: 23px; padding: 0 10px; border-radius: 6px; font: 700 11px var(--sans); letter-spacing: 0.2px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); white-space: nowrap; }
 /* gb-lbl used opacity:0.75 to read as secondary next to the bold number —
@@ -5183,7 +5183,7 @@ function renderGallery(srcRows){
       +'</div></div>'
       +'<div class="gcard-badges">'
       +'<span class="gbadge" style="color:'+rsC+';background:'+rsBg+'" title="RS Rating '+(r.rs??'—')+'/99 — '+(activeScreener==='commodities'?'דירוג יחסי בתוך 12 הסחורות בלבד, לא מול השוק':'ביצוע יחסי מול השוק')+'"><span class="gb-lbl">RS</span> <b>'+(r.rs??'—')+'</b></span>'+sectorBadgeHtml(r.sector,true)+'</div></div>'
-      +((earnB||ttB||viaB||r.rangeSetup)?'<div class="gcard-tags">'+viaB+rangeBadgeHtml(r)+earnB+ttB+'</div>':'')
+      +'<div class="gcard-tags">'+viaB+rangeBadgeHtml(r)+earnB+ttB+'</div>'
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
