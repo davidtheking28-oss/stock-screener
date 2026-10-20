@@ -113,7 +113,7 @@
     const base = { close: 50, SMA50: 40, SMA150: 40, SMA200: 40, price_52_week_high: 60, price_52_week_low: 30,
       market_cap_basic: 5e9, average_volume_10d_calc: 1e6, volume: 1e6, description: 'x', exchange: 'NASDAQ', sector: 'Technology Services',
       earnings_per_share_diluted_yoy_growth_fq: 30, total_revenue_yoy_growth_fq: 30,
-      earnings_per_share_diluted_yoy_growth_ttm: 10, earnings_per_share_diluted_ttm: 2, earnings_per_share_forecast_next_fy: 3, gross_margin: 60 };
+      earnings_per_share_diluted_fy: 2, earnings_per_share_forecast_next_fy: 3, gross_margin: 60 };
     const mk = (n, o) => mkStock('G:' + n, { ...base, name: n, ...o });
     const uni = [
       mk('GROWA', {}),
@@ -122,12 +122,13 @@
       mk('LOWREV', { total_revenue_yoy_growth_fq: 20 }),
       mk('LOWGM', { gross_margin: 40 }),
       mk('NOGM', { gross_margin: null }),
-      mk('NEGYR', { earnings_per_share_diluted_yoy_growth_ttm: -5 }),
+      mk('NEGYR', { earnings_per_share_forecast_next_fy: 1.5 }),
       mk('LOWNEXT', { earnings_per_share_forecast_next_fy: 2.2 }),
+      mk('NOEPS', { earnings_per_share_diluted_yoy_growth_fq: null }),
       mk('LOWMC', { market_cap_basic: 1e9 }),
     ];
     const out = tickers(applyFilters(uni, {}));
-    check('applyFilters growth: all seven Finviz conditions, any sector', eqSet(out, ['GROWA', 'UTIL']), 'got ' + JSON.stringify(out));
+    check('applyFilters growth: all seven Finviz conditions, any sector', eqSet(out, ['GROWA', 'UTIL', 'NOEPS']), 'got ' + JSON.stringify(out));
   }
 
   // ── applyFilters: finviz ("מומנטום שנתי") enforces "near the high" ──
@@ -463,7 +464,7 @@
     const base = { close: 50, SMA50: 40, SMA150: 40, SMA200: 40, price_52_week_high: 60, price_52_week_low: 30,
       market_cap_basic: 5e9, average_volume_10d_calc: 1e6, volume: 1e6, description: 'x', exchange: 'NASDAQ',
       earnings_per_share_diluted_yoy_growth_fq: 30, total_revenue_yoy_growth_fq: 30,
-      earnings_per_share_diluted_yoy_growth_ttm: 10, earnings_per_share_diluted_ttm: 2, earnings_per_share_forecast_next_fy: 3, gross_margin: 60 };
+      earnings_per_share_diluted_fy: 2, earnings_per_share_forecast_next_fy: 3, gross_margin: 60 };
     const uni = [
       mkStock('U:GROWA', { ...base, name: 'GROWA', sector: 'Technology Services' }),
       mkStock('U:NOPE', { ...base, name: 'NOPE', sector: 'Utilities', gross_margin: 10 }),

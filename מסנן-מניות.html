@@ -1464,7 +1464,7 @@ const COLUMNS = [
   // bounds the 50-day high from below so the candidate cut never drops a name the
   // exact 50-day check (validateExact) would keep.
   "beta_5_year","High.1M",
-  "gross_margin","earnings_per_share_diluted_yoy_growth_ttm"
+  "gross_margin","earnings_per_share_diluted_fy"
 ];
 const C = Object.fromEntries(COLUMNS.map((c,i)=>[c,i]));
 
@@ -4329,15 +4329,21 @@ function applyFilters(universe, rsMap, opts={}){
       // Mirrors the Finviz screen this was modelled on. Finviz's "Qtr over Qtr"
       // compares with the same quarter a year earlier, so the YoY columns are
       // the match — TradingView's *_qoq_* columns are sequential and differ.
-      // "EPS this year" and "next year" have no estimate column here: this year
-      // uses trailing EPS growth, next year the forecast over trailing EPS.
+      // TradingView's forecast_next_fy is the first fiscal year not yet reported
+      // (Finviz's "this year"); there is no estimate for the year after it, so
+      // both year gates read forecast over the last reported fiscal-year EPS.
+      // Measured against Finviz's own list (57 names, 2026-10-20) this variant
+      // overlapped 34 versus 18 for the trailing-EPS version it replaced.
       // EPS growth next 5 years is not available from TradingView at all.
+      // An EPS growth that TradingView cannot compute (loss a year ago) is
+      // unknown, not failing: Finviz keeps those names (CRWD, SNDK, MDB).
       const epsQMin=num('epsQoqMin'), revQMin=num('revQoqMin'), epsYrMin=num('epsYrMin'), epsNextMin=num('epsNextMin'), gmMin=num('gmMin');
-      const epsTtmGrowth=d[C.earnings_per_share_diluted_yoy_growth_ttm], gm=d[C.gross_margin];
-      const epsOk=eps!=null && eps>=epsQMin;
+      const epsFy=d[C.earnings_per_share_diluted_fy], gm=d[C.gross_margin];
+      const epsFyGrowth=(epsFy!=null && epsFy>0 && epsFwdFy!=null) ? (epsFwdFy/epsFy-1)*100 : null;
+      const epsOk=eps==null || eps>=epsQMin;
       const revOk=rev!=null && rev>=revQMin;
-      const yrOk=epsYrMin<=-100 || (epsTtmGrowth!=null && epsTtmGrowth>epsYrMin);
-      const nextOk=epsNextMin<=-100 || (epsFwdGrowth!=null && epsFwdGrowth>=epsNextMin);
+      const yrOk=epsYrMin<=-100 || (epsFyGrowth!=null && epsFyGrowth>epsYrMin);
+      const nextOk=epsNextMin<=-100 || (epsFyGrowth!=null && epsFyGrowth>=epsNextMin);
       const gmOk=gmMin<=-100 || (gm!=null && gm>=gmMin);
       checks={epsOk,revOk,yrOk,nextOk,gmOk};
       pass=epsOk&&revOk&&yrOk&&nextOk&&gmOk;
