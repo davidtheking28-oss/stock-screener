@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.daily-scan]
 verify_jwt = false
+
+[functions.estimates]
+verify_jwt = false

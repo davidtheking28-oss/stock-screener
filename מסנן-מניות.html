@@ -1626,6 +1626,7 @@ let _scanToken = 0;
 // ran to completion first. Measured live: none were ever actually aborted.
 let _scanAbort = null;
 let _rawUniverse = null, _rawTime = 0, _rsMapMem = null;
+let _estMem = {};
 // Inside the journal this page is loaded in the background while the browser is
 // idle, long before the tab is opened. Fetching the universe then (and only
 // then: never over data a scan already put there) means the first scan finds
@@ -2100,7 +2101,7 @@ async function _galleryBarsFromValidated(sym, now=Date.now()){
   const bars=entry.bars.filter(b=>b.t>=cutoff);
   return bars.length ? bars : null;
 }
-async function _fetchBars1yWarm(tickers, signal){
+async function _fetchBars1yWarm(tickers, signal, onChunk){
   signal?.throwIfAborted();
   const waits=new Set(), need=[];
   for(const t of new Set(tickers)){
@@ -2113,7 +2114,7 @@ async function _fetchBars1yWarm(tickers, signal){
     await Promise.all(need.map(async t=>{ const s=await _barsStore.get(t); if(_barsFresh(s)) _valBars.set(t,s); else cold.push(t); }));
     const chunks=[]; for(let i=0;i<cold.length;i+=BATCH_CHUNK) chunks.push(cold.slice(i,i+BATCH_CHUNK));
     let idx=0;
-    async function worker(){ while(idx<chunks.length){ signal?.throwIfAborted(); await _fetchBars1yBatch(chunks[idx++], signal); } }
+    async function worker(){ while(idx<chunks.length){ signal?.throwIfAborted(); const ch=chunks[idx++]; await _fetchBars1yBatch(ch, signal); onChunk?.(ch.length); } }
     await Promise.all(Array.from({length:Math.min(BATCH_CONCURRENCY,chunks.length)}, worker));
   })();
   need.forEach(t=>_warmInflight.set(t,job));
@@ -2679,7 +2680,8 @@ async function validateExact(list, scr, onProgress, signal){
   // symbol added after the batch ran) still falls back to fetching itself.
   // SPY rides in the same batch: fetched on its own first, it was requested
   // once per concurrent cleanbase source and held every batch back ~1s.
-  await _fetchBars1yWarm(['SPY', ...list.map(r=>r.ticker)], signal).catch(()=>{});
+  let loaded=0;
+  await _fetchBars1yWarm(['SPY', ...list.map(r=>r.ticker)], signal, n=>{ loaded+=n; onProgress?.(Math.min(loaded,total), total, 'bars'); }).catch(()=>{});
   signal?.throwIfAborted();
   // One benchmark for the whole pass — the RS line is price/SPY.
   const spy=await _fetchBars1y('SPY', signal).catch(()=>null);
@@ -2735,7 +2737,7 @@ async function validateExact(list, scr, onProgress, signal){
         }
       }catch(e){ if(signal?.aborted) throw e; r.validation={status:'approximate',asOf:null}; }
       done++;
-      if(onProgress && (done%6===0||done===total)) onProgress(done,total);
+      if(onProgress && (done%6===0||done===total)) onProgress(done,total,'check');
     }
   }
   await Promise.all(Array.from({length:Math.min(20,total)}, worker));
@@ -4040,6 +4042,7 @@ async function scan(force=false){
       if(rated) _paintBreadth(Math.round(a200/rated*100), bPct);
     }
 
+    if(activeScreener==='growth'){ $('statBar').innerHTML='<span class="spinner"></span> מושך תחזיות אנליסטים…'; await _loadEstimates(universe, rsMap, myAbort.signal); if(myToken!==_scanToken) return; }
     if(activeScreener==='cleanbase') $('statBar').innerHTML='<span class="spinner"></span> מריץ את כל המסננים…';
     allResults = activeScreener==='cleanbase' ? await _cleanbaseUniverse(universe, rsMap, myAbort.signal) : applyFilters(universe, rsMap);
     _dataGen++;
@@ -4102,9 +4105,9 @@ async function scan(force=false){
       // loading (intentional, see _ohlcObserve above) doing its job while the
       // list itself hadn't actually finished validating yet; a live counter
       // at least makes the wait legible instead of looking stuck/broken.
-      const onExactProgress = (done, total) => {
+      const onExactProgress = (done, total, phase) => {
         if(myToken!==_scanToken || mode==='watch') return;
-        $('statBar').innerHTML='<span class="spinner"></span> מאמת מדויק מול OHLC… <b>'+done+'</b>/'+total;
+        $('statBar').innerHTML='<span class="spinner"></span> '+(phase==='bars'?'מוריד נתוני מחיר…':'מאמת מדויק מול OHLC…')+' <b>'+done+'</b>/'+total;
       };
       validateExact(allResults, activeScreener, onExactProgress, myAbort.signal).then(v=>{
         if(myToken!==_scanToken) return;   // superseded by a newer scan
@@ -4196,6 +4199,23 @@ async function fetchUniverse(){
   ]);
   const seen=new Set(stocks.map(r=>r.s));
   return stocks.concat(drs.filter(r=>!seen.has(r.s)));
+}
+
+// Analyst growth estimates for the names that already pass every other growth
+// gate. Best effort: a failure leaves _estMem as it was and the TradingView
+// stand-in decides, so the screener never depends on this call.
+async function _loadEstimates(universe, rsMap, signal){
+  if(!HAS_SUPABASE) return;
+  const tickers=applyFilters(universe, rsMap, {estCoarse:true}).map(r=>r.ticker).filter(t=>!(t in _estMem));
+  if(!tickers.length) return;
+  try{
+    for(let i=0;i<tickers.length;i+=250){
+      const res=await fetch(SUPABASE_URL+'/functions/v1/estimates',
+        {method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},body:JSON.stringify({symbols:tickers.slice(i,i+250)}),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(20000)]):AbortSignal.timeout(20000)});
+      if(!res.ok) return;
+      Object.assign(_estMem, await res.json());
+    }
+  }catch(e){ if(signal?.aborted) throw e; }
 }
 
 async function fetchCommodities(){
@@ -4339,7 +4359,7 @@ function applyFilters(universe, rsMap, opts={}){
       // Mirrors the Finviz screen this was modelled on. Finviz's "Qtr over Qtr"
       // compares with the same quarter a year earlier, so the YoY columns are
       // the match — TradingView's *_qoq_* columns are sequential and differ.
-      // TradingView's forecast_next_fy is the first fiscal year not yet reported
+      // Used only when Yahoo estimates are missing for a name. TradingView's forecast_next_fy is the first fiscal year not yet reported
       // (Finviz's "this year"); there is no estimate for the year after it, so
       // both year gates read forecast over the last reported fiscal-year EPS.
       // Measured against Finviz's own list (57 names, 2026-10-20) this variant
@@ -4352,8 +4372,14 @@ function applyFilters(universe, rsMap, opts={}){
       const epsFyGrowth=(epsFy!=null && epsFy>0 && epsFwdFy!=null) ? (epsFwdFy/epsFy-1)*100 : null;
       const epsOk=eps==null || eps>=epsQMin;
       const revOk=rev!=null && rev>=revQMin;
-      const yrOk=epsYrMin<=-100 || (epsFyGrowth!=null && epsFyGrowth>epsYrMin);
-      const nextOk=epsNextMin<=-100 || (epsFyGrowth!=null && epsFyGrowth>=epsNextMin);
+      // Analyst estimates (Yahoo, via the estimates function) are Finviz's own
+      // definition of both year gates; the TradingView figure above only stands in
+      // for a name whose estimates did not load. estCoarse is the pre-pass that
+      // picks which names to ask about.
+      const est=_estMem[d[C.name]];
+      const yrG=est&&est.y0!=null ? est.y0 : epsFyGrowth, nextG=est&&est.y1!=null ? est.y1 : epsFyGrowth;
+      const yrOk=opts.estCoarse || epsYrMin<=-100 || (yrG!=null && yrG>epsYrMin);
+      const nextOk=opts.estCoarse || epsNextMin<=-100 || (nextG!=null && nextG>=epsNextMin);
       const gmOk=gmMin<=-100 || (gm!=null && gm>=gmMin);
       checks={epsOk,revOk,yrOk,nextOk,gmOk};
       pass=epsOk&&revOk&&yrOk&&nextOk&&gmOk;

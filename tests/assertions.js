@@ -129,6 +129,18 @@
     ];
     const out = tickers(applyFilters(uni, {}));
     check('applyFilters growth: all seven Finviz conditions, any sector', eqSet(out, ['GROWA', 'UTIL', 'NOEPS']), 'got ' + JSON.stringify(out));
+    _estMem = { ESTUP: { y0: 40, y1: 35 }, ESTDOWN: { y0: 40, y1: 10 }, ESTLOSS: { y0: -3, y1: 50 } };
+    const uni2 = [
+      mk('ESTUP', { earnings_per_share_forecast_next_fy: 2.1 }),
+      mk('ESTDOWN', {}),
+      mk('ESTLOSS', {}),
+      mk('NOEST', { earnings_per_share_forecast_next_fy: 2.1 }),
+    ];
+    const out2 = tickers(applyFilters(uni2, {}));
+    check('applyFilters growth: analyst estimates decide both year gates, TradingView only stands in when they are missing', eqSet(out2, ['ESTUP']), 'got ' + JSON.stringify(out2));
+    const coarse = tickers(applyFilters(uni2, {}, { estCoarse: true }));
+    check('applyFilters growth: the estimate pre-pass keeps every name that passes the other gates', eqSet(coarse, ['ESTUP', 'ESTDOWN', 'ESTLOSS', 'NOEST']), 'got ' + JSON.stringify(coarse));
+    _estMem = {};
   }
 
   // ── applyFilters: finviz ("מומנטום שנתי") enforces "near the high" ──
