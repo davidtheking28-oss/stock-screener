@@ -1626,6 +1626,16 @@ let _scanToken = 0;
 // ran to completion first. Measured live: none were ever actually aborted.
 let _scanAbort = null;
 let _rawUniverse = null, _rawTime = 0, _rsMapMem = null;
+// Inside the journal this page is loaded in the background while the browser is
+// idle, long before the tab is opened. Fetching the universe then (and only
+// then: never over data a scan already put there) means the first scan finds
+// it in memory instead of waiting on a 1.4 MB download.
+if(window.parent!==window){
+  const _prefetchUniverse=()=>fetchUniverse().then(u=>{
+    if(!_rawUniverse && u.length){ _rawUniverse=u; _rawTime=Date.now(); _rsMapMem=null; }
+  }).catch(()=>{});
+  window.addEventListener('load',()=>{ (window.requestIdleCallback||setTimeout)(_prefetchUniverse); });
+}
 // ticker.sector -> 1-99 trend-strength percentage, computed alongside the
 // global breadth chip in scan() (same Trend Template test, bucketed by
 // sector instead of summed globally). Not persisted — recomputed fresh on
