@@ -68,6 +68,27 @@
     check('gallery shares in-flight validation instead of a second fetch', (await reusedPending)?.length===91);
     _warmInflight.delete('SYNTHETIC-CACHE'); _valBars.delete('SYNTHETIC-CACHE');
   } else check('gallery validation-cache reuse exists', false);
+  {
+    const get=_barsStore.get,batch=_fetchBars1yBatch;
+    const tickers=Array.from({length:120},(_,i)=>'SYNTHETIC-EARLY-'+i);
+    let releaseSlow;const slow=new Promise(resolve=>{releaseSlow=resolve;});
+    const now=Date.now(),bars=Array.from({length:250},(_,i)=>({t:Math.floor(now/1000)-(249-i)*86400,o:100,h:101,l:99,c:100,v:1000}));
+    let complete=false;
+    try{
+      _barsStore.get=async()=>null;
+      _fetchBars1yBatch=async symbols=>{
+        if(symbols.includes(tickers[60]))await slow;
+        for(const sym of symbols)_valBars.set(sym,{bars,t:now,key:_closedSessionKey(now)});
+      };
+      const all=_fetchBars1yWarm(tickers).then(()=>{complete=true;});
+      let ready=false;
+      await Promise.race([_galleryBarsFromValidated(tickers[0],now).then(value=>{ready=!!value;}),new Promise(resolve=>setTimeout(resolve,100))]);
+      check('first ready stock chart does not wait for unrelated slow batch',ready && !complete);
+      releaseSlow();await all;
+      check('early stock availability still completes every validation batch',complete && tickers.every(sym=>_valBars.has(sym)));
+      check('early stock availability clears all in-flight ownership',tickers.every(sym=>!_warmInflight.has(sym)));
+    }finally{releaseSlow();_barsStore.get=get;_fetchBars1yBatch=batch;tickers.forEach(sym=>_valBars.delete(sym));}
+  }
   const abort = new AbortController(); abort.abort();
   for (const [name, action] of [
     ['warm batches',()=>_fetchBars1yWarm(['SYNTHETIC'],abort.signal)],

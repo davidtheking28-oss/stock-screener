@@ -2092,7 +2092,9 @@ const _warmInflight=new Map();
 // chart window, and await its in-flight batch rather than downloading twice.
 async function _galleryBarsFromValidated(sym, now=Date.now()){
   const pending=_warmInflight.get(sym);
-  if(pending) await pending.catch(()=>{});
+  // An already-ready stock must not be held behind another batch.
+  const cached=_valBars.get(sym);
+  if(!_barsFresh(cached,now) && pending)await pending.catch(()=>{});
   const entry=_valBars.get(sym);
   if(!_barsFresh(entry,now) || !entry.bars?.length || !_barsSane(entry.bars)) return null;
   const cutoff=Math.floor(now/1000)-90*86400;
@@ -2107,17 +2109,35 @@ async function _fetchBars1yWarm(tickers, signal, onChunk){
     const p=_warmInflight.get(t);
     if(p) waits.add(p); else need.push(t);
   }
+  // Release each stock when its own batch finishes, not when the whole pool
+  // finishes. Visible charts can use ready bars while exact validation continues.
+  const ready=new Map();
+  for(const t of need){
+    let resolve;const promise=new Promise(done=>{resolve=done;});
+    ready.set(t,{promise,resolve});_warmInflight.set(t,promise);
+  }
+  const release=t=>ready.get(t)?.resolve();
   const job=(async()=>{
     const cold=[];
-    await Promise.all(need.map(async t=>{ const s=await _barsStore.get(t); if(_barsFresh(s)) _valBars.set(t,s); else cold.push(t); }));
-    const chunks=[]; for(let i=0;i<cold.length;i+=BATCH_CHUNK) chunks.push(cold.slice(i,i+BATCH_CHUNK));
+    await Promise.all(need.map(async t=>{
+      const cached=await _barsStore.get(t);
+      if(_barsFresh(cached)){_valBars.set(t,cached);release(t);}else cold.push(t);
+    }));
+    const chunks=[];for(let i=0;i<cold.length;i+=BATCH_CHUNK)chunks.push(cold.slice(i,i+BATCH_CHUNK));
     let idx=0;
-    async function worker(){ while(idx<chunks.length){ signal?.throwIfAborted(); const ch=chunks[idx++]; await _fetchBars1yBatch(ch, signal); onChunk?.(ch.length); } }
-    await Promise.all(Array.from({length:Math.min(BATCH_CONCURRENCY,chunks.length)}, worker));
+    async function worker(){
+      while(idx<chunks.length){
+        signal?.throwIfAborted();const chunk=chunks[idx++];
+        try{await _fetchBars1yBatch(chunk,signal);}finally{chunk.forEach(release);}
+        onChunk?.(chunk.length);
+      }
+    }
+    await Promise.all(Array.from({length:Math.min(BATCH_CONCURRENCY,chunks.length)},worker));
   })();
-  need.forEach(t=>_warmInflight.set(t,job));
-  try{ await Promise.all([job, ...waits]); }
-  finally{ need.forEach(t=>{ if(_warmInflight.get(t)===job) _warmInflight.delete(t); }); }
+  try{await Promise.all([job,...waits]);}
+  finally{
+    for(const [t,entry] of ready){entry.resolve();if(_warmInflight.get(t)===entry.promise)_warmInflight.delete(t);}
+  }
 }
 // A watchlist name that just cleared its base: the most recent completed
 // session in the last `lookback` that closed through the pivot of the base as
