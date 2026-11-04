@@ -1,5 +1,11 @@
 (async () => {
   const checks = [];
+  const scripts=[...document.scripts].map(script=>script.getAttribute('src')||'');
+  const localAuth=scripts.includes('vendor/supabase-2.117.2.min.js');
+  const localCharts=scripts.includes('vendor/lightweight-charts-4.2.0.js');
+  checks.push({name:'startup SDK is bundled locally and usable',pass:localAuth && typeof window.supabase?.createClient==='function'});
+  checks.push({name:'chart dependency is bundled locally and usable',pass:localCharts && typeof window.LightweightCharts?.createChart==='function'});
+
   const check = (name, value) => checks.push({ name, pass: !!value, detail: value ? '' : 'regression reproduced' });
   const originalUser = _currentUser;
   const originalGeneration = typeof _accountGeneration === 'number' ? _accountGeneration : null;
