@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { serveCached } from "../_shared/market_cache.ts";
-import { lastSessionEdgeMs } from "../_shared/market_hours.ts";
+import { lastSessionEdgeMs, universePolicy } from "../_shared/market_hours.ts";
 
 import { readScanRequest, trimMap } from "./request_policy.ts";
 
@@ -11,13 +11,11 @@ const CORS = {
 
 
 const mem = new Map<string, { data: unknown; time: number }>();
-const MEM_TTL = 5 * 60 * 1000;   // 5 min in-instance
-const DB_TTL = 5 * 60 * 1000;    // 5 min persistent freshness
+const MEM_TTL = 5 * 60 * 1000;   // 5 min in-instance, while the session runs
 // A full-market scan is the heaviest fetch in this project, so this is also
-// where a TTL-only cache hurt most — see _shared/market_cache.ts. Past the TTL
-// but under this bound, the last scan is served immediately and refreshed
-// behind the response instead of blocking the caller on TradingView.
-const MAX_STALE = 20 * 60 * 1000; // 20 min
+// where a TTL-only cache hurt most — see _shared/market_cache.ts. The DB freshness
+// window and the stale bound (served at once, refreshed behind the response) come
+// from universePolicy in _shared/market_hours.ts.
 
 const _rate = new Map<string, { count: number; resetAt: number }>();
 // A scan now issues TWO queries (stocks, then ADRs — see fetchUniverse in the
@@ -65,12 +63,14 @@ Deno.serve(async (req: Request) => {
   // 1. warm in-instance cache
   const m = mem.get(key);
   const edge = lastSessionEdgeMs(Date.now());
-  if (m && Date.now() - m.time < MEM_TTL && m.time >= edge) return ok(m.data, 'MEM');
+  const policy = universePolicy(Date.now());
+  if (m && m.time >= edge && Date.now() - m.time < (policy.ttl === Infinity ? Infinity : MEM_TTL)) return ok(m.data, 'MEM');
 
   // 2. persistent DB cache — fresh, stale-but-usable (background refresh), or
-  // a blocking live fetch past MAX_STALE
+  // a blocking live fetch past the stale bound. Outside the session both bounds
+  // are unlimited (see universePolicy).
   try {
-    const { data, src } = await serveCached(key, DB_TTL, MAX_STALE, () => fetchLive(body), undefined, edge);
+    const { data, src } = await serveCached(key, policy.ttl, policy.maxStale, () => fetchLive(body), undefined, edge);
     // A STALE row is a fallback (or a row being refreshed behind the response); stamping
     // it with the current time would have this instance serve it as fresh for MEM_TTL.
     if (src !== 'STALE') { mem.set(key, { data, time: Date.now() }); trimMap(mem,3); }

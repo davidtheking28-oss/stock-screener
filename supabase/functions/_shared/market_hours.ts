@@ -57,6 +57,17 @@ export function lastSessionEdgeMs(now: number): number {
   return Math.max(lastUsCloseMs(now), lastUsOpenMs(now));
 }
 
+// The full-market scan. While the session runs it is re-read every few minutes; once
+// it has closed nothing can change until the next open, so a row taken after the
+// close never expires (a row from before the close is already rejected by the
+// session-edge check in serveCached, which makes the first visit after the bell
+// the only one that waits).
+export function universePolicy(now: number) {
+  return usMarketOpen(now)
+    ? { ttl: 5 * 60 * 1000, maxStale: 20 * 60 * 1000 }
+    : { ttl: Infinity, maxStale: Infinity };
+}
+
 // A 1y snapshot taken before the last close holds a half-finished candle (and
 // its low partial volume) for that session, so it is neither fresh nor
 // servable-while-stale once the session has closed. Intraday, the live bar is

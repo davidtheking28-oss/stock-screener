@@ -42,6 +42,21 @@ Deno.test("oneYearBarsPolicy: nothing from before the last close is fresh or ser
   assertEquals(q.maxStale, sinceMon);
 });
 
+// The bug this guards: the full-market scan was "fresh" for 5 minutes at all hours, so
+// every visit outside the session (evenings, the whole weekend) waited ~8s on
+// TradingView for numbers that cannot change until the next open.
+Deno.test("universePolicy: short windows while the session runs, no expiry once it is closed", async () => {
+  const { universePolicy } = await import("./market_hours.ts");
+  const open = universePolicy(z("2026-09-22T14:00:00"));
+  assertEquals(open.ttl, 5 * 60 * 1000);
+  assertEquals(open.maxStale, 20 * 60 * 1000);
+  for (const t of ["2026-09-22T21:00:00", "2026-09-26T16:00:00", "2026-09-22T12:00:00"]) {
+    const p = universePolicy(z(t));
+    assertEquals(p.ttl, Infinity);
+    assertEquals(p.maxStale, Infinity);
+  }
+});
+
 Deno.test("lastSessionEdgeMs: the later of the open (+2 min grace) and the close", async () => {
   const { lastSessionEdgeMs, lastUsOpenMs } = await import("./market_hours.ts");
   assertEquals(lastUsOpenMs(z("2026-09-22T14:00:00")), z("2026-09-22T13:32:00"));
