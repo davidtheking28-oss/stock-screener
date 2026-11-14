@@ -999,6 +999,21 @@ tbody tr:last-child td { border-bottom: none; }
 #authEmail { box-sizing:border-box; min-height:40px; padding:8px 12px; border:1px solid var(--border); border-radius:var(--r2); background:var(--bg2); color:var(--text); font:500 14px var(--sans); }
 #authEmail:focus-visible { outline:2px solid var(--accent2); outline-offset:2px; }
 .filter-panel > .screeners { margin:0; padding:12px 20px; border-bottom:1px solid var(--border2); }
+/* Once results are on screen the results header already has "סרוק שנית"; a collapsed
+   panel repeating a second scan button right above it was just noise. The panel's own
+   button still shows whenever the panel is open, or before any scan has run. */
+body:has(#resultsPanel[style*="display: block"]) #filterPanel:not(.open) .filter-scan-action { display:none; }
+/* display:flex on the summary removed the browser's disclosure marker, so the line
+   read as a bare caption rather than something that opens. */
+.perf-panel summary::before { content:'\25C2'; display:inline-block; margin-inline-end:8px; transition:transform .15s var(--ease); }
+.perf-panel[open] summary::before { transform:rotate(-90deg); }
+@media(max-width:640px) {
+  /* Nine screeners wrapped onto four rows (~170px) and pushed the first result to the
+     very bottom of the screen after a scan. One swipeable row instead. */
+  .filter-panel > .screeners { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .filter-panel > .screeners::-webkit-scrollbar { display:none; }
+  .filter-panel > .screeners > * { flex-shrink:0; }
+}
 .advanced-filters summary { cursor:pointer; color:var(--text2); font:600 12px var(--sans); padding:8px 0; }
 .advanced-filters .toggle { margin:8px 0; }
 .feat-panel { width:340px; max-width:calc(100vw - 40px); padding:16px; }
@@ -3837,7 +3852,7 @@ function setScreener(key, applyDef=true){
   // learns which screener is actually active from the one place that's
   // supposed to announce it.
   const h1=document.querySelector('h1'); if(h1) h1.textContent=cfg.name+' — '+cfg.sub;
-  document.querySelectorAll('.screener-btn').forEach(b=>{ const on=b.dataset.screener===key; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
+  document.querySelectorAll('.screener-btn').forEach(b=>{ const on=b.dataset.screener===key; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); if(on && b.parentElement.scrollWidth>b.parentElement.clientWidth) b.scrollIntoView({block:'nearest',inline:'center'}); });
   if(applyDef){
     Object.entries(SCREENER_DEFAULTS[key]||{}).forEach(([k,v])=>{ setFieldValue($(k),v); });
     if(key==='sepa') document.querySelectorAll('.preset-btn').forEach((b,i)=>{ b.classList.toggle('active', i===0); b.setAttribute('aria-pressed', String(i===0)); });
