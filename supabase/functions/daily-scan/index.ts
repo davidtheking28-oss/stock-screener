@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { COLUMNS, C, FILTERS, Row, computeRS, applyClassicSEPA } from './scoring.ts';
 import { approachingPivot, Bar } from './pivot.ts';
+import { newEntries, forwardReturns } from './entries.ts';
 import { buildPivotAlert, nearItems, SCREENER_TITLES, SCREENER_ORDER, NearPivot } from './alert.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
@@ -244,7 +245,7 @@ Deno.serve(async (req: Request) => {
       prevRes.ok ? await prevRes.json() : [];
     const prevSet = new Set<string>((prevRows[0]?.tickers || []).map(r => r.t));
     const todaySet = new Set(results.map(r => r.t));
-    const entries = prevRows.length ? results.map(r => r.t).filter(t => !prevSet.has(t)) : [];
+    const entries = newEntries(results.map(r => r.t), prevRows);
     const exits = prevRows.length ? [...prevSet].filter(t => !todaySet.has(t)) : [];
 
     const priceNow = new Map<string, number>();
@@ -257,11 +258,7 @@ Deno.serve(async (req: Request) => {
       if (!row) return null;
       const entryTickers = row.summary?.entries || [];
       const priceThen = new Map((row.tickers || []).map(x => [x.t, x.c]));
-      const rets: number[] = [];
-      for (const t of entryTickers) {
-        const p0 = priceThen.get(t), p1 = priceNow.get(t);
-        if (p0 && p1) rets.push((p1 / p0 - 1) * 100);
-      }
+      const rets = forwardReturns(entryTickers, priceThen, priceNow);
       if (!rets.length) return null;
       return { n: rets.length, avg: +(rets.reduce((a, b) => a + b, 0) / rets.length).toFixed(1) };
     };
