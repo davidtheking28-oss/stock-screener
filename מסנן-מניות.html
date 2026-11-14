@@ -1151,8 +1151,8 @@ body:has(#resultsPanel[style*="display: block"]) #filterPanel:not(.open) .filter
             <label class="toggle"><input type="checkbox" id="useFund" checked onchange="toggleFundFields()"> כלול קריטריונים פונדמנטליים</label>
             <details class="advanced-filters"><summary>תנאים מתקדמים — רווחיות, צמיחה ובסיס</summary>
             <label class="toggle"><input type="checkbox" id="requireProfit" checked> שולי רווח חיוביים</label>
-            <label class="toggle"><input type="checkbox" id="requireEpsAccel" checked> האצה ב-EPS (רבעון אחרון &ge; קודם)</label>
-            <label class="toggle"><input type="checkbox" id="requireRevAccel" checked> האצה במכירות (רבעון אחרון &ge; קודם)</label>
+            <label class="toggle"><input type="checkbox" id="requireEpsAccel" checked> רווח למניה ברבעון האחרון לא נמוך מהקודם</label>
+            <label class="toggle"><input type="checkbox" id="requireRevAccel" checked> מכירות ברבעון האחרון לא נמוכות מהקודם</label>
             <label class="toggle"><input type="checkbox" id="requireMarginTrend"> שיפור שולי רווח (מול שנה קודמת)</label>
             <label class="toggle"><input type="checkbox" id="requireVCP"> בסיס VCP (2+ התכווצויות מתהדקות)</label>
             <label class="toggle"><input type="checkbox" id="requireRSLine"> קו RS בשיא חדש (מול S&amp;P 500)</label>
@@ -1955,7 +1955,9 @@ async function _ohlcDraw(el){
     const volCol = hiContrast ? (isLight?'rgba(51,65,85,0.45)':'rgba(255,255,255,0.5)') : (_cv('--chart-vol')||'rgba(255,255,255,0.25)');
     vs.setData(bars.map(b=>({time:toTime(b.t),value:b.v||0,color:volCol})));
     const row=results.find(x=>x.ticker===el.dataset.ticker)||ttUniverse[el.dataset.ticker];
-    (colVis.f_pivotLines===false ? [] : _pivotLines(row?.vcp?.pivot!=null ? row.vcp : _vcp(bars)).filter(l=>!l.base || colVis.f_baseHigh!==false)).forEach(l=>bs.createPriceLine({
+    // A pivot is the breakout level of a stock base. For the 12 fixed commodity ETFs it is
+    // only the last swing high, often 15%+ above the price, and read as a trade level.
+    (colVis.f_pivotLines===false || activeScreener==='commodities' ? [] : _pivotLines(row?.vcp?.pivot!=null ? row.vcp : _vcp(bars)).filter(l=>!l.base || colVis.f_baseHigh!==false)).forEach(l=>bs.createPriceLine({
       price:l.price, title:l.title, color:_rgbColor(_cv(l.base?'--text3':'--accent')), lineWidth:l.base?1:2,
       lineStyle:l.base?LightweightCharts.LineStyle.Dashed:LightweightCharts.LineStyle.Solid, axisLabelVisible:true}));
     _fitChart(chart, bars.length);
@@ -5262,7 +5264,9 @@ function renderGallery(srcRows){
       +'<div class="gcard-chart tv-lazy" data-sym="'+r.sym+'" data-ticker="'+r.ticker+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.25"><span class="spinner"></span></div></div>'
       +'<div class="gcard-stats">'
       +stat('ביצ׳ שנה', r.perfY, 'שינוי מחיר ב-12 חודשים')
-      +stat('EPS YoY', r.eps, r.epsQoq!=null?'שנה מול שנה: '+pct(r.eps)+' · רבעון מול הקודם: '+pct(r.epsQoq):'צמיחת רווח למניה, שנה מול שנה')
+      +(activeScreener==='commodities'
+        ? stat('ביצ׳ 3 חודשים', r.perf3, 'שינוי מחיר ב-3 חודשים')
+        : stat('EPS YoY', r.eps, r.epsQoq!=null?'שנה מול שנה: '+pct(r.eps)+' · רבעון מול הקודם: '+pct(r.epsQoq):'צמיחת רווח למניה, שנה מול שנה'))
       +'<div class="gstat" title="מרחק מהשיא של 52 שבועות"><div class="gstat-lbl">מהשיא</div><div class="gstat-val '+(fhUp?'pos':'neg')+'">'+r.fromHighPct.toFixed(1)+'%</div></div>'
       +'</div></div>';
   });
